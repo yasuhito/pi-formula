@@ -1,5 +1,63 @@
 export type MathRenderer = (latex: string, display: boolean, original: string) => string;
 
+interface MacroArgument {
+  value: string;
+  end: number;
+}
+
+function readMacroArgument(source: string, start: number): MacroArgument | undefined {
+  let opening = start;
+  while (/\s/.test(source[opening] ?? "")) opening += 1;
+  if (source[opening] !== "{") return undefined;
+
+  let depth = 1;
+  for (let index = opening + 1; index < source.length; index += 1) {
+    if (source[index] === "\\") {
+      index += 1;
+      continue;
+    }
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) {
+      return { value: source.slice(opening + 1, index), end: index + 1 };
+    }
+  }
+  return undefined;
+}
+
+export function expandQuantumMacros(latex: string): string {
+  let expanded = "";
+
+  for (let index = 0; index < latex.length;) {
+    const macro = latex.slice(index).match(/^\\(braket|ket|bra)(?![A-Za-z])/);
+    if (!macro) {
+      expanded += latex[index];
+      index += 1;
+      continue;
+    }
+
+    const first = readMacroArgument(latex, index + macro[0].length);
+    const second = macro[1] === "braket" && first
+      ? readMacroArgument(latex, first.end)
+      : undefined;
+    if (!first || (macro[1] === "braket" && !second)) {
+      expanded += macro[0];
+      index += macro[0].length;
+      continue;
+    }
+
+    const firstValue = expandQuantumMacros(first.value);
+    if (macro[1] === "ket") expanded += `|${firstValue}\\rangle`;
+    if (macro[1] === "bra") expanded += `\\langle ${firstValue}|`;
+    if (macro[1] === "braket") {
+      expanded += `\\langle ${firstValue}|${expandQuantumMacros(second!.value)}\\rangle`;
+    }
+    index = second?.end ?? first.end;
+  }
+
+  return expanded;
+}
+
 interface ProtectedMarkdown {
   markdown: string;
   restore: (value: string) => string;

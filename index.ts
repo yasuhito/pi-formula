@@ -5,7 +5,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with { "reso
 
 import { RenderCache } from "./cache";
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
-import { transformMathMarkdown } from "./markdown";
+import { expandQuantumMacros, transformMathMarkdown } from "./markdown";
 import { typesetMath, type TypesetImage } from "./typesetter";
 
 const packageManifest = JSON.parse(
@@ -20,7 +20,6 @@ const { getCellDimensions } = require("@earendil-works/pi-tui") as {
   getCellDimensions: () => { widthPx: number; heightPx: number };
 };
 
-const STATUS_HEADER = `qni-math ${packageManifest.version}\npath: image (fixed)`;
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
 
 function rgbFromAnsi(ansi: string): string | undefined {
@@ -68,6 +67,8 @@ function initialTextColor(): string {
 }
 
 export default function qniMathExtension(pi: ExtensionAPI): void {
+  const path = process.env.QNI_MATH_PATH === "text" ? "text" : "image";
+  const statusHeader = `qni-math ${packageManifest.version}\npath: ${path} (fixed)`;
   let textColor = initialTextColor();
 
   pi.on("session_start", (_event, ctx) => {
@@ -76,6 +77,11 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
 
   pi.registerMarkdownTransformer((markdown, context) => {
     if (context.messageType === "assistant-thinking") return markdown;
+    if (path === "text") {
+      return transformMathMarkdown(markdown, (_latex, _display, original) =>
+        expandQuantumMacros(original)
+      );
+    }
 
     const transfers = new Map<number, string>();
     const transformed = transformMathMarkdown(markdown, (latex, display, original) => {
@@ -124,7 +130,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
       const stats = imageCache.stats();
       const failure = stats.lastFailure?.replace(/\s+/g, " ") ?? "none";
       ctx.ui.setWidget("qni-math-status", [
-        ...STATUS_HEADER.split("\n"),
+        ...statusHeader.split("\n"),
         `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
         `last failure: ${failure}`
       ], {
