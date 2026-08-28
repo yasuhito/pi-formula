@@ -16,21 +16,24 @@ function protectCode(markdown: string): ProtectedMarkdown {
   let fenced = false;
   let fenceCharacter = "";
   let fenceLength = 0;
+  let fenceQuoteDepth = 0;
   let fencedContent = "";
   let withoutFences = "";
 
   for (const line of lines) {
-    const opening = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    const opening = line.match(/^((?: {0,3}>[ \t]?)* {0,3})(`{3,}|~{3,})/);
     if (!fenced && opening) {
       fenced = true;
-      fenceCharacter = opening[1]![0]!;
-      fenceLength = opening[1]!.length;
+      fenceCharacter = opening[2]![0]!;
+      fenceLength = opening[2]!.length;
+      fenceQuoteDepth = opening[1]!.split(">").length - 1;
       fencedContent = line;
       continue;
     }
     if (fenced) {
       fencedContent += line;
-      const closing = new RegExp(`^ {0,3}${fenceCharacter}{${fenceLength},}\\s*$`);
+      const quotePrefix = `(?: {0,3}>[ \\t]?){${fenceQuoteDepth}} {0,3}`;
+      const closing = new RegExp(`^${quotePrefix}${fenceCharacter}{${fenceLength},}\\s*$`);
       if (closing.test(line.trimEnd())) {
         withoutFences += token(fencedContent);
         fenced = false;

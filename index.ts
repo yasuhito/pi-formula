@@ -91,16 +91,20 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     const transformed = transformMathMarkdown(markdown, (latex, display, original) => {
       const image = cachedImage(latex, display, textColor, context.availableWidth);
       if (!image) return original;
-      const id = stableImageId(JSON.stringify([
-        latex,
-        display,
-        textColor,
-        context.availableWidth,
-        image.rows
-      ]));
-      transfers.set(id, encodeTransfer(image.png, id, image.columns, image.rows));
-      const rows = encodePlaceholderRows(id, image.columns, image.rows);
-      return display ? rows.join("\n") : rows[0]!;
+      try {
+        const id = stableImageId(JSON.stringify([
+          latex,
+          display,
+          textColor,
+          context.availableWidth,
+          image.rows
+        ]));
+        const rows = encodePlaceholderRows(id, image.columns, image.rows);
+        transfers.set(id, encodeTransfer(image.png, id, image.columns, image.rows));
+        return display ? rows.join("\n") : rows[0]!;
+      } catch {
+        return original;
+      }
     });
 
     return transfers.size === 0
