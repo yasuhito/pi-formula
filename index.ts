@@ -6,6 +6,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with { "reso
 import { RenderCache } from "./cache";
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
 import { expandQuantumMacros, transformMathMarkdown } from "./markdown";
+import {
+  mathConfigPath,
+  readDefaultPath,
+  writeDefaultPath,
+  type MathPathMode
+} from "./path-settings";
+import { multiplexerProbeResult, probePngSupport, type TerminalProbe } from "./terminal-probe";
 import { typesetMath, type TypesetImage } from "./typesetter";
 
 const packageManifest = JSON.parse(
@@ -17,8 +24,18 @@ if (typeof packageManifest.version !== "string") {
 }
 
 const { Type } = require("typebox");
-const { getCellDimensions } = require("@earendil-works/pi-tui") as {
+const {
+  getCapabilities,
+  getCellDimensions,
+  setCapabilities
+} = require("@earendil-works/pi-tui") as {
+  getCapabilities: () => { images: "kitty" | "iterm2" | null; trueColor: boolean; hyperlinks: boolean };
   getCellDimensions: () => { widthPx: number; heightPx: number };
+  setCapabilities: (capabilities: {
+    images: "kitty" | "iterm2" | null;
+    trueColor: boolean;
+    hyperlinks: boolean;
+  }) => void;
 };
 
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
@@ -68,18 +85,82 @@ function initialTextColor(): string {
   return index !== undefined && index >= 7 ? "#1f2328" : "#d4d4d4";
 }
 
+function restoredSessionMode(entries: readonly unknown[]): MathPathMode {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index] as {
+      type?: unknown;
+      customType?: unknown;
+      data?: { path?: unknown };
+    };
+    if (entry.type !== "custom" || entry.customType !== "qni-math-path") continue;
+    const path = entry.data?.path;
+    if (path === "auto" || path === "image" || path === "text") return path;
+  }
+  return "auto";
+}
+
+function applyCapabilities(path: "image" | "text"): void {
+  setCapabilities({
+    ...getCapabilities(),
+    images: path === "image" ? "kitty" : null
+  });
+}
+
 export default function qniMathExtension(pi: ExtensionAPI): void {
-  const path = process.env.QNI_MATH_PATH === "text" ? "text" : "image";
-  const statusHeader = `qni-math ${packageManifest.version}\npath: ${path} (fixed)`;
+  let effectivePath: "image" | "text" = "text";
+  let selectionReason = "起動前";
+  let probe: TerminalProbe = {
+    path: "text",
+    reason: "問い合わせ前",
+    response: "not-started"
+  };
+  let sessionMode: MathPathMode = "auto";
+  let defaultPath: "image" | "text" | undefined;
+  let configPath = mathConfigPath(process.env);
   let textColor = initialTextColor();
 
-  pi.on("session_start", (_event, ctx) => {
+  const selectPath = (): void => {
+    if (sessionMode !== "auto") {
+      effectivePath = sessionMode;
+      selectionReason = "手動指定";
+    } else if (defaultPath) {
+      effectivePath = defaultPath;
+      selectionReason = "全体既定";
+    } else {
+      effectivePath = probe.path;
+      selectionReason = probe.reason;
+    }
+    applyCapabilities(effectivePath);
+  };
+
+  pi.on("session_start", async (_event, ctx) => {
     textColor = rgbFromAnsi(ctx.ui.theme.getFgAnsi("text")) ?? textColor;
+    configPath = mathConfigPath(process.env);
+    defaultPath = readDefaultPath(configPath);
+    sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
+
+    const multiplexer = multiplexerProbeResult(process.env);
+    if (multiplexer) {
+      probe = multiplexer;
+    } else if (ctx.mode === "tui") {
+      let pending: Promise<TerminalProbe> | undefined;
+      ctx.ui.setWidget("qni-math-probe", (tui) => {
+        pending = probePngSupport(tui);
+        return { render: () => [], invalidate: () => {} };
+      });
+      probe = pending
+        ? await pending
+        : { path: "text", reason: "端末 UI なし", response: "unavailable" };
+      ctx.ui.setWidget("qni-math-probe", undefined);
+    } else {
+      probe = { path: "text", reason: `実行モード ${ctx.mode}`, response: "問い合わせなし" };
+    }
+    selectPath();
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
     if (context.messageType === "assistant-thinking") return markdown;
-    if (path === "text") {
+    if (effectivePath === "text") {
       return transformMathMarkdown(markdown, (_latex, _display, original) =>
         expandQuantumMacros(original)
       );
@@ -140,23 +221,43 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("math", {
-    description: "Show qni-math status or clear its cache",
+    description: "Show status, select auto/image/text, or clear the qni-math cache",
     handler: async (args, ctx) => {
-      const action = args.trim();
-      if (action === "clear") {
+      const tokens = args.trim().split(/\s+/u).filter(Boolean);
+      const action = tokens[0] ?? "status";
+      const saveDefault = tokens[1] === "--default" && tokens.length === 2;
+
+      if (action === "clear" && tokens.length === 1) {
         imageCache.clear();
         ctx.ui.notify("qni-math cache cleared", "info");
         return;
       }
-      if (action !== "status") {
-        ctx.ui.notify("Usage: /math status|clear", "warning");
+
+      if ((action === "auto" || action === "image" || action === "text")
+          && (tokens.length === 1 || saveDefault)) {
+        sessionMode = action;
+        pi.appendEntry("qni-math-path", { path: action });
+        if (saveDefault) {
+          writeDefaultPath(configPath, action);
+          defaultPath = readDefaultPath(configPath);
+        }
+        selectPath();
+        ctx.ui.notify(`qni-math path: ${effectivePath} (${selectionReason})`, "info");
+        return;
+      }
+
+      if (action !== "status" || tokens.length !== 1) {
+        ctx.ui.notify("Usage: /math status|clear|auto|image|text [--default]", "warning");
         return;
       }
 
       const stats = imageCache.stats();
       const failure = stats.lastFailure?.replace(/\s+/g, " ") ?? "none";
       ctx.ui.setWidget("qni-math-status", [
-        ...statusHeader.split("\n"),
+        `qni-math ${packageManifest.version}`,
+        `path: ${effectivePath}`,
+        `reason: ${selectionReason}`,
+        `probe: ${probe.response}`,
         `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
         `last failure: ${failure}`
       ], {
