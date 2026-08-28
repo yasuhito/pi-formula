@@ -27,15 +27,27 @@ const { Type } = require("typebox");
 const {
   getCapabilities,
   getCellDimensions,
-  setCapabilities
+  Image,
+  setCapabilities,
+  Text
 } = require("@earendil-works/pi-tui") as {
   getCapabilities: () => { images: "kitty" | "iterm2" | null; trueColor: boolean; hyperlinks: boolean };
   getCellDimensions: () => { widthPx: number; heightPx: number };
+  Image: new (
+    base64Data: string,
+    mimeType: string,
+    theme: { fallbackColor: (text: string) => string },
+    options?: { maxWidthCells?: number; maxHeightCells?: number }
+  ) => { render(width: number): string[]; invalidate(): void };
   setCapabilities: (capabilities: {
     images: "kitty" | "iterm2" | null;
     trueColor: boolean;
     hyperlinks: boolean;
   }) => void;
+  Text: new (text: string, paddingX?: number, paddingY?: number) => {
+    render(width: number): string[];
+    invalidate(): void;
+  };
 };
 
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
@@ -215,8 +227,26 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
       }
       return {
         content: [{ type: "text", text: result.stdout }],
-        details: {}
+        details: args.includes("--latex") ? { latex: result.stdout } : {}
       };
+    },
+    renderResult(result, { expanded }, theme) {
+      const text = result.content.find((item) => item.type === "text")?.text ?? "";
+      const details = result.details as { latex?: unknown } | undefined;
+      if (effectivePath === "image" && typeof details?.latex === "string") {
+        const latex = details.latex.trim();
+        const color = rgbFromAnsi(theme.fg("toolOutput", "sample")) ?? textColor;
+        const image = cachedImage(latex, true, color, expanded ? 120 : 60);
+        if (image) {
+          return new Image(
+            image.png.toString("base64"),
+            "image/png",
+            { fallbackColor: (fallback) => theme.fg("muted", fallback) },
+            { maxWidthCells: expanded ? 120 : 60, maxHeightCells: 4 }
+          );
+        }
+      }
+      return new Text(text.trimEnd(), 0, 0);
     }
   });
 
