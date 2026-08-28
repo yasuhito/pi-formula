@@ -9,6 +9,7 @@ import "@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js";
 import { mathjax } from "@mathjax/src/js/mathjax.js";
 import { SVG } from "@mathjax/src/js/output/svg.js";
 
+import type { CachedImage } from "./cache";
 import { calculateRasterLayout, type CellDimensions, type RasterLayout } from "./layout";
 
 const adaptor = liteAdaptor({ fontSize: 16 });
@@ -31,9 +32,7 @@ const svgOutput = new SVG({
 });
 const document = mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
 
-export interface TypesetImage extends RasterLayout {
-  png: Buffer;
-}
+export interface TypesetImage extends RasterLayout, CachedImage {}
 
 function svgFor(latex: string, display: boolean, color: string, widthPx: number): string {
   const node = document.convert(latex, {
@@ -71,5 +70,5 @@ export function typesetMath(
     ? natural
     : new Resvg(svg, { fitTo: { mode: "zoom", value: layout.scale } }).render();
 
-  return { ...layout, png: rendered.asPng() };
+  return { ...layout, svg, png: rendered.asPng() };
 }
