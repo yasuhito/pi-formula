@@ -10,6 +10,24 @@ export interface LoadedMathMacros {
 
 const RESERVED_MACROS = new Set(["ket", "bra", "braket"]);
 
+function invalidParameterReference(replacement: string, argumentsCount: number): string | undefined {
+  for (let index = 0; index < replacement.length; index += 1) {
+    if (replacement[index] !== "#") continue;
+    const reference = replacement[index + 1];
+    if (reference === "#") {
+      index += 1;
+      continue;
+    }
+    const number = reference ? Number.parseInt(reference, 10) : Number.NaN;
+    if (number >= 1 && number <= argumentsCount && reference === String(number)) {
+      index += 1;
+      continue;
+    }
+    return reference ? `#${reference}` : "#";
+  }
+  return undefined;
+}
+
 function normalizeMacros(value: unknown, source: string): LoadedMathMacros {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { macros: {}, error: `${source}: マクロ定義は JSON オブジェクトにしてください` };
@@ -24,23 +42,33 @@ function normalizeMacros(value: unknown, source: string): LoadedMathMacros {
     if (RESERVED_MACROS.has(name)) {
       return { macros: {}, error: `${source}: 既定マクロ \\${name} は変更できません` };
     }
+    let normalized: MathMacroDefinition;
     if (typeof definition === "string") {
-      macros[name] = definition;
-      continue;
-    }
-    if (Array.isArray(definition)
+      normalized = definition;
+    } else if (Array.isArray(definition)
         && definition.length === 2
         && typeof definition[0] === "string"
         && Number.isInteger(definition[1])
         && definition[1] >= 0
         && definition[1] <= 9) {
-      macros[name] = [definition[0], definition[1]];
-      continue;
+      normalized = [definition[0], definition[1]];
+    } else {
+      return {
+        macros: {},
+        error: `${source}: \\${name} は文字列または [置換文字列, 引数の数] にしてください`
+      };
     }
-    return {
-      macros: {},
-      error: `${source}: \\${name} は文字列または [置換文字列, 引数の数] にしてください`
-    };
+    const [replacement, argumentsCount] = typeof normalized === "string"
+      ? [normalized, 0] as const
+      : normalized;
+    const invalidReference = invalidParameterReference(replacement, argumentsCount);
+    if (invalidReference) {
+      return {
+        macros: {},
+        error: `${source}: \\${name} の ${invalidReference} は引数の数を超えています`
+      };
+    }
+    macros[name] = normalized;
   }
   return { macros };
 }
