@@ -16,11 +16,13 @@ if (typeof packageManifest.version !== "string") {
   throw new Error("qni-math could not read the qni-cli package version");
 }
 
+const { Type } = require("typebox");
 const { getCellDimensions } = require("@earendil-works/pi-tui") as {
   getCellDimensions: () => { widthPx: number; heightPx: number };
 };
 
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
+const qniExecutable = resolve(__dirname, "../bin/qni.js");
 
 function rgbFromAnsi(ansi: string): string | undefined {
   const trueColor = ansi.match(/38;2;(\d+);(\d+);(\d+)/);
@@ -111,6 +113,30 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     return transfers.size === 0
       ? transformed
       : `${Array.from(transfers.values()).join("")}\n${transformed}`;
+  });
+
+  pi.registerTool({
+    name: "qni",
+    label: "Qni",
+    description: "qni-cli をシェルを介さず実行する。引数に [\"--help\"] を渡すと使い方を確認できる。",
+    parameters: Type.Object({
+      args: Type.Array(Type.String())
+    }),
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const { args } = params as { args: string[] };
+      const result = await pi.exec(process.execPath, [qniExecutable, ...args], {
+        cwd: ctx.cwd,
+        signal
+      });
+      if (result.code !== 0) {
+        const stderr = result.stderr.trimEnd();
+        throw new Error(`${stderr ? `${stderr}\n` : ""}qni exited with status ${result.code}`);
+      }
+      return {
+        content: [{ type: "text", text: result.stdout }],
+        details: {}
+      };
+    }
   });
 
   pi.registerCommand("math", {
