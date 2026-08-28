@@ -236,13 +236,14 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
       if (effectivePath === "image" && typeof details?.latex === "string") {
         const latex = details.latex.trim();
         const color = rgbFromAnsi(theme.fg("toolOutput", "sample")) ?? textColor;
-        const image = cachedImage(latex, true, color, expanded ? 120 : 60);
+        const maxWidthCells = expanded ? 120 : 60;
+        const image = cachedImage(latex, true, color, maxWidthCells);
         if (image) {
           return new Image(
             image.png.toString("base64"),
             "image/png",
             { fallbackColor: (fallback) => theme.fg("muted", fallback) },
-            { maxWidthCells: expanded ? 120 : 60, maxHeightCells: 4 }
+            { maxWidthCells, maxHeightCells: 4 }
           );
         }
       }
