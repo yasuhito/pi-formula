@@ -1,3 +1,5 @@
+import type { MathMacroDefinition, MathMacros } from "./macros";
+
 export type MathRenderer = (latex: string, display: boolean, original: string) => string;
 
 interface MacroArgument {
@@ -25,20 +27,74 @@ function readMacroArgument(source: string, start: number): MacroArgument | undef
   return undefined;
 }
 
-export function expandQuantumMacros(latex: string): string {
+function macroParts(definition: MathMacroDefinition): {
+  replacement: string;
+  argumentsCount: number;
+} {
+  return typeof definition === "string"
+    ? { replacement: definition, argumentsCount: 0 }
+    : { replacement: definition[0], argumentsCount: definition[1] };
+}
+
+function expandUserMacros(latex: string, macros: MathMacros, depth = 0): string {
+  if (depth >= 20 || Object.keys(macros).length === 0) return latex;
   let expanded = "";
 
   for (let index = 0; index < latex.length;) {
-    const macro = latex.slice(index).match(/^\\(braket|ket|bra)(?![A-Za-z])/);
-    if (!macro) {
+    if (latex[index] !== "\\") {
+      expanded += latex[index];
+      index += 1;
+      continue;
+    }
+    const nameMatch = latex.slice(index + 1).match(/^[A-Za-z]+/u);
+    const name = nameMatch?.[0];
+    const definition = name ? macros[name] : undefined;
+    if (!name || definition === undefined) {
       expanded += latex[index];
       index += 1;
       continue;
     }
 
-    const first = readMacroArgument(latex, index + macro[0].length);
+    const { replacement, argumentsCount } = macroParts(definition);
+    const values: string[] = [];
+    let end = index + name.length + 1;
+    for (let argument = 0; argument < argumentsCount; argument += 1) {
+      const parsed = readMacroArgument(latex, end);
+      if (!parsed) break;
+      values.push(parsed.value);
+      end = parsed.end;
+    }
+    if (values.length !== argumentsCount) {
+      expanded += `\\${name}`;
+      index += name.length + 1;
+      continue;
+    }
+
+    const substituted = replacement.replace(/#([1-9])/gu, (placeholder, number: string) => {
+      const value = values[Number.parseInt(number, 10) - 1];
+      return value === undefined ? placeholder : value;
+    });
+    expanded += expandUserMacros(substituted, macros, depth + 1);
+    index = end;
+  }
+  return expanded;
+}
+
+export function expandQuantumMacros(latex: string, macros: MathMacros = {}): string {
+  const source = expandUserMacros(latex, macros);
+  let expanded = "";
+
+  for (let index = 0; index < source.length;) {
+    const macro = source.slice(index).match(/^\\(braket|ket|bra)(?![A-Za-z])/);
+    if (!macro) {
+      expanded += source[index];
+      index += 1;
+      continue;
+    }
+
+    const first = readMacroArgument(source, index + macro[0].length);
     const second = macro[1] === "braket" && first
-      ? readMacroArgument(latex, first.end)
+      ? readMacroArgument(source, first.end)
       : undefined;
     if (!first || (macro[1] === "braket" && !second)) {
       expanded += macro[0];
@@ -46,11 +102,11 @@ export function expandQuantumMacros(latex: string): string {
       continue;
     }
 
-    const firstValue = expandQuantumMacros(first.value);
+    const firstValue = expandQuantumMacros(first.value, macros);
     if (macro[1] === "ket") expanded += `|${firstValue}\\rangle`;
     if (macro[1] === "bra") expanded += `\\langle ${firstValue}|`;
     if (macro[1] === "braket") {
-      expanded += `\\langle ${firstValue}|${expandQuantumMacros(second!.value)}\\rangle`;
+      expanded += `\\langle ${firstValue}|${expandQuantumMacros(second!.value, macros)}\\rangle`;
     }
     index = second?.end ?? first.end;
   }

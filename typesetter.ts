@@ -11,31 +11,45 @@ import { SVG } from "@mathjax/src/js/output/svg.js";
 
 import type { CachedImage } from "./cache";
 import { calculateRasterLayout, type CellDimensions, type RasterLayout } from "./layout";
+import type { MathMacros } from "./macros";
 
 const adaptor = liteAdaptor({ fontSize: 16 });
 RegisterHTMLHandler(adaptor);
 
-const tex = new TeX({
-  packages: ["base", "ams", "newcommand", "configmacros"],
-  macros: {
-    ket: ["\\left|#1\\right\\rangle", 1],
-    bra: ["\\left\\langle#1\\right|", 1],
-    braket: ["\\left\\langle#1\\middle|#2\\right\\rangle", 2]
-  },
-  formatError: (_jax: unknown, error: unknown) => {
-    throw error;
-  }
-});
-const svgOutput = new SVG({
-  fontCache: "local",
-  linebreaks: { inline: false }
-});
-const document = mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
-
 export interface TypesetImage extends RasterLayout, CachedImage {}
 
-function svgFor(latex: string, display: boolean, color: string, widthPx: number): string {
-  const node = document.convert(latex, {
+function mathDocument(macros: MathMacros) {
+  const configured = Object.fromEntries(Object.entries(macros).map(([name, definition]) => [
+    name,
+    typeof definition === "string" ? definition : [definition[0], definition[1]]
+  ]));
+  const tex = new TeX({
+    packages: ["base", "ams", "newcommand", "configmacros"],
+    macros: {
+      ...configured,
+      ket: ["\\left|#1\\right\\rangle", 1],
+      bra: ["\\left\\langle#1\\right|", 1],
+      braket: ["\\left\\langle#1\\middle|#2\\right\\rangle", 2]
+    },
+    formatError: (_jax: unknown, error: unknown) => {
+      throw error;
+    }
+  });
+  const svgOutput = new SVG({
+    fontCache: "local",
+    linebreaks: { inline: false }
+  });
+  return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
+}
+
+function svgFor(
+  latex: string,
+  display: boolean,
+  color: string,
+  widthPx: number,
+  macros: MathMacros
+): string {
+  const node = mathDocument(macros).convert(latex, {
     display,
     em: 16,
     ex: 8,
@@ -55,9 +69,10 @@ export function typesetMath(
   display: boolean,
   color: string,
   availableWidth: number,
-  cell: CellDimensions
+  cell: CellDimensions,
+  macros: MathMacros = {}
 ): TypesetImage {
-  const svg = svgFor(latex, display, color, availableWidth * cell.widthPx);
+  const svg = svgFor(latex, display, color, availableWidth * cell.widthPx, macros);
   const natural = new Resvg(svg).render();
   const layout = calculateRasterLayout(
     natural.width,

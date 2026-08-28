@@ -5,6 +5,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with { "reso
 
 import { RenderCache } from "./cache";
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
+import { loadMathMacros, type MathMacros } from "./macros";
 import { expandQuantumMacros, transformMathMarkdown } from "./markdown";
 import {
   mathConfigPath,
@@ -81,13 +82,22 @@ function cachedImage(
   latex: string,
   display: boolean,
   color: string,
-  availableWidth: number
+  availableWidth: number,
+  macros: MathMacros
 ): TypesetImage | undefined {
   const cell = getCellDimensions();
-  const key = JSON.stringify([latex, display, color, availableWidth, cell.widthPx, cell.heightPx]);
+  const key = JSON.stringify([
+    latex,
+    display,
+    color,
+    availableWidth,
+    cell.widthPx,
+    cell.heightPx,
+    macros
+  ]);
   return imageCache.getOrCreate(
     key,
-    () => typesetMath(latex, display, color, availableWidth, cell)
+    () => typesetMath(latex, display, color, availableWidth, cell, macros)
   );
 }
 
@@ -130,6 +140,8 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
   let defaultPath: "image" | "text" | undefined;
   let configPath = mathConfigPath(process.env);
   let textColor = initialTextColor();
+  let userMacros: MathMacros = {};
+  let macroError: string | undefined;
 
   const selectPath = (): void => {
     if (sessionMode !== "auto") {
@@ -149,6 +161,9 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     textColor = rgbFromAnsi(ctx.ui.theme.getFgAnsi("text")) ?? textColor;
     configPath = mathConfigPath(process.env);
     defaultPath = readDefaultPath(configPath);
+    const loadedMacros = loadMathMacros(configPath, process.env);
+    userMacros = loadedMacros.macros;
+    macroError = loadedMacros.error;
     sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
 
     const multiplexer = multiplexerProbeResult(process.env);
@@ -174,13 +189,13 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     if (context.messageType === "assistant-thinking") return markdown;
     if (effectivePath === "text") {
       return transformMathMarkdown(markdown, (_latex, _display, original) =>
-        expandQuantumMacros(original)
+        expandQuantumMacros(original, userMacros)
       );
     }
 
     const transfers = new Map<number, string>();
     const transformed = transformMathMarkdown(markdown, (latex, display, original) => {
-      const image = cachedImage(latex, display, textColor, context.availableWidth);
+      const image = cachedImage(latex, display, textColor, context.availableWidth, userMacros);
       if (!image) return original;
       const identity = JSON.stringify([
         latex,
@@ -237,7 +252,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
         const latex = details.latex.trim();
         const color = rgbFromAnsi(theme.fg("toolOutput", "sample")) ?? textColor;
         const maxWidthCells = expanded ? 120 : 60;
-        const image = cachedImage(latex, true, color, maxWidthCells);
+        const image = cachedImage(latex, true, color, maxWidthCells, userMacros);
         if (image) {
           return new Image(
             image.png.toString("base64"),
@@ -290,6 +305,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
         `reason: ${selectionReason}`,
         `probe: ${probe.response}`,
         `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
+        `macro error: ${macroError ?? "none"}`,
         `last failure: ${failure}`
       ], {
         placement: "belowEditor"
