@@ -15,6 +15,7 @@ import {
 } from "./path-settings";
 import { multiplexerProbeResult, probePngSupport, type TerminalProbe } from "./terminal-probe";
 import { typesetMath, type TypesetImage } from "./typesetter";
+import { QniWorkdirs } from "./workdir";
 
 const packageManifest = JSON.parse(
   readFileSync(resolve(__dirname, "../../package.json"), "utf8")
@@ -28,10 +29,16 @@ const { Type } = require("typebox");
 const {
   getCapabilities,
   getCellDimensions,
+  Container,
   Image,
   setCapabilities,
   Text
 } = require("@earendil-works/pi-tui") as {
+  Container: new () => {
+    addChild(component: { render(width: number): string[]; invalidate(): void }): void;
+    render(width: number): string[];
+    invalidate(): void;
+  };
   getCapabilities: () => { images: "kitty" | "iterm2" | null; trueColor: boolean; hyperlinks: boolean };
   getCellDimensions: () => { widthPx: number; heightPx: number };
   Image: new (
@@ -142,6 +149,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
   let textColor = initialTextColor();
   let userMacros: MathMacros = {};
   let macroError: string | undefined;
+  const qniWorkdirs = new QniWorkdirs((customType, data) => pi.appendEntry(customType, data));
 
   const selectPath = (): void => {
     if (sessionMode !== "auto") {
@@ -157,7 +165,8 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     applyCapabilities(effectivePath);
   };
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
+    qniWorkdirs.restore(ctx.sessionManager.getBranch(), event.reason);
     textColor = rgbFromAnsi(ctx.ui.theme.getFgAnsi("text")) ?? textColor;
     configPath = mathConfigPath(process.env);
     defaultPath = readDefaultPath(configPath);
@@ -183,6 +192,10 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
       probe = { path: "text", reason: `実行モード ${ctx.mode}`, response: "問い合わせなし" };
     }
     selectPath();
+  });
+
+  pi.on("session_shutdown", (event) => {
+    if (event.reason !== "reload") qniWorkdirs.cleanup();
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
@@ -226,35 +239,43 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "qni",
     label: "Qni",
-    description: "qni-cli をシェルを介さず実行する。引数に [\"--help\"] を渡すと使い方を確認できる。",
+    description: "qni-cli をシェルを介さず実行する。workdir を省略するとセッション専用の一時作業場所を使う。利用者が選んだ場所には Pi の作業場所からの相対パスを指定する。引数に [\"--help\"] を渡すと使い方を確認できる。",
     parameters: Type.Object({
-      args: Type.Array(Type.String())
+      args: Type.Array(Type.String()),
+      workdir: Type.Optional(Type.String())
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const { args } = params as { args: string[] };
-      const result = await pi.exec(process.execPath, [qniExecutable, ...args], {
-        cwd: ctx.cwd,
-        signal
+      const { args, workdir: requestedWorkdir } = params as { args: string[]; workdir?: string };
+      const workdir = qniWorkdirs.resolve(ctx.cwd, requestedWorkdir);
+      return qniWorkdirs.run(workdir, async () => {
+        const result = await pi.exec(process.execPath, [qniExecutable, ...args], {
+          cwd: workdir,
+          signal
+        });
+        if (result.code !== 0) {
+          const stderr = result.stderr.trimEnd();
+          throw new Error(`${stderr ? `${stderr}\n` : ""}qni exited with status ${result.code}`);
+        }
+        return {
+          content: [{ type: "text", text: result.stdout }],
+          details: {
+            ...(args.includes("--latex") ? { latex: result.stdout } : {}),
+            workdir
+          }
+        };
       });
-      if (result.code !== 0) {
-        const stderr = result.stderr.trimEnd();
-        throw new Error(`${stderr ? `${stderr}\n` : ""}qni exited with status ${result.code}`);
-      }
-      return {
-        content: [{ type: "text", text: result.stdout }],
-        details: args.includes("--latex") ? { latex: result.stdout } : {}
-      };
     },
     renderResult(result, { expanded }, theme) {
       const text = result.content.find((item) => item.type === "text")?.text ?? "";
-      const details = result.details as { latex?: unknown } | undefined;
+      const details = result.details as { latex?: unknown; workdir?: unknown } | undefined;
+      let body;
       if (effectivePath === "image" && typeof details?.latex === "string") {
         const latex = details.latex.trim();
         const color = rgbFromAnsi(theme.fg("toolOutput", "sample")) ?? textColor;
         const maxWidthCells = expanded ? 120 : 60;
         const image = cachedImage(latex, true, color, maxWidthCells, userMacros);
         if (image) {
-          return new Image(
+          body = new Image(
             image.png.toString("base64"),
             "image/png",
             { fallbackColor: (fallback) => theme.fg("muted", fallback) },
@@ -262,7 +283,13 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
           );
         }
       }
-      return new Text(text.trimEnd(), 0, 0);
+      body ??= new Text(text.trimEnd(), 0, 0);
+      if (!expanded || typeof details?.workdir !== "string") return body;
+
+      const container = new Container();
+      container.addChild(new Text(theme.fg("muted", `workdir: ${details.workdir}`), 0, 0));
+      container.addChild(body);
+      return container;
     }
   });
 
