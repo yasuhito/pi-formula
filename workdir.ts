@@ -1,12 +1,16 @@
+import { randomUUID } from "node:crypto";
 import {
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
-  statSync
+  statSync,
+  writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import {
   basename,
+  dirname,
   isAbsolute,
   join,
   relative,
@@ -16,11 +20,12 @@ import {
 
 const ENTRY_TYPE = "qni-tool-temporary-workdir";
 const TEMPORARY_WORKDIR_PREFIX = "qni-cli-pi-";
+const TEMPORARY_WORKDIR_MARKER = ".qni-pi-workdir";
 
 type SessionEntry = {
   type?: unknown;
   customType?: unknown;
-  data?: { workdir?: unknown };
+  data?: { token?: unknown; workdir?: unknown };
 };
 
 function isInside(root: string, target: string): boolean {
@@ -53,9 +58,13 @@ export class QniWorkdirs {
     for (let index = entries.length - 1; index >= 0; index -= 1) {
       const entry = entries[index] as SessionEntry;
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE) continue;
+      const token = entry.data?.token;
       const workdir = entry.data?.workdir;
-      if (typeof workdir === "string" && this.isSafeTemporaryWorkdir(workdir)) {
-        this.temporaryWorkdir = existingDirectory(workdir);
+      if (typeof token === "string" && typeof workdir === "string") {
+        const safeWorkdir = this.safeTemporaryWorkdir(workdir, token);
+        if (safeWorkdir) {
+          this.temporaryWorkdir = safeWorkdir;
+        }
       }
       return;
     }
@@ -104,20 +113,39 @@ export class QniWorkdirs {
 
   private getTemporaryWorkdir(): string {
     if (!this.temporaryWorkdir) {
-      this.temporaryWorkdir = mkdtempSync(join(tmpdir(), TEMPORARY_WORKDIR_PREFIX));
-      this.appendEntry(ENTRY_TYPE, { workdir: this.temporaryWorkdir });
+      const token = randomUUID();
+      const workdir = mkdtempSync(join(tmpdir(), TEMPORARY_WORKDIR_PREFIX));
+      try {
+        writeFileSync(
+          join(workdir, TEMPORARY_WORKDIR_MARKER),
+          token,
+          { encoding: "utf8", mode: 0o600 }
+        );
+        this.appendEntry(ENTRY_TYPE, { token, workdir });
+        this.temporaryWorkdir = workdir;
+      } catch (error) {
+        rmSync(workdir, { recursive: true, force: true });
+        throw error;
+      }
     }
     return this.temporaryWorkdir;
   }
 
-  private isSafeTemporaryWorkdir(workdir: string): boolean {
-    if (!isAbsolute(workdir) || !basename(workdir).startsWith(TEMPORARY_WORKDIR_PREFIX)) {
-      return false;
-    }
+  private safeTemporaryWorkdir(workdir: string, token: string): string | undefined {
+    if (!isAbsolute(workdir)) return undefined;
     try {
-      return isInside(existingDirectory(tmpdir()), existingDirectory(workdir));
+      const temporaryRoot = existingDirectory(tmpdir());
+      const canonical = existingDirectory(workdir);
+      if (
+        dirname(canonical) !== temporaryRoot
+        || !basename(canonical).startsWith(TEMPORARY_WORKDIR_PREFIX)
+        || readFileSync(join(canonical, TEMPORARY_WORKDIR_MARKER), "utf8") !== token
+      ) {
+        return undefined;
+      }
+      return canonical;
     } catch {
-      return false;
+      return undefined;
     }
   }
 }
