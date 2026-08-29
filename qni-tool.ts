@@ -109,11 +109,15 @@ export function formatBatchFailure(
     formatQniExitError(result)
   ];
   const succeeded = failedIndex === 0
-    ? "No commands succeeded and no changes were made by this batch."
+    ? "No commands succeeded."
     : `Commands ${failedIndex === 1 ? "1" : `1-${failedIndex}`} succeeded and their changes remain in the workdir.`;
-  const remaining = failedIndex + 1 < totalCommands
-    ? ` Command ${failedIndex + 2} was not run.`
-    : "";
+  const firstNotRun = failedIndex + 2;
+  const remainingCount = totalCommands - failedIndex - 1;
+  const remaining = remainingCount === 0
+    ? ""
+    : remainingCount === 1
+      ? ` Command ${firstNotRun} was not run.`
+      : ` Commands ${firstNotRun}-${totalCommands} were not run.`;
   blocks.push(
     `Stopped at command ${failedIndex + 1} of ${totalCommands}. ${succeeded}${remaining}`
   );
