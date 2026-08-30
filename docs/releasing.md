@@ -42,6 +42,7 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
 - Repository: `pi-formula`
 - Workflow filename: `release.yml`
 - Environment: `npm`
+- Allowed actions: `npm publish`
 
 GitHub の repository environment `npm` を作り、required reviewer に保守者を設定する。`npm` environment に npm トークンは登録しない。`.github/workflows/release.yml` は `id-token: write` で OpenID Connect の短期資格情報を取得し、`npm publish --provenance` で由来証明を付ける。
 

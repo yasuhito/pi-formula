@@ -3,6 +3,7 @@
 const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { extractReleaseNotes } = require('./release-notes');
 
 const root = resolve(__dirname, '..');
 const tag = process.argv[2];
@@ -23,12 +24,10 @@ if (tag !== expectedTag) {
 }
 
 const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
-const escapedVersion = manifest.version.replaceAll('.', '\\.');
-const section = new RegExp(`^## ${escapedVersion}[^\\n]*\\n\\n((?:- .+\\n?)+)`, 'mu').exec(changelog);
-if (!section) {
+const releaseNotes = extractReleaseNotes(changelog, manifest.version);
+if (!releaseNotes) {
   fail(`CHANGELOG.md has no bullet list for ${manifest.version}`);
 }
-const releaseNotes = `${section[1].trimEnd()}\n`;
 
 mkdirSync(outputDirectory, { recursive: true });
 const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', outputDirectory], {

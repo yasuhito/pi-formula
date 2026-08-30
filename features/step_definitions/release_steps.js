@@ -4,6 +4,7 @@ const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { After, Given, Then, When } = require('@cucumber/cucumber');
+const { extractReleaseNotes } = require('../../scripts/release-notes');
 
 const root = resolve(__dirname, '../..');
 const readProjectFile = (path) => readFileSync(join(root, path), 'utf8');
@@ -85,6 +86,7 @@ Then('全チェック後の tarball と CHANGELOG の箇条書きが公開用に
 
 Given('npm 公開用の GitHub Actions がある', function () {
   this.releaseWorkflow = readProjectFile('.github/workflows/release.yml');
+  this.releaseGuide = readProjectFile('docs/releasing.md');
 });
 
 When('公開ジョブの権限と環境を調べる', function () {
@@ -95,12 +97,14 @@ Then('人間の承認、npm の信頼された公開、由来証明が必須に�
   assert.deepEqual({
     tagTrigger: /tags:\s*\n\s*- ['"]v\*\.\*\.\*['"]/u.test(this.publishJob),
     approvalEnvironment: /environment:\s*npm/u.test(this.publishJob),
+    allowedAction: /Allowed actions: `npm publish`/u.test(this.releaseGuide),
     oidc: /id-token:\s*write/u.test(this.publishJob),
     provenance: /npm publish .*--provenance/u.test(this.publishJob),
     noToken: !/NODE_AUTH_TOKEN|NPM_TOKEN/u.test(this.publishJob)
   }, {
     tagTrigger: true,
     approvalEnvironment: true,
+    allowedAction: true,
     oidc: true,
     provenance: true,
     noToken: true
@@ -110,21 +114,46 @@ Then('人間の承認、npm の信頼された公開、由来証明が必須に�
 Then('Release の題名と本文は同じ版の CHANGELOG に一致する', function () {
   assert.equal(this.preparation.status, 0, this.preparation.stderr);
   const manifest = JSON.parse(readProjectFile('package.json'));
-  const changelog = readProjectFile('CHANGELOG.md');
-  const section = new RegExp(`^## ${manifest.version}[^\\n]*\\n\\n((?:- .+\\n?)+)`, 'mu').exec(changelog);
+  const changelogLines = readProjectFile('CHANGELOG.md').split('\n');
+  const headingIndex = changelogLines.findIndex((line) =>
+    line === `## ${manifest.version}` || line.startsWith(`## ${manifest.version} `)
+  );
+  const bulletLines = changelogLines.slice(headingIndex + 2);
+  const firstNonBullet = bulletLines.findIndex((line) => !line.startsWith('- '));
+  const bulletEnd = firstNonBullet === -1 ? bulletLines.length : firstNonBullet;
+  const expectedNotes = `${bulletLines.slice(0, bulletEnd).join('\n')}\n`;
   const notes = readFileSync(join(this.releaseDirectory, 'release-notes.md'), 'utf8');
   const workflow = readProjectFile('.github/workflows/release.yml');
   assert.deepEqual({
     notes,
-    expectedNotes: `${section[1].trimEnd()}\n`,
     title: /--title "pi-formula \$\{VERSION\}"/u.test(workflow),
     notesFile: /--notes-file .*release-notes\.md/u.test(workflow)
   }, {
-    notes: `${section[1].trimEnd()}\n`,
-    expectedNotes: `${section[1].trimEnd()}\n`,
+    notes: expectedNotes,
     title: true,
     notesFile: true
   });
+});
+
+Given('CHANGELOG に現在の版から始まる別の版だけがある', function () {
+  this.similarVersionChangelog = [
+    '## 0.1.00 - Unreleased',
+    '',
+    '- Wrong numeric version.',
+    '',
+    '## 0.1.0x - Unreleased',
+    '',
+    '- Wrong suffix version.',
+    ''
+  ].join('\n');
+});
+
+When('現在の版の Release 本文を取り出す', function () {
+  this.releaseNotes = extractReleaseNotes(this.similarVersionChangelog, '0.1.0');
+});
+
+Then('現在の版の Release 本文は見つからない', function () {
+  assert.equal(this.releaseNotes, null);
 });
 
 Given('継続公開の運用手順がある', function () {

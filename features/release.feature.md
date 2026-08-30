@@ -34,6 +34,12 @@ pi-formula の保守者として
 - When 公開準備を実行する
 - Then Release の題名と本文は同じ版の CHANGELOG に一致する
 
+## Scenario: 似た版の CHANGELOG 見出しを現在の版として扱わない
+
+- Given CHANGELOG に現在の版から始まる別の版だけがある
+- When 現在の版の Release 本文を取り出す
+- Then 現在の版の Release 本文は見つからない
+
 ## Scenario: 公開後の対応と外部サービス停止時の対応を確認する
 
 - Given 継続公開の運用手順がある
