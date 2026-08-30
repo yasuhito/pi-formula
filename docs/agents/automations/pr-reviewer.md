@@ -17,6 +17,7 @@
 ## 原則
 
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
+- worker へのプロンプト送信は、この run 自身が `terminal create` で作成し、`terminal show` で worktree と起動コマンドを検証した handle だけに行う。create の失敗や handle の不整合時は、既存の別 terminal（main workspace の他 agent セッションを含む）へ送らず、新しい terminal を作り直す（2026-08-31 に REVIEW_PROMPT が監視用の別セッションへ誤送信された）。
 - 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。
 - Coordinator は対象選択、bot review の収集、read-only review worker と implementation/fix worker の起動と監視、検証、push、コメント、ラベル操作、merge だけを行う。コードを直接編集しない。
 - Review worker は独立レビューだけを行い、ファイル編集、commit、push、ラベル操作、issue / PR コメント、PR 作成、issue close を禁止する。
