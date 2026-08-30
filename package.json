@@ -47,7 +47,8 @@
     "test:unit": "npm run build && node --test test/*.test.js",
     "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
     "test": "npm run test:unit && npm run test:cucumber",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "release:prepare": "npm run check && node scripts/prepare-release.js"
   },
   "dependencies": {
     "@mathjax/src": "^4.1.3",
