@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { inflateSync } = require('node:zlib');
 
 const { typesetMath } = require('../dist/typesetter.js');
 
@@ -10,6 +11,15 @@ test('MathJax display formula becomes a transparent PNG', () => {
 
   assert.equal(image.png.subarray(1, 4).toString('ascii'), 'PNG');
   assert.equal(image.png[25], 6, 'PNG must use RGBA color');
+  const idat = [];
+  for (let offset = 8; offset < image.png.length;) {
+    const length = image.png.readUInt32BE(offset);
+    const type = image.png.subarray(offset + 4, offset + 8).toString('ascii');
+    if (type === 'IDAT') idat.push(image.png.subarray(offset + 8, offset + 8 + length));
+    offset += length + 12;
+  }
+  const firstScanline = inflateSync(Buffer.concat(idat));
+  assert.equal(firstScanline[4], 0, 'top-left background pixel must be transparent');
   assert.match(image.svg, /<svg/u);
 });
 

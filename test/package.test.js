@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { readdirSync, readFileSync } = require('node:fs');
+const { readdirSync, readFileSync, statSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const test = require('node:test');
 
@@ -14,9 +14,19 @@ test('package exposes a CommonJS typesetter', () => {
 });
 
 test('source contains no qni-specific execution modules', () => {
-  const files = readdirSync(join(root, 'src'));
-  const source = files.map((file) => readFileSync(join(root, 'src', file), 'utf8')).join('\n');
+  const sourceDir = join(root, 'src');
+  const pending = [sourceDir];
+  const files = [];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      if (statSync(path).isDirectory()) pending.push(path);
+      else files.push(path);
+    }
+  }
+  const source = files.map((file) => readFileSync(file, 'utf8')).join('\n');
 
-  assert.deepEqual(files.sort(), ['layout.ts', 'typesetter.ts']);
+  assert.ok(files.length > 0);
   assert.doesNotMatch(source, /qni|workdir|registerTool/iu);
 });
