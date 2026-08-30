@@ -13,7 +13,7 @@ import type { CachedImage } from "./cache";
 import type { CellDimensions, RasterLayout } from "./layout";
 import type { MathMacros } from "./macros";
 
-const DISPLAY_EX_TO_CELL_HEIGHT = 0.75;
+const DISPLAY_EX_TO_CELL_HEIGHT = 0.65;
 const INLINE_EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
 const DEVICE_SCALE = 2;
