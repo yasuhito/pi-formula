@@ -6,6 +6,12 @@ Formula for Pi keeps inline formulas such as `$x^2$` and `\(x^2\)` in Pi's Unico
 
 The extension changes only the displayed Markdown. Saved messages and the model context retain the original LaTeX.
 
+## Markdown safety
+
+Formula for Pi recognizes only `$...$`, `\(...\)`, `$$...$$`, and `\[...\]`. It leaves code fences, inline code, thinking, escaped dollar signs, ordinary money, URLs, shell variables, ambiguous dollar signs, and incomplete formulas unchanged. Closed display formulas can appear while a response is streaming, and display formulas keep their list or quote nesting.
+
+If one display formula is invalid, Formula for Pi leaves that formula as LaTeX and continues rendering the rest of the message.
+
 ## Try a local tarball
 
 Requires Pi 0.84 or later and Node.js 22.19 or later.

@@ -39,7 +39,9 @@
     "build": "tsc",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.js",
+    "test:unit": "npm run build && node --test test/*.test.js",
+    "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
+    "test": "npm run test:unit && npm run test:cucumber",
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
@@ -51,6 +53,7 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^13.2.1",
     "@earendil-works/pi-coding-agent": "^0.84.4",
     "@earendil-works/pi-tui": "^0.84.4",
     "@types/node": "^25.6.0",

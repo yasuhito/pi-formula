@@ -3,6 +3,36 @@ interface ProtectedMarkdown {
   restore(value: string): string;
 }
 
+interface MarkdownHierarchy {
+  quote: string;
+  indent: string;
+  marker: string;
+  consumed: number;
+  continuation: string;
+}
+
+function markdownHierarchy(value: string): MarkdownHierarchy {
+  const match = value.match(
+    /^((?: {0,3}>[ \t]?)*)([ \t]*)((?:[-+*]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)?/u
+  )!;
+  const quote = match[1]!;
+  const indent = match[2]!;
+  const marker = match[3] ?? "";
+  return {
+    quote,
+    indent,
+    marker,
+    consumed: quote.length + indent.length + marker.length,
+    continuation: `${quote}${indent}${" ".repeat(marker.length)}`
+  };
+}
+
+function indentationWidth(value: string): number {
+  return Array.from(value).reduce((width, character) =>
+    width + (character === "\t" ? 4 : 1), 0
+  );
+}
+
 function protectCode(markdown: string): ProtectedMarkdown {
   const parts: string[] = [];
   const token = (value: string): string => `\u{e000}${parts.push(value) - 1}\u{e001}`;
@@ -10,35 +40,62 @@ function protectCode(markdown: string): ProtectedMarkdown {
   let fence: {
     character: string;
     length: number;
-    quoteDepth: number;
+    continuation: string;
     content: string;
   } | undefined;
+  const listContinuations = new Map<string, number[]>();
   let withoutFences = "";
 
   for (const line of lines) {
-    const opening = line.match(/^((?: {0,3}>[ \t]?)* {0,3})(`{3,}|~{3,})/u);
-    if (!fence && opening) {
-      fence = {
-        character: opening[2]![0]!,
-        length: opening[2]!.length,
-        quoteDepth: opening[1]!.split(">").length - 1,
-        content: line
-      };
-      continue;
-    }
     if (fence) {
       fence.content += line;
-      const quotePrefix = `(?: {0,3}>[ \\t]?){${fence.quoteDepth}} {0,3}`;
-      const closing = new RegExp(
-        `^${quotePrefix}${fence.character}{${fence.length},}\\s*$`, "u"
-      );
-      if (closing.test(line.trimEnd())) {
+      const candidate = line.startsWith(fence.continuation)
+        ? line.slice(fence.continuation.length).trimEnd()
+        : "";
+      const closing = new RegExp(`^ {0,3}${fence.character}{${fence.length},}\\s*$`, "u");
+      if (closing.test(candidate)) {
         withoutFences += token(fence.content);
         fence = undefined;
       }
       continue;
     }
-    const indentedCode = /^(?: {0,3}>[ \t]?)*(?: {4}|\t)/u.test(line);
+
+    const fenceRun = line.match(/`{3,}|~{3,}/u);
+    if (fenceRun?.index !== undefined) {
+      const beforeFence = line.slice(0, fenceRun.index);
+      const hierarchy = markdownHierarchy(beforeFence);
+      const insideList = (listContinuations.get(hierarchy.quote) ?? [])
+        .some((width) => width <= indentationWidth(hierarchy.indent));
+      const validIndent = indentationWidth(hierarchy.indent) <= 3 || insideList;
+      if (hierarchy.consumed === beforeFence.length && validIndent) {
+        fence = {
+          character: fenceRun[0][0]!,
+          length: fenceRun[0].length,
+          continuation: hierarchy.continuation,
+          content: line
+        };
+        continue;
+      }
+    }
+
+    const hierarchy = markdownHierarchy(line);
+    const indent = indentationWidth(hierarchy.indent);
+    if (line.trim()) {
+      for (const quote of listContinuations.keys()) {
+        if (quote !== hierarchy.quote) listContinuations.delete(quote);
+      }
+    }
+    let activeLists = listContinuations.get(hierarchy.quote) ?? [];
+    if (hierarchy.marker) {
+      activeLists = activeLists.filter((width) => width <= indent);
+      activeLists.push(indent + hierarchy.marker.length);
+      listContinuations.set(hierarchy.quote, activeLists);
+    } else if (line.trim()) {
+      activeLists = activeLists.filter((width) => width <= indent);
+      listContinuations.set(hierarchy.quote, activeLists);
+    }
+    const listContent = activeLists.some((width) => width <= indent);
+    const indentedCode = indent >= 4 && !listContent;
     withoutFences += indentedCode ? token(line) : line;
   }
   if (fence) withoutFences += token(fence.content);
@@ -88,6 +145,41 @@ function closingIndex(source: string, delimiter: string, start: number): number 
   return -1;
 }
 
+function hierarchyContinuation(source: string, openingIndex: number): string {
+  const lineStart = source.lastIndexOf("\n", openingIndex - 1) + 1;
+  return markdownHierarchy(source.slice(lineStart, openingIndex)).continuation;
+}
+
+function isUrlDollar(source: string, openingIndex: number): boolean {
+  const tokenStart = Math.max(
+    source.lastIndexOf(" ", openingIndex - 1),
+    source.lastIndexOf("\n", openingIndex - 1),
+    source.lastIndexOf("\t", openingIndex - 1)
+  ) + 1;
+  return /(?:[a-z][a-z0-9+.-]*:\/\/|www\.)\S*$/iu.test(source.slice(tokenStart, openingIndex));
+}
+
+function looksLikeDollarDisplay(latex: string): boolean {
+  const value = latex.trim();
+  if (!value) return false;
+  if (/\\[A-Za-z]/u.test(value)) return true;
+  if (/;|&&|\|\|/u.test(value)) return false;
+  if (/^\p{L}$/u.test(value)) return true;
+  return /[\d_^=+*/<>()[\]|&±≤≥≠≈∈→⇒∞∫∑√-]/u.test(value);
+}
+
+function removeContinuation(latex: string, continuation: string): string {
+  if (!continuation) return latex;
+  return latex.split("\n").map((line, index) =>
+    index > 0 && line.startsWith(continuation) ? line.slice(continuation.length) : line
+  ).join("\n");
+}
+
+function keepHierarchy(rendered: string, continuation: string): string {
+  if (!continuation) return rendered;
+  return rendered.split("\n").map((line) => `${continuation}${line}`).join("\n");
+}
+
 export function transformDisplayMath(
   markdown: string,
   render: (latex: string, original: string) => string
@@ -114,7 +206,17 @@ export function transformDisplayMath(
       continue;
     }
     const original = source.slice(index, closing + closingDelimiter.length);
-    transformed += `\n${render(source.slice(contentStart, closing), original)}\n`;
+    const continuation = hierarchyContinuation(source, index);
+    const latex = removeContinuation(source.slice(contentStart, closing), continuation);
+    if (opening === "$$" && (isUrlDollar(source, index) || !looksLikeDollarDisplay(latex))) {
+      transformed += original;
+      index = closing + closingDelimiter.length;
+      continue;
+    }
+    const rendered = render(latex, original);
+    transformed += rendered === original
+      ? original
+      : `\n${keepHierarchy(rendered, continuation)}\n`;
     index = closing + closingDelimiter.length;
   }
 
