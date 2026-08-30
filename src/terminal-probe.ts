@@ -21,12 +21,20 @@ export function multiplexerProbeResult(env: NodeJS.ProcessEnv): TerminalProbe | 
   return undefined;
 }
 
+function possiblePrefixSuffix(value: string, prefix: string): number {
+  const maximum = Math.min(value.length, prefix.length - 1);
+  for (let length = maximum; length > 0; length -= 1) {
+    if (prefix.startsWith(value.slice(-length))) return length;
+  }
+  return 0;
+}
+
 export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
   const imageId = nextProbeId++;
   const query = `\x1b_Ga=q,t=d,f=100,i=${imageId},s=1,v=1;${PROBE_PNG}\x1b\\`;
   return new Promise((resolve) => {
     const prefix = `\x1b_Gi=${imageId};`;
-    let leadingInput = "";
+    let pendingPrefix = "";
     let response = "";
     let settled = false;
     let unsubscribe = () => {};
@@ -41,33 +49,42 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
       path: "text", reason: "PNG query timed out", response: "timeout"
     }), PROBE_TIMEOUT_MS);
     timeout.unref?.();
-    unsubscribe = tui.addInputListener((data) => {
-      if (response.length === 0) {
-        const start = data.indexOf(prefix);
-        if (start < 0) {
-          const marker = data.indexOf("\x1b_G");
-          if (marker < 0 || !prefix.startsWith(data.slice(marker))) return undefined;
-          leadingInput = data.slice(0, marker);
-          response = data.slice(marker);
-        } else {
-          leadingInput = data.slice(0, start);
-          response = data.slice(start);
-        }
-      } else {
-        response += data;
-      }
+
+    const completeResponse = (): { consume: true } | { data: string } | undefined => {
       const end = response.indexOf("\x1b\\");
-      if (end < 0) {
-        const pendingInput = leadingInput;
-        leadingInput = "";
-        return pendingInput ? { data: pendingInput } : { consume: true };
-      }
+      if (end < 0) return undefined;
       const value = response.slice(prefix.length, end);
-      const remaining = leadingInput + response.slice(end + 2);
+      const trailingInput = response.slice(end + 2);
       finish(value === "OK"
         ? { path: "image", reason: "PNG query returned OK", response: value }
         : { path: "text", reason: "PNG query was rejected", response: value });
-      return remaining ? { data: remaining } : { consume: true };
+      return trailingInput ? { data: trailingInput } : { consume: true };
+    };
+
+    unsubscribe = tui.addInputListener((data) => {
+      if (response) {
+        response += data;
+        return completeResponse() ?? { consume: true };
+      }
+
+      const candidate = pendingPrefix + data;
+      pendingPrefix = "";
+      const start = candidate.indexOf(prefix);
+      if (start >= 0) {
+        const leadingInput = candidate.slice(0, start);
+        response = candidate.slice(start);
+        const completed = completeResponse();
+        if (completed && "data" in completed) {
+          const returnedInput = leadingInput + completed.data;
+          return returnedInput ? { data: returnedInput } : { consume: true };
+        }
+        return leadingInput ? { data: leadingInput } : (completed ?? { consume: true });
+      }
+
+      const suffixLength = possiblePrefixSuffix(candidate, prefix);
+      pendingPrefix = suffixLength > 0 ? candidate.slice(-suffixLength) : "";
+      const input = suffixLength > 0 ? candidate.slice(0, -suffixLength) : candidate;
+      return input ? { data: input } : { consume: true };
     });
     tui.terminal.write(query);
   });

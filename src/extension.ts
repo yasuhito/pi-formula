@@ -49,11 +49,11 @@ function cachedImage(
   if (latex.length > MAX_LATEX_LENGTH) return undefined;
   const cell = getCellDimensions();
   const key = JSON.stringify([latex, color, availableWidth, cell.widthPx, cell.heightPx]);
-  const image = imageCache.getOrCreate(
+  return imageCache.getOrCreate(
     key,
-    () => typesetMath(latex, color, availableWidth, cell)
+    () => typesetMath(latex, color, availableWidth, cell),
+    (image) => image.scale >= 0.5
   );
-  return image && image.scale >= 0.5 ? image : undefined;
 }
 
 function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {

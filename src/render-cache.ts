@@ -26,7 +26,11 @@ export class RenderCache {
 
   constructor(private readonly maxEntries: number) {}
 
-  getOrCreate(key: string, create: () => TypesetImage): TypesetImage | undefined {
+  getOrCreate(
+    key: string,
+    create: () => TypesetImage,
+    accept: (image: TypesetImage) => boolean = () => true
+  ): TypesetImage | undefined {
     const cached = this.entries.get(key);
     if (cached) {
       this.touch(key, cached);
@@ -35,6 +39,10 @@ export class RenderCache {
 
     try {
       const image = create();
+      if (!accept(image)) {
+        this.add(key, { kind: "failure", bytes: Buffer.byteLength(key) });
+        return undefined;
+      }
       this.add(key, {
         kind: "image",
         image,

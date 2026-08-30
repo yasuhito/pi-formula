@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { mkdirSync, mkdtempSync } = require('node:fs');
+const { mkdirSync, mkdtempSync, readFileSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
@@ -37,6 +37,27 @@ test('display formulas use a Kitty PNG transfer and placeholder rows', async () 
     hasPngTransfer: true,
     hasPlaceholder: true,
     hasLatex: false
+  });
+});
+
+test('an unreadably scaled formula uses text without retaining image bytes', async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi);
+  await pi.commands.get('formula').handler('clear', started.ctx);
+  const markdown = '$$\\frac{12345678901234567890}{12345678901234567890}$$';
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: 'assistant', isStreaming: false, availableWidth: 10
+  });
+  await pi.commands.get('formula').handler('status', started.ctx);
+  const cacheBytes = Number(/cache: 1 entries, (\d+) bytes/u.exec(
+    started.widgets.get('pi-formula-status').join('\n')
+  )?.[1]);
+
+  assert.deepEqual({ rendered, lightweightCache: cacheBytes > 0 && cacheBytes < 1000 }, {
+    rendered: markdown,
+    lightweightCache: true
   });
 });
 
@@ -131,6 +152,45 @@ test('a default rename failure leaves the session path unchanged and reports the
         level: 'error'
       }
     });
+  } finally {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+  }
+});
+
+test('invalid config is preserved when changing or clearing the default path', async () => {
+  const xdg = mkdtempSync(join(tmpdir(), 'pi-formula-invalid-config-'));
+  const configPath = join(xdg, 'pi-formula', 'config.json');
+  mkdirSync(join(xdg, 'pi-formula'), { recursive: true });
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  try {
+    const results = [];
+    for (const raw of ['{ broken JSON', '[]']) {
+      for (const action of ['auto --default', 'text --default']) {
+        writeFileSync(configPath, raw);
+        const pi = fakePi();
+        registerFormula(pi.api);
+        const started = await startSession(pi, { response: 'OK' });
+
+        await pi.commands.get('formula').handler(action, started.ctx);
+        await pi.commands.get('formula').handler('status', started.ctx);
+        results.push({
+          contents: readFileSync(configPath, 'utf8'),
+          savedEntries: pi.entries.length,
+          path: started.widgets.get('pi-formula-status')
+            .find((line) => line.startsWith('path:')),
+          notification: started.notifications.at(-1)
+        });
+      }
+    }
+
+    assert.equal(results.every((result, index) =>
+      result.contents === (index < 2 ? '{ broken JSON' : '[]')
+      && result.savedEntries === 0
+      && result.path === 'path: image'
+      && result.notification?.level === 'error'
+    ), true);
   } finally {
     if (original === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = original;
