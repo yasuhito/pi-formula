@@ -254,6 +254,26 @@ test "$(git rev-parse HEAD)" = "$review_base_head"
 test -z "$(git status --short)"
 ```
 
+### 6.2. Convergence: 繰り返しレビューを打ち切る
+
+同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次の両方を満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
+
+- この PR に、自分が投稿した `<!-- pi-formula-auto-review:` marker 付きコメントが既に 3 件以上ある（HEAD ごとに 1 件なので、修正を 3 回以上返した状態）
+- 今回の `VERDICT: CHANGES_REQUIRED` の finding に severity `high` 以上が 1 件も無い（medium / low だけ）
+
+```bash
+viewer=$(gh api user --jq '.login')
+review_record_count=$(gh api repos/yasuhito/pi-formula/issues/<PR>/comments --paginate | jq --arg viewer "$viewer" '[.[] | select(.user.login == $viewer and ((.body // "") | contains("<!-- pi-formula-auto-review:")))] | length')
+```
+
+PASS 相当として扱う場合:
+
+- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。`ready-for-agent` / `agent:implement` は付けない。
+- Review record の判定を `PASS（後続 issue #M へ切り出し）` とし、切り出した finding と issue 番号を「指摘と対応」に書く。
+- high 以上の finding が 1 件でもあれば、この打ち切りは適用せず通常どおり 7 の Fix へ進む。
+
+完了条件: 打ち切り条件を判定済みで、該当する場合は follow-up issue が存在し、7.5 へ進む準備ができている。
+
 ### 6.5. Review record: 各 HEAD に1件だけ記録する
 
 レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
@@ -270,7 +290,7 @@ test -z "$(git status --short)"
 <!-- pi-formula-auto-review:<review_base_head> -->
 ## 自動レビュー結果
 
-- 判定: PASS | CHANGES_REQUIRED | BLOCKED
+- 判定: PASS | PASS（後続 issue #M へ切り出し） | CHANGES_REQUIRED | BLOCKED
 - 対象コミット: `<短いSHA>`
 - Issue契約: 適合 | 不適合 | 判断不能
 - `npm run check`: 成功 | 失敗 | 未実行
@@ -303,7 +323,7 @@ CHANGES_REQUIRED は修正・検証後に記録する。PASS は merge 直前に
 
 ### 7. Fix: 指摘を実装担当へ返す
 
-`<review>CHANGES_REQUIRED</review>` の場合、worktree comment から元の implementation worker handle を読む。
+`<review>CHANGES_REQUIRED</review>` の場合（6.2 で PASS 相当と判断した場合を除く）、worktree comment から元の implementation worker handle を読む。
 
 ```bash
 worktree_json=$(orca-ide worktree show --worktree path:"<worktreePath>" --json)
@@ -376,7 +396,7 @@ gh pr edit <PR> -R yasuhito/pi-formula --remove-label agent:reviewing
 
 ### 7.5. Pass and merge: 全ゲート通過後に自動マージする
 
-`<review>PASS</review>` の場合、同じ HEAD に対して次をすべて確認する。
+`<review>PASS</review>` の場合、または 6.2 で PASS 相当と判断した場合、同じ HEAD に対して次をすべて確認する。
 
 - PR は open かつ draft ではない
 - `mergeStateStatus` は `CLEAN`
@@ -449,7 +469,7 @@ BODY
 - 対象 PR 番号、または「対象 PR なし」
 - 実施した状態変更（ready 化、label 変更など）
 - 対応した review comment（あれば）
-- review 判定（PASS / CHANGES_REQUIRED / BLOCKED）
+- review 判定（PASS / CHANGES_REQUIRED / BLOCKED）。6.2 で打ち切った場合は follow-up issue 番号
 - 修正を返した implementation worker handle（あれば）
 - push した commit（あれば）
 - `npm run check` の結果（実行した場合）

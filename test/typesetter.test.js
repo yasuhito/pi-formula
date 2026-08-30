@@ -49,20 +49,17 @@ test('PNG uses twice the pixel density of its terminal placement', () => {
 test('typesetter rejects input beyond the character and row limits', () => {
   const tooLong = 'x'.repeat(FORMULA_SAFETY_LIMITS.latexCharacters + 1);
   const tooTall = `\\begin{aligned}${Array.from(
-    { length: 200 }, (_, index) => `x_{${index}}`
+    { length: FORMULA_SAFETY_LIMITS.imageRows + 1 }, (_, index) => `x_{${index}}`
   ).join('\\\\')}\\end{aligned}`;
 
-  assert.deepEqual([
+  assert.throws(
     () => typesetMath(tooLong, '#d4d4d4', 80, cell),
-    () => typesetMath(tooTall, '#d4d4d4', 80, cell)
-  ].map((render) => {
-    try {
-      render();
-      return false;
-    } catch {
-      return true;
-    }
-  }), [true, true]);
+    /fixed character limit/u
+  );
+  assert.throws(
+    () => typesetMath(tooTall, '#d4d4d4', 80, cell),
+    /fixed row limit/u
+  );
 });
 
 test('typesetter accepts only exact RGB and finite positive layout dimensions', () => {

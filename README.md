@@ -16,7 +16,40 @@ If one display formula is invalid, exceeds the fixed character or image-cell lim
 
 MathJax and Resvg are loaded only when the first display formula enters the image path. SVG and PNG data stay in a bounded in-memory cache; they are never written to disk. Cache identity includes the current theme color, available width, and terminal cell dimensions. Rendering does not use a network connection, browser, or child process.
 
-The fixed limits are exported as `FORMULA_SAFETY_LIMITS`: 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Failed formulas are cached too, so repeated invalid input is not typeset again.
+The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Failed formulas are cached too, so repeated invalid input is not typeset again.
+
+## Macros
+
+Put persistent user macros in `$XDG_CONFIG_HOME/pi-formula/config.json` (or `~/.config/pi-formula/config.json`):
+
+```json
+{
+  "macros": {
+    "RR": "\\mathbb{R}",
+    "pair": ["\\left(#1,#2\\right)", 2]
+  }
+}
+```
+
+`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides names from the file. An invalid JSON source is ignored. An invalid individual definition is ignored without disabling the other definitions or a valid file definition with the same name.
+
+## Extension API
+
+The CommonJS package exports only `registerFormula` and synchronous `createFormulaPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+
+```js
+const { createFormulaPng, registerFormula } = require("pi-formula");
+
+registerFormula(pi, {
+  ket: ["\\left|#1\\right\\rangle", 1]
+});
+
+const image = createFormulaPng("\\ket{0}", availableWidth);
+```
+
+Additional macro names contain ASCII letters, with an optional leading backslash. A definition is either a replacement string (including an empty string) or `[replacement, argumentCount]`, where `argumentCount` is an integer from 0 through 9. References such as `#1` must not exceed that count; write `\\#` for a literal hash. `registerFormula` throws `TypeError` if any additional macro is invalid.
+
+`image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts; it does not contain a Pi UI component. Each call returns an independent PNG buffer. Additional macros override user macros and remain protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
 
 ## Try a local tarball
 
@@ -27,4 +60,15 @@ npm pack
 pi install npm:pi-formula@file:./pi-formula-0.1.0.tgz
 ```
 
-Use `/formula status` to show the package version and the active `image` or `text` path.
+Formula for Pi checks terminal image support with a PNG query. Ghostty and Kitty responses select the image path. A rejected or unanswered query, tmux, screen, and non-interactive Pi modes select the text path without sending terminal controls.
+
+## Display path command
+
+Use `/formula` with one of these actions:
+
+- `status` shows the version, active path, selection reason, terminal, macro count, in-memory cache size, and latest failure.
+- `image` or `text` selects a path for the current session.
+- `auto` returns the current session to automatic selection.
+- `clear` removes rendered images and failures from the in-memory cache.
+
+Add `--default` to `image`, `text`, or `auto` to update the global default. Formula for Pi writes only explicit defaults to `${XDG_CONFIG_HOME:-~/.config}/pi-formula/config.json`; `auto --default` removes the saved path. Without `--default`, a path selection is saved only in the current Pi session.

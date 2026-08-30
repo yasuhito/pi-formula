@@ -1,4 +1,5 @@
 import type { CellDimensions, RasterLayout } from "./layout";
+import type { FormulaMacros } from "./macros";
 
 const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
@@ -32,11 +33,18 @@ interface MathDocument {
 
 interface PreparedTypesetter {
   adaptor: MathAdaptor;
-  createDocument(): MathDocument;
+  createDocument(macros: FormulaMacros): MathDocument;
   rasterize(svg: string): Buffer;
 }
 
 let prepared: PreparedTypesetter | undefined;
+
+function configuredMacros(macros: FormulaMacros): Record<string, string | [string, number]> {
+  return Object.fromEntries(Object.entries(macros).map(([name, definition]) => [
+    name,
+    typeof definition === "string" ? definition : [definition[0], definition[1]]
+  ]));
+}
 
 function prepareTypesetter(): PreparedTypesetter {
   if (prepared) return prepared;
@@ -71,9 +79,10 @@ function prepareTypesetter(): PreparedTypesetter {
   RegisterHTMLHandler(adaptor);
   prepared = {
     adaptor,
-    createDocument: () => {
+    createDocument: (macros) => {
       const tex = new TeX({
         packages: ["base", "ams", "newcommand", "configmacros"],
+        macros: configuredMacros(macros),
         formatError: (_jax: unknown, error: unknown) => {
           throw error;
         }
@@ -96,9 +105,10 @@ function svgFor(
   latex: string,
   color: string,
   widthPx: number,
+  macros: FormulaMacros,
   typesetter: PreparedTypesetter
 ): string {
-  const node = typesetter.createDocument().convert(latex, {
+  const node = typesetter.createDocument(macros).convert(latex, {
     display: true,
     em: 16,
     ex: 8,
@@ -174,9 +184,11 @@ function rasterLayout(
     1,
     Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9)
   );
-  if (columns > FORMULA_SAFETY_LIMITS.imageColumns ||
-      rows > FORMULA_SAFETY_LIMITS.imageRows) {
-    throw new Error("Formula image exceeds the fixed cell limits");
+  if (columns > FORMULA_SAFETY_LIMITS.imageColumns) {
+    throw new Error("Formula image exceeds the fixed column limit");
+  }
+  if (rows > FORMULA_SAFETY_LIMITS.imageRows) {
+    throw new Error("Formula image exceeds the fixed row limit");
   }
   const canvasWidth = Math.ceil(columns * cell.widthPx * DEVICE_SCALE);
   const canvasHeight = Math.ceil(rows * cell.heightPx * DEVICE_SCALE);
@@ -209,7 +221,8 @@ export function typesetMath(
   latex: string,
   color: string,
   availableWidth: number,
-  cell: CellDimensions
+  cell: CellDimensions,
+  macros: FormulaMacros = {}
 ): TypesetImage {
   if (latex.length > FORMULA_SAFETY_LIMITS.latexCharacters) {
     throw new Error("Formula input exceeds the fixed character limit");
@@ -222,7 +235,7 @@ export function typesetMath(
   }
 
   const typesetter = prepareTypesetter();
-  const svg = svgFor(latex, color, availableWidth * cell.widthPx, typesetter);
+  const svg = svgFor(latex, color, availableWidth * cell.widthPx, macros, typesetter);
   const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
   const png = typesetter.rasterize(padded);
   return { ...layout, svg, png };

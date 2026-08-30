@@ -8,16 +8,29 @@ const test = require('node:test');
 
 const root = resolve(__dirname, '..');
 
-test('package exposes a CommonJS typesetter', () => {
+function packedPackage(packOutput) {
+  const candidate = Array.isArray(packOutput)
+    ? packOutput[0]
+    : typeof packOutput?.filename === 'string'
+      ? packOutput
+      : packOutput?.['pi-formula'];
+  assert.equal(typeof candidate?.filename, 'string');
+  assert.notEqual(candidate.filename.trim(), '');
+  return candidate;
+}
+
+test('package exposes the CommonJS registration and PNG creation API', () => {
   const manifest = require(join(root, 'package.json'));
   const exported = require(root);
 
   assert.deepEqual({
     moduleType: manifest.type,
-    exportedTypesetter: typeof exported.typesetMath
+    registerFormula: typeof exported.registerFormula,
+    createFormulaPng: typeof exported.createFormulaPng
   }, {
     moduleType: 'commonjs',
-    exportedTypesetter: 'function'
+    registerFormula: 'function',
+    createFormulaPng: 'function'
   });
 });
 
@@ -29,8 +42,7 @@ test('a local tarball is discovered by the real Pi runtime', { timeout: 60000 },
       encoding: 'utf8'
     });
     assert.equal(packed.status, 0, packed.stderr);
-    const packOutput = JSON.parse(packed.stdout);
-    const packResult = Array.isArray(packOutput) ? packOutput[0] : Object.values(packOutput)[0];
+    const packResult = packedPackage(JSON.parse(packed.stdout));
     const tarball = join(temporary, packResult.filename);
     const isolatedEnv = {
       ...process.env,
@@ -76,6 +88,16 @@ test('a local tarball is discovered by the real Pi runtime', { timeout: 60000 },
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
+});
+
+test('npm pack result accepts every supported JSON shape', () => {
+  const expected = { filename: 'pi-formula-0.1.0.tgz' };
+
+  assert.deepEqual([
+    packedPackage([expected]),
+    packedPackage(expected),
+    packedPackage({ 'pi-formula': expected })
+  ], [expected, expected, expected]);
 });
 
 test('source contains no qni-specific execution modules', () => {

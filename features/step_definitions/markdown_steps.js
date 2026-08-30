@@ -5,7 +5,6 @@ const http = require('node:http');
 const https = require('node:https');
 const net = require('node:net');
 const { resolve } = require('node:path');
-const { performance } = require('node:perf_hooks');
 const { Given, Then, When } = require('@cucumber/cucumber');
 
 const registerFormula = require('../../dist/extension.js').default;
@@ -29,10 +28,22 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function cacheImage(bytes) {
+  return {
+    svg: 's'.repeat(bytes),
+    png: Buffer.alloc(bytes),
+    scale: 1,
+    widthPx: 1,
+    heightPx: 1,
+    columns: 1,
+    rows: 1
+  };
+}
+
 Given('画像経路で数式を描ける Pi がある', async function () {
   this.pi = fakePi();
   registerFormula(this.pi.api);
-  await startWithKitty(this.pi);
+  this.started = await startWithKitty(this.pi);
 });
 
 When('4 種類の数式区切りを含む本文を変換する', function () {
@@ -150,10 +161,10 @@ Then('入力文字数、画像列数・行数、一時保存件数・バイト�
 });
 
 When('上限を超えた表示数式と正しい表示数式を変換する', function () {
-  const max = require('../../dist/typesetter.js').FORMULA_SAFETY_LIMITS.latexCharacters;
-  this.oversizedLatex = `x${' '.repeat(max)}`;
+  const limits = require('../../dist/typesetter.js').FORMULA_SAFETY_LIMITS;
+  this.oversizedLatex = `x${' '.repeat(limits.latexCharacters)}`;
   this.tooTallLatex = `\\begin{aligned}${Array.from(
-    { length: 200 }, (_, index) => `x_{${index}}`
+    { length: limits.imageRows + 1 }, (_, index) => `x_{${index}}`
   ).join('\\\\')}\\end{aligned}`;
   transform(this, `$$${this.oversizedLatex}$$\n$$${this.tooTallLatex}$$\n$$x+7$$`);
 });
@@ -181,25 +192,24 @@ Then('小さくなりすぎる数式は残り、正しい数式だけが画像�
   }, { smallRemains: true, imageCount: 1 });
 });
 
-When('同じ表示数式を異なるテーマ色と表示幅で変換する', async function () {
+When('同じ表示数式のテーマ色だけと表示幅だけを変えて変換する', function () {
   const formula = '$$x_{theme-width}$$';
-  const first = this.pi.transformer()(formula, {
-    messageType: 'assistant', isStreaming: false, availableWidth: 80
+  const render = (availableWidth) => this.pi.transformer()(formula, {
+    messageType: 'assistant', isStreaming: false, availableWidth
   });
-  const otherPi = fakePi();
-  registerFormula(otherPi.api);
-  await startWithKitty(otherPi, { foregroundAnsi: '\x1b[38;2;10;20;30m' });
-  const second = otherPi.transformer()(formula, {
-    messageType: 'assistant', isStreaming: false, availableWidth: 40
-  });
-  this.imageIdentities = [first, second].map((rendered) =>
+  const baseline = render(80);
+  this.started.setTextColor('\x1b[38;2;10;20;30m');
+  const colorOnly = render(80);
+  this.started.setTextColor('\x1b[38;2;212;212;212m');
+  const widthOnly = render(40);
+  this.imageIdentities = [baseline, colorOnly, widthOnly].map((rendered) =>
     /\bi=(\d+)/u.exec(rendered)?.[1]
   );
 });
 
-Then('テーマ色と表示幅ごとに異なる画像になる', function () {
+Then('テーマ色と表示幅の各変更が別の一時保存項目になる', function () {
   assert.equal(
-    this.imageIdentities.every(Boolean) && new Set(this.imageIdentities).size === 2,
+    this.imageIdentities.every(Boolean) && new Set(this.imageIdentities).size === 3,
     true
   );
 });
@@ -218,16 +228,69 @@ Then('RGB を得られない数式は原文のまま残る', function () {
   assert.equal(this.rendered, this.source);
 });
 
-When('同じ不正な表示数式を二回変換する', function () {
-  const markdown = '$$\\notacommand{cache-failure}$$';
-  transform(this, markdown);
-  const started = performance.now();
-  transform(this, markdown);
-  this.failedCacheDuration = performance.now() - started;
+Given('件数上限が3件の画像一時保存がある', function () {
+  const { RenderCache } = require('../../dist/render-cache.js');
+  this.renderCache = new RenderCache(3, 10_000);
+  this.cacheCreates = new Map();
 });
 
-Then('二回目の失敗結果は5ミリ秒未満で返る', function () {
-  assert.ok(this.failedCacheDuration < 5, `cached failure took ${this.failedCacheDuration}ms`);
+When('4件を保存して2件目を再利用する', function () {
+  const get = (key) => this.renderCache.getOrCreate(key, () => {
+    this.cacheCreates.set(key, (this.cacheCreates.get(key) ?? 0) + 1);
+    return cacheImage(20);
+  });
+  get('a'); get('b'); get('c'); get('b'); get('d'); get('a');
+  this.cacheStats = this.renderCache.stats();
+});
+
+Then('最も長く使っていない項目が退避され件数上限内に残る', function () {
+  assert.deepEqual({
+    recreatedOldest: this.cacheCreates.get('a'),
+    reusedSecond: this.cacheCreates.get('b'),
+    entriesWithinLimit: this.cacheStats.entries <= 3
+  }, { recreatedOldest: 2, reusedSecond: 1, entriesWithinLimit: true });
+});
+
+Given('バイト上限が300バイトの画像一時保存がある', function () {
+  const { RenderCache } = require('../../dist/render-cache.js');
+  this.renderCache = new RenderCache(10, 300);
+  this.cacheCreates = new Map();
+});
+
+When('バイト上限を超える画像を順に保存する', function () {
+  const get = (key) => this.renderCache.getOrCreate(key, () => {
+    this.cacheCreates.set(key, (this.cacheCreates.get(key) ?? 0) + 1);
+    return cacheImage(80);
+  });
+  get('a'); get('b'); get('a');
+  this.cacheStats = this.renderCache.stats();
+});
+
+Then('最も長く使っていない項目が退避されバイト上限内に残る', function () {
+  assert.deepEqual({
+    recreatedOldest: this.cacheCreates.get('a'),
+    entries: this.cacheStats.entries,
+    bytesWithinLimit: this.cacheStats.bytes <= 300
+  }, { recreatedOldest: 2, entries: 1, bytesWithinLimit: true });
+});
+
+Given('画像結果を作る回数を数えられる一時保存がある', function () {
+  const { RenderCache } = require('../../dist/render-cache.js');
+  this.renderCache = new RenderCache(3, 300);
+  this.failedCreates = 0;
+});
+
+When('同じ失敗項目を二回取得する', function () {
+  const fail = () => {
+    this.failedCreates += 1;
+    throw new Error('invalid LaTeX');
+  };
+  this.renderCache.getOrCreate('failure', fail);
+  this.renderCache.getOrCreate('failure', fail);
+});
+
+Then('同じ失敗項目の画像処理は一回だけになる', function () {
+  assert.equal(this.failedCreates, 1);
 });
 
 When('外部作用を監視しながら表示数式を変換する', function () {
@@ -281,6 +344,41 @@ Given('pi-formula を新しい Node.js プロセスで読み込む', function ()
   this.projectRoot = resolve(__dirname, '../..');
 });
 
+When('入力上限を超えた表示数式を変換する', function () {
+  const script = `
+    const crypto = require('node:crypto');
+    let keyCreations = 0;
+    crypto.createHash = () => { keyCreations += 1; throw new Error('unexpected key creation'); };
+    const loaded = () => Object.keys(require.cache).some((path) =>
+      path.includes('@mathjax/src') || path.includes('@resvg/resvg-js'));
+    const registerFormula = require('./dist/extension.js').default;
+    const { FORMULA_SAFETY_LIMITS } = require('./dist/typesetter.js');
+    const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
+    (async () => {
+      const pi = fakePi(); registerFormula(pi.api); await startWithKitty(pi);
+      const latex = 'x'.repeat(FORMULA_SAFETY_LIMITS.latexCharacters + 1);
+      const source = '$$' + latex + '$$';
+      const rendered = pi.transformer()(source, {
+        messageType: 'assistant', isStreaming: false, availableWidth: 80
+      });
+      process.stdout.write(JSON.stringify({ keyCreations, prepared: loaded(), unchanged: rendered === source }));
+    })().catch((error) => { console.error(error); process.exitCode = 1; });
+  `;
+  const result = childProcess.spawnSync(process.execPath, ['-e', script], {
+    cwd: this.projectRoot, encoding: 'utf8'
+  });
+  assert.equal(result.status, 0, result.stderr);
+  this.oversizedPreparation = JSON.parse(result.stdout);
+});
+
+Then('鍵作成と画像処理へ進まない', function () {
+  assert.deepEqual(this.oversizedPreparation, {
+    keyCreations: 0,
+    prepared: false,
+    unchanged: true
+  });
+});
+
 When('表示数式を初めて変換する', function () {
   const script = `
     const loaded = () => Object.keys(require.cache).some((path) =>
@@ -313,19 +411,30 @@ Then('MathJaxとResvgは最初の表示数式で初めて準備される', funct
 });
 
 When('初回、次の異なる数式、一時保存済み数式を計測する', function () {
-  const renderTimed = (latex) => {
-    const started = performance.now();
-    this.pi.transformer()(`$$${latex}$$`, {
-      messageType: 'assistant', isStreaming: false, availableWidth: 80
-    });
-    return performance.now() - started;
-  };
-  const seed = `${process.pid}-${Date.now()}`;
-  this.durations = {
-    first: renderTimed(`x_{first-${seed}}`),
-    next: renderTimed(`x_{next-${seed}}`)
-  };
-  this.durations.cached = renderTimed(`x_{next-${seed}}`);
+  const script = `
+    const { performance } = require('node:perf_hooks');
+    const registerFormula = require('./dist/extension.js').default;
+    const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
+    (async () => {
+      const pi = fakePi(); registerFormula(pi.api); await startWithKitty(pi);
+      const renderTimed = (latex) => {
+        const started = performance.now();
+        pi.transformer()('$$' + latex + '$$', {
+          messageType: 'assistant', isStreaming: false, availableWidth: 80
+        });
+        return performance.now() - started;
+      };
+      const first = renderTimed('x_{cold1}');
+      const next = renderTimed('x_{cold2}');
+      const cached = renderTimed('x_{cold2}');
+      process.stdout.write(JSON.stringify({ first, next, cached }));
+    })().catch((error) => { console.error(error); process.exitCode = 1; });
+  `;
+  const result = childProcess.spawnSync(process.execPath, ['-e', script], {
+    cwd: resolve(__dirname, '../..'), encoding: 'utf8'
+  });
+  assert.equal(result.status, 0, result.stderr);
+  this.durations = JSON.parse(result.stdout);
 });
 
 Then('初回は1秒未満、次は200ミリ秒未満、一時保存済みは5ミリ秒未満である', function () {
