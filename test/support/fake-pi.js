@@ -82,8 +82,12 @@ async function startSession(pi, options = {}) {
   };
 }
 
-function startWithKitty(pi) {
-  return startSession(pi, { response: 'OK' });
+function startWithKitty(pi, options = {}) {
+  return startSession(pi, {
+    ...options,
+    response: options.response ?? 'OK',
+    textColor: options.foregroundAnsi ?? options.textColor
+  });
 }
 
 function startWithText(pi) {

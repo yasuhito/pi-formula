@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -23,7 +24,7 @@ import {
 } from "./path-settings";
 import { RenderCache } from "./render-cache";
 import { multiplexerProbeResult, probePngSupport, type TerminalProbe } from "./terminal-probe";
-import { typesetMath, type TypesetImage } from "./typesetter";
+import { FORMULA_SAFETY_LIMITS, typesetMath, type TypesetImage } from "./typesetter";
 
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../package.json"), "utf8")
@@ -32,8 +33,6 @@ if (typeof manifest.version !== "string") {
   throw new Error("pi-formula could not read its package version");
 }
 
-const MAX_CACHE_ENTRIES = 64;
-const MAX_LATEX_LENGTH = 16_384;
 const PATH_ENTRY = "pi-formula-path";
 const SHARED_KEY = Symbol.for("pi-formula.shared-api.v1");
 
@@ -74,10 +73,14 @@ function sharedStore(): SharedStore {
 }
 
 function rgbFromAnsi(ansi: string): string | undefined {
-  const match = ansi.match(/38;2;(\d+);(\d+);(\d+)/u);
+  const match = ansi.match(/(?:^|[;[])38;2;(\d{1,3});(\d{1,3});(\d{1,3})(?=m|;)/u);
   if (!match) return undefined;
-  return `#${match.slice(1).map((part) =>
-    Number(part).toString(16).padStart(2, "0")
+  const channels = match.slice(1).map(Number);
+  if (channels.some((channel) => !Number.isInteger(channel) || channel > 255)) {
+    return undefined;
+  }
+  return `#${channels.map((channel) =>
+    channel.toString(16).padStart(2, "0")
   ).join("")}`;
 }
 
@@ -85,24 +88,31 @@ function effectiveMacros(state: FormulaState): FormulaMacros {
   return { ...state.userMacros, ...state.additionalMacros };
 }
 
+interface CachedImage {
+  image: TypesetImage;
+  key: string;
+}
+
 function cachedImage(
   state: FormulaState,
   latex: string,
   availableWidth: number
-): TypesetImage | undefined {
-  if (state.path === "text" || latex.length > MAX_LATEX_LENGTH) return undefined;
+): CachedImage | undefined {
+  if (state.path === "text" ||
+      latex.length > FORMULA_SAFETY_LIMITS.latexCharacters) return undefined;
   const color = state.textColor();
   if (!color) return undefined;
   const cell = getCellDimensions();
   const macros = effectiveMacros(state);
-  const key = JSON.stringify([
+  const key = createHash("sha256").update(JSON.stringify([
     latex, color, availableWidth, cell.widthPx, cell.heightPx, macros
-  ]);
-  return state.imageCache.getOrCreate(
+  ])).digest("hex");
+  const image = state.imageCache.getOrCreate(
     key,
     () => typesetMath(latex, color, availableWidth, cell, macros),
-    (image) => image.scale >= 0.5
+    (value) => value.scale >= 0.5
   );
+  return image ? { image, key } : undefined;
 }
 
 function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
@@ -158,7 +168,10 @@ function newState(): FormulaState {
     textColor: () => undefined,
     userMacros: {},
     additionalMacros: Object.create(null) as Record<string, MacroDefinition>,
-    imageCache: new RenderCache(MAX_CACHE_ENTRIES)
+    imageCache: new RenderCache(
+      FORMULA_SAFETY_LIMITS.cacheEntries,
+      FORMULA_SAFETY_LIMITS.cacheBytes
+    )
   };
 }
 
@@ -183,14 +196,14 @@ export function createFormulaPng(
       || !state
       || !Number.isFinite(availableWidth)
       || availableWidth <= 0) return undefined;
-  const image = cachedImage(state, latex, availableWidth);
-  if (!image) return undefined;
+  const cached = cachedImage(state, latex, availableWidth);
+  if (!cached) return undefined;
   return {
-    data: Buffer.from(image.png),
-    widthPx: image.widthPx,
-    heightPx: image.heightPx,
-    columns: image.columns,
-    rows: image.rows
+    data: Buffer.from(cached.image.png),
+    widthPx: cached.image.widthPx,
+    heightPx: cached.image.heightPx,
+    columns: cached.image.columns,
+    rows: cached.image.rows
   };
 }
 
@@ -250,20 +263,22 @@ export function registerFormula(
 
   pi.registerMarkdownTransformer((markdown, context) => {
     if (context.messageType === "assistant-thinking" || state.path === "text") return markdown;
-    const color = state.textColor();
-    if (!color) return markdown;
     const transfers = new Map<number, string>();
     const transformed = transformDisplayMath(markdown, (latex, original) => {
-      const image = cachedImage(state, latex, context.availableWidth);
-      if (!image) return original;
+      const cached = cachedImage(state, latex, context.availableWidth);
+      if (!cached) return original;
       try {
-        const identity = JSON.stringify([
-          latex, color, context.availableWidth, image.columns, image.rows, effectiveMacros(state)
-        ]);
-        const id = stableImageId(identity);
-        transfers.set(id, encodeTransfer(image.png, id, image.columns, image.rows));
-        return encodePlaceholderRows(id, image.columns, image.rows).join("\n");
+        const id = stableImageId(cached.key);
+        const transfer = encodeTransfer(
+          cached.image.png, id, cached.image.columns, cached.image.rows
+        );
+        const placeholder = encodePlaceholderRows(
+          id, cached.image.columns, cached.image.rows
+        ).join("\n");
+        transfers.set(id, transfer);
+        return placeholder;
       } catch {
+        state.imageCache.recordFailure(cached.key, "placement failed");
         return original;
       }
     });

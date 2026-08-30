@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { inflateSync } = require('node:zlib');
 
-const { typesetMath } = require('../dist/typesetter.js');
+const { FORMULA_SAFETY_LIMITS, typesetMath } = require('../dist/typesetter.js');
 
 const cell = { widthPx: 10, heightPx: 20 };
 
@@ -44,4 +44,37 @@ test('PNG uses twice the pixel density of its terminal placement', () => {
     { width: image.png.readUInt32BE(16), height: image.png.readUInt32BE(20) },
     { width: image.columns * cell.widthPx * 2, height: image.rows * cell.heightPx * 2 }
   );
+});
+
+test('typesetter rejects input beyond the character and row limits', () => {
+  const tooLong = 'x'.repeat(FORMULA_SAFETY_LIMITS.latexCharacters + 1);
+  const tooTall = `\\begin{aligned}${Array.from(
+    { length: FORMULA_SAFETY_LIMITS.imageRows + 1 }, (_, index) => `x_{${index}}`
+  ).join('\\\\')}\\end{aligned}`;
+
+  assert.throws(
+    () => typesetMath(tooLong, '#d4d4d4', 80, cell),
+    /fixed character limit/u
+  );
+  assert.throws(
+    () => typesetMath(tooTall, '#d4d4d4', 80, cell),
+    /fixed row limit/u
+  );
+});
+
+test('typesetter accepts only exact RGB and finite positive layout dimensions', () => {
+  const invalidCalls = [
+    () => typesetMath('x', 'currentColor', 80, cell),
+    () => typesetMath('x', '#d4d4d4', Number.NaN, cell),
+    () => typesetMath('x', '#d4d4d4', 80, { widthPx: 0, heightPx: 20 })
+  ];
+
+  assert.deepEqual(invalidCalls.map((render) => {
+    try {
+      render();
+      return false;
+    } catch {
+      return true;
+    }
+  }), [true, true, true]);
 });

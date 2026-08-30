@@ -54,6 +54,50 @@ test('an accepted image is reused with its image bytes', () => {
   assert.deepEqual({ sameImage: first === second, creates, stats: cache.stats() }, {
     sameImage: true,
     creates: 1,
-    stats: { entries: 1, bytes: 40 }
+    stats: { entries: 1, bytes: Buffer.byteLength('readable') + 40 }
+  });
+});
+
+test('entry and byte limits evict the least recently used image', () => {
+  const cache = new RenderCache(2, 90);
+  const creates = new Map();
+  const get = (key) => cache.getOrCreate(key, () => {
+    creates.set(key, (creates.get(key) ?? 0) + 1);
+    return image(1, 20);
+  });
+
+  get('a');
+  get('b');
+  get('b');
+  get('c');
+  get('a');
+
+  assert.deepEqual({
+    creates: Object.fromEntries(creates),
+    stats: cache.stats()
+  }, {
+    creates: { a: 2, b: 1, c: 1 },
+    stats: { entries: 2, bytes: 82 }
+  });
+});
+
+test('a failed image creation is called once for the same key', () => {
+  const cache = new RenderCache(4, 100);
+  let creates = 0;
+  const create = () => {
+    creates += 1;
+    throw new Error('invalid LaTeX');
+  };
+
+  cache.getOrCreate('invalid', create);
+  cache.getOrCreate('invalid', create);
+
+  assert.deepEqual({ creates, stats: cache.stats() }, {
+    creates: 1,
+    stats: {
+      entries: 1,
+      bytes: Buffer.byteLength('invalid'),
+      lastFailure: 'typesetting failed'
+    }
   });
 });

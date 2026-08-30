@@ -24,7 +24,15 @@ export class RenderCache {
   private bytes = 0;
   private lastFailure?: string;
 
-  constructor(private readonly maxEntries: number) {}
+  constructor(
+    private readonly maxEntries: number,
+    private readonly maxBytes = Number.MAX_SAFE_INTEGER
+  ) {
+    if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0 ||
+        !Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
+      throw new Error("RenderCache limits must be positive safe integers");
+    }
+  }
 
   getOrCreate(
     key: string,
@@ -43,11 +51,12 @@ export class RenderCache {
         this.recordFailure(key, "image would be too small");
         return undefined;
       }
-      this.add(key, {
-        kind: "image",
-        image,
-        bytes: Buffer.byteLength(image.svg) + image.png.byteLength
-      });
+      const bytes = Buffer.byteLength(key) + Buffer.byteLength(image.svg) + image.png.byteLength;
+      if (bytes > this.maxBytes) {
+        this.recordFailure(key, "image exceeds cache byte limit");
+        return undefined;
+      }
+      this.add(key, { kind: "image", image, bytes });
       return image;
     } catch {
       this.recordFailure(key, "typesetting failed");
@@ -64,7 +73,7 @@ export class RenderCache {
 
   recordFailure(key: string, reason: string): void {
     this.lastFailure = reason;
-    if (this.entries.has(key)) return;
+    this.remove(key);
     this.add(key, { kind: "failure", bytes: Buffer.byteLength(key) });
   }
 
@@ -87,15 +96,20 @@ export class RenderCache {
     this.entries.set(key, entry);
   }
 
+  private remove(key: string): void {
+    const entry = this.entries.get(key);
+    if (!entry) return;
+    this.entries.delete(key);
+    this.bytes -= entry.bytes;
+  }
+
   private add(key: string, entry: CacheEntry): void {
     this.entries.set(key, entry);
     this.bytes += entry.bytes;
-    while (this.entries.size > this.maxEntries) {
+    while (this.entries.size > this.maxEntries || this.bytes > this.maxBytes) {
       const oldestKey = this.entries.keys().next().value as string | undefined;
       if (oldestKey === undefined) break;
-      const oldest = this.entries.get(oldestKey)!;
-      this.entries.delete(oldestKey);
-      this.bytes -= oldest.bytes;
+      this.remove(oldestKey);
     }
   }
 }
