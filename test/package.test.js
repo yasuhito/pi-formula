@@ -29,7 +29,11 @@ test('a local tarball is discovered by the real Pi runtime', { timeout: 60000 },
       encoding: 'utf8'
     });
     assert.equal(packed.status, 0, packed.stderr);
-    const tarball = join(temporary, JSON.parse(packed.stdout)[0].filename);
+    const packResult = JSON.parse(packed.stdout);
+    const packedPackage = Array.isArray(packResult)
+      ? packResult[0]
+      : packResult['pi-formula'];
+    const tarball = join(temporary, packedPackage.filename);
     const isolatedEnv = {
       ...process.env,
       HOME: temporary,
