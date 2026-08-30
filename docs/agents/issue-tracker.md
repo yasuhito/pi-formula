@@ -20,3 +20,24 @@
 ## 子Issueと依存関係
 
 複数の作業へ分ける場合は GitHub の子Issueを使う。作業順は GitHub の依存関係で表し、依存関係を使えない場合だけIssue本文の `Blocked by:` 行へ記録する。未完了の依存先がなく、担当者がいないIssueを次の作業候補とする。
+
+## 実装契約
+
+自動実装に渡す issue の本文には、次の節を置く。
+
+- `## What to build`: 何をどう変えるか
+- `## Acceptance criteria`: 検証できる条件のチェックリスト
+- `## Out of scope`（任意）: この issue でやらないこと
+
+## 自動化ループのラベル
+
+| label | 意味 |
+| --- | --- |
+| `agent:implement` | `ready-for-agent` と併用すると、issue coordinator が worker に渡す |
+| `agent:in-progress` | worker が実装中 |
+| `agent:waiting-dependency` | 依存 issue の完了待ち。依存がすべて閉じると自動で `agent:implement` に戻る |
+| `agent:blocked` | 自動処理を停止。原因を人間が確認するまで再実行しない |
+| `agent:review` | PR がレビュー待ち |
+| `agent:reviewing` | PR reviewer がレビュー中 |
+
+automation の定義は `docs/agents/automations/` を参照する。

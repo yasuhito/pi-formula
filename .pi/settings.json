@@ -1,0 +1,8 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "z-ai/glm-5.3-flash",
+  "defaultThinkingLevel": "max",
+  "enabledModels": [
+    "openrouter/z-ai/glm-5.3-flash"
+  ]
+}

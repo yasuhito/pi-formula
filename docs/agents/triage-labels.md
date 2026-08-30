@@ -11,3 +11,5 @@ triage スキルの役割を、同名の GitHub label に対応させる。
 | `wontfix` | `wontfix` | 対応しない |
 
 スキルが役割名を示した場合は、この表の GitHub label を使う。
+
+自動化ループ専用の `agent:*` label は `docs/agents/issue-tracker.md` を参照する。
