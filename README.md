@@ -1,26 +1,51 @@
 # Formula for Pi
 
-Readable LaTeX in Pi: terminal-native inline math and MathJax display images.
+[日本語](README.ja.md)
 
-Formula for Pi keeps inline formulas such as `$x^2$` and `\(x^2\)` in Pi's Unicode text renderer. In Ghostty and Kitty, display formulas such as `$$x^2$$` and `\[x^2\]` are rendered as transparent MathJax PNG images. Other terminals and non-interactive modes keep Pi's text rendering.
+Readable LaTeX in Pi: selectable Unicode inline formulas and MathJax display-formula images.
 
-The extension changes only the displayed Markdown. Saved messages and the model context retain the original LaTeX.
+## Install
 
-## Markdown safety
+Requires Pi 0.84 or later and Node.js 22.19 or later.
 
-Formula for Pi recognizes only `$...$`, `\(...\)`, `$$...$$`, and `\[...\]`. It leaves code fences, inline code, thinking, escaped dollar signs, ordinary money, URLs, shell variables, ambiguous dollar signs, and incomplete formulas unchanged. Closed display formulas can appear while a response is streaming, and display formulas keep their list or quote nesting.
+```sh
+pi install npm:pi-formula
+```
 
-If one display formula is invalid, exceeds the fixed character or image-cell limits, cannot obtain an exact theme RGB color, or would shrink below half size, Formula for Pi leaves that formula as LaTeX and continues rendering the rest of the message.
+Pi loads the extension automatically. Ask the model to use `$...$` or `\(...\)` for inline formulas and `$$...$$` or `\[...\]` for display formulas.
 
-## Image safety
+## Preview
 
-MathJax and Resvg are loaded only when the first display formula enters the image path. SVG and PNG data stay in a bounded in-memory cache; they are never written to disk. Cache identity includes the current theme color, available width, and terminal cell dimensions. Rendering does not use a network connection, browser, or child process.
+The Ghostty capture below shows Unicode inline formulas in the prose and MathJax images for display formulas at the same time.
 
-The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Failed formulas are cached too, so repeated invalid input is not typeset again.
+![Ghostty showing Unicode inline formulas and MathJax display-formula images](assets/ghostty-formulas.png)
 
-## Macros
+## What it does
 
-Put persistent user macros in `$XDG_CONFIG_HOME/pi-formula/config.json` (or `~/.config/pi-formula/config.json`):
+- **Inline formulas** (`$...$` and `\(...\)`) stay in Pi's Unicode text renderer. They remain selectable, searchable, and aligned with surrounding text.
+- **Display formulas** (`$$...$$` and `\[...\]`) use transparent MathJax PNG images on the image path.
+- If images are unavailable, display formulas use Pi's Unicode text path too.
+- Only displayed Markdown changes. Saved messages and model context retain the original LaTeX.
+
+Formula for Pi leaves code fences, inline code, thinking, escaped dollar signs, ordinary money, URLs, shell variables, ambiguous dollar signs, and incomplete formulas unchanged. A closed display formula can appear while a response is streaming and keeps its list or quote nesting.
+
+If one display formula is invalid, exceeds a safety limit, lacks an exact theme RGB color, or would shrink below half size, only that formula stays as LaTeX. Later formulas continue rendering.
+
+## `/formula` command
+
+| Command | Effect |
+| --- | --- |
+| `/formula status` | Show the version, active path, selection reason, terminal, macro count, in-memory cache size, and latest failure. |
+| `/formula image` | Select the image path for this Pi session. |
+| `/formula text` | Select the text path for this Pi session. |
+| `/formula auto` | Return this Pi session to automatic selection. |
+| `/formula clear` | Remove rendered images and failures from the in-memory cache. |
+
+Add `--default` to `image`, `text`, or `auto` to change the global default. For example, `/formula text --default` saves the text path. `/formula auto --default` removes the saved path. A command without `--default` affects only the current session.
+
+## Configuration
+
+The configuration file is `$XDG_CONFIG_HOME/pi-formula/config.json`, or `~/.config/pi-formula/config.json` when `XDG_CONFIG_HOME` is unset.
 
 ```json
 {
@@ -31,11 +56,49 @@ Put persistent user macros in `$XDG_CONFIG_HOME/pi-formula/config.json` (or `~/.
 }
 ```
 
-`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides names from the file. An invalid JSON source is ignored. An invalid individual definition is ignored without disabling the other definitions or a valid file definition with the same name.
+`path` can be `image`, `text`, or omitted for automatic selection. `/formula` writes only explicit defaults; `auto` is represented by an omitted `path`.
+
+`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides valid names from the file:
+
+```sh
+export PI_FORMULA_MACROS='{"RR":"\\mathbb{R}"}'
+```
+
+An invalid JSON source is ignored. An invalid individual macro is ignored without disabling other definitions. Macro names contain ASCII letters. A definition is a replacement string or `[replacement, argumentCount]`, where `argumentCount` is an integer from 0 through 9. Write `\\#` for a literal hash.
+
+## Supported terminals and operating systems
+
+| Environment | Result |
+| --- | --- |
+| Ghostty on Linux or macOS | Image path after a successful PNG query |
+| Kitty on Linux or macOS | Image path after a successful PNG query |
+| Other terminals | Text path |
+| tmux or screen | Text path; no image query |
+| Non-interactive Pi modes | Text path; no terminal controls |
+
+The supported image path is a direct Ghostty or Kitty session on Linux or macOS. A rejected or unanswered PNG query safely selects the text path. Windows and other terminal image protocols are not supported or verified in 0.1.0.
+
+## Not supported and extension coexistence
+
+Formula for Pi intentionally does not:
+
+- render inline formulas as images;
+- recognize LaTeX delimiters other than `$...$`, `\(...\)`, `$$...$$`, and `\[...\]`;
+- guarantee images through terminal multiplexers;
+- include subject-specific macros by default;
+- provide an ES Modules entry point in 0.1.0.
+
+Do not enable Formula for Pi with other math rendering extensions that transform the same Markdown. Their transformers can duplicate or corrupt output. `qni-cli` is the exception: it uses Formula for Pi's public API, supplies protected additional macros, and shares registration so that installing both still creates one formula renderer and one `/formula` command.
+
+## Image safety
+
+MathJax and Resvg load only when the first display formula enters the image path. SVG and PNG data stay in a bounded in-memory cache and are never written to disk. Rendering does not use a network connection, browser, or child process.
+
+The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Failed formulas are cached, so repeated invalid input is not typeset again.
 
 ## Extension API
 
-The CommonJS package exports only `registerFormula` and synchronous `createFormulaPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+The CommonJS package exports only synchronous `registerFormula` and `createFormulaPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
 
 ```js
 const { createFormulaPng, registerFormula } = require("pi-formula");
@@ -47,28 +110,18 @@ registerFormula(pi, {
 const image = createFormulaPng("\\ket{0}", availableWidth);
 ```
 
-Additional macro names contain ASCII letters, with an optional leading backslash. A definition is either a replacement string (including an empty string) or `[replacement, argumentCount]`, where `argumentCount` is an integer from 0 through 9. References such as `#1` must not exceed that count; write `\\#` for a literal hash. `registerFormula` throws `TypeError` if any additional macro is invalid.
+Additional macro names contain ASCII letters, with an optional leading backslash. Invalid additional macros make `registerFormula` throw `TypeError`. Additional macros override user macros and stay protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
 
-`image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts; it does not contain a Pi UI component. Each call returns an independent PNG buffer. Additional macros override user macros and remain protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
+`image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts. It does not contain a Pi UI component. Each call returns an independent PNG buffer.
 
-## Try a local tarball
+## Audit and releases
 
-Requires Pi 0.84 or later and Node.js 22.19 or later.
+- [CHANGELOG.md](CHANGELOG.md) describes user-visible changes.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records source provenance, direct dependency versions, update status, licenses, and the dated vulnerability check.
+- [LICENSE](LICENSE) contains the MIT License.
+
+To inspect the exact npm payload locally:
 
 ```sh
-npm pack
-pi install npm:pi-formula@file:./pi-formula-0.1.0.tgz
+npm pack --dry-run
 ```
-
-Formula for Pi checks terminal image support with a PNG query. Ghostty and Kitty responses select the image path. A rejected or unanswered query, tmux, screen, and non-interactive Pi modes select the text path without sending terminal controls.
-
-## Display path command
-
-Use `/formula` with one of these actions:
-
-- `status` shows the version, active path, selection reason, terminal, macro count, in-memory cache size, and latest failure.
-- `image` or `text` selects a path for the current session.
-- `auto` returns the current session to automatic selection.
-- `clear` removes rendered images and failures from the in-memory cache.
-
-Add `--default` to `image`, `text`, or `auto` to update the global default. Formula for Pi writes only explicit defaults to `${XDG_CONFIG_HOME:-~/.config}/pi-formula/config.json`; `auto --default` removes the saved path. Without `--default`, a path selection is saved only in the current Pi session.

@@ -24,12 +24,17 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/yasuhito/pi-formula/main/assets/ghostty-formulas.png"
   },
   "files": [
     "src/",
     "dist/",
+    "assets/ghostty-formulas.png",
+    "README.md",
+    "README.ja.md",
     "LICENSE",
+    "CHANGELOG.md",
     "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
