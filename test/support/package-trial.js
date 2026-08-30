@@ -2,6 +2,8 @@ const { realpathSync } = require('node:fs');
 const { spawn } = require('node:child_process');
 const { isAbsolute, relative } = require('node:path');
 
+const PACKAGE_TRIAL_STEP_TIMEOUT_MS = 90_000;
+
 function isInside(directory, path) {
   const route = relative(realpathSync(directory), realpathSync(path));
   return route !== '' && !route.startsWith('..') && !isAbsolute(route);
@@ -93,4 +95,8 @@ async function commandsFromRealPi(cwd, env, options = {}) {
   };
 }
 
-module.exports = { commandsFromRealPi, isInside };
+module.exports = {
+  commandsFromRealPi,
+  isInside,
+  PACKAGE_TRIAL_STEP_TIMEOUT_MS
+};

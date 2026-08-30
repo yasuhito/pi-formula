@@ -10,7 +10,15 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
 
-const { commandsFromRealPi, isInside } = require('./support/package-trial');
+const {
+  commandsFromRealPi,
+  isInside,
+  PACKAGE_TRIAL_STEP_TIMEOUT_MS
+} = require('./support/package-trial');
+
+test('package trial allows at least one minute for slow platform installs', () => {
+  assert.equal(PACKAGE_TRIAL_STEP_TIMEOUT_MS >= 60_000, true);
+});
 
 test('temporary install check resolves directory aliases before comparing paths', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'pi-formula-path-alias-'));

@@ -5,7 +5,11 @@ const { join, resolve } = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { After, Given, setDefaultTimeout, Then, When } = require('@cucumber/cucumber');
-const { commandsFromRealPi, isInside } = require('../../test/support/package-trial');
+const {
+  commandsFromRealPi,
+  isInside,
+  PACKAGE_TRIAL_STEP_TIMEOUT_MS
+} = require('../../test/support/package-trial');
 
 setDefaultTimeout(30_000);
 
@@ -143,7 +147,9 @@ Given('pi-formula の公開候補 tarball がある', function () {
   }
 });
 
-When('tarball を新しい一時環境へ導入して本物の Pi で調べる', async function () {
+When('tarball を新しい一時環境へ導入して本物の Pi で調べる', {
+  timeout: PACKAGE_TRIAL_STEP_TIMEOUT_MS
+}, async function () {
   const work = join(this.packageTrialRoot, 'work');
   const home = join(this.packageTrialRoot, 'home');
   const config = join(this.packageTrialRoot, 'config');
