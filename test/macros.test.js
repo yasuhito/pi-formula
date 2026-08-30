@@ -3,6 +3,10 @@ const test = require('node:test');
 
 const { validateAdditionalMacros } = require('../dist/macros.js');
 
+test('macro validation accepts empty string replacements', () => {
+  assert.deepEqual(validateAdditionalMacros({ empty: '' }), { empty: '' });
+});
+
 test('macro validation follows TeX hash escaping and parameter references', () => {
   const escaped = validateAdditionalMacros({ hash: '\\#' });
   const errors = [];

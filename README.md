@@ -41,6 +41,8 @@ registerFormula(pi, {
 const image = createFormulaPng("\\ket{0}", availableWidth);
 ```
 
+Additional macro names contain ASCII letters, with an optional leading backslash. A definition is either a replacement string (including an empty string) or `[replacement, argumentCount]`, where `argumentCount` is an integer from 0 through 9. References such as `#1` must not exceed that count; write `\\#` for a literal hash. `registerFormula` throws `TypeError` if any additional macro is invalid.
+
 `image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts; it does not contain a Pi UI component. Each call returns an independent PNG buffer. Additional macros override user macros and remain protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
 
 ## Try a local tarball

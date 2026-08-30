@@ -86,6 +86,33 @@ Then('環境変数の利用者マクロで PNG が作られる', function () {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
+Given('空文字列の利用者マクロがある', function () {
+  writeConfig(this, { empty: '' });
+});
+
+When('空文字列の利用者マクロを使う PNG を公開 API で作る', async function () {
+  await registeredImageApi(this);
+  this.image = this.formula.createFormulaPng('\\empty{}x', 80);
+  this.expectedImage = this.formula.createFormulaPng('x', 80);
+});
+
+Then('空文字列の利用者マクロが使える', function () {
+  assert.deepEqual(this.image?.data, this.expectedImage?.data);
+});
+
+Given('空文字列の追加マクロがある', async function () {
+  await registeredImageApi(this, { empty: '' });
+});
+
+When('空文字列の追加マクロを使う PNG を公開 API で作る', function () {
+  this.image = this.formula.createFormulaPng('\\empty{}x', 80);
+  this.expectedImage = this.formula.createFormulaPng('x', 80);
+});
+
+Then('空文字列の追加マクロが使える', function () {
+  assert.deepEqual(this.image?.data, this.expectedImage?.data);
+});
+
 Given('エスケープしたハッシュ記号の利用者マクロがある', function () {
   writeConfig(this, { hash: '\\#' });
 });

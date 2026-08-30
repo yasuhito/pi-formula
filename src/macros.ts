@@ -73,7 +73,7 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
     ) {
       normalized = [definition[0], definition[1]];
     }
-    if (!normalized) {
+    if (normalized === undefined) {
       result.rejected.add(name);
       result.errors.push(
         `${source}: \\${name} must be a string or [replacement, argument count]`
