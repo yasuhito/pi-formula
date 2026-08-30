@@ -34,6 +34,24 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
 
 このスクリプトは一時 `.npmrc` に秘密参照だけを書き、`op run` の子プロセスへトークンと OTP を渡す。秘密情報を標準出力へ表示せず、ファイルやログへ値を保存しない。一時 `.npmrc` は終了時に削除する。
 
+5. npm の版を確認し、検証済みのローカルコミットが `origin/main` と一致することを確認する。タグはまだ push しない。
+
+   ```sh
+   npm view pi-formula@0.1.0 version dist.integrity
+   git fetch origin main
+   test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+   ```
+
+6. `initial-release` を手動で起動する。
+
+   ```sh
+   gh workflow run release.yml --ref main -f tag=v0.1.0
+   gh run list --workflow release.yml --event workflow_dispatch --limit 1
+   gh run watch <run-id>
+   ```
+
+`initial-release` は同じ全チェックを再実行し、指定版と tarball の integrity が npm の公開物に一致することを確認してから、選択したコミットに遠隔タグを付け、`pi-formula 0.1.0` という題名と `release-notes.md` を持つ GitHub Release を作る。タグ作成には workflow の `GITHUB_TOKEN` を使うため、タグ push 用の公開処理は新しく起動せず、同じ npm 版を再公開しない。初回版は 1Password で手動公開するため、OpenID Connect の由来証明は付かない。
+
 ## 継続公開の事前設定
 
 初回公開後、npm のパッケージ設定で GitHub Actions を信頼された公開元として登録する。
@@ -68,7 +86,7 @@ workdir=$(mktemp -d)
 rm -rf "$workdir"
 ```
 
-さらに新しい一時環境で `pi install npm:pi-formula@X.Y.Z` を実行し、Pi が拡張を読み込めることを確認する。npm の Provenance 表示から、`yasuhito/pi-formula` の `release.yml` と対象タグに由来することも確認する。
+さらに新しい一時環境で `pi install npm:pi-formula@X.Y.Z` を実行し、Pi が拡張を読み込めることを確認する。継続公開では、npm の Provenance 表示から `yasuhito/pi-formula` の `release.yml` と対象タグに由来することも確認する。1Password を使う初回版には OpenID Connect の由来証明がないため、この Provenance 表示の確認だけを省く。
 
 ## 認証または外部サービスで止まった場合
 

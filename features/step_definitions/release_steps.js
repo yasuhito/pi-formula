@@ -41,6 +41,49 @@ Then('秘密情報を表示もログ保存もせず初回公開できる', funct
   });
 });
 
+Given('初回版が 1Password で npm に公開済みである', function () {
+  this.releaseGuide = readProjectFile('docs/releasing.md');
+  this.releaseWorkflow = readProjectFile('.github/workflows/release.yml');
+});
+
+When('初回版の遠隔タグと Release を作る経路を調べる', function () {
+  this.initialReleaseJob = this.releaseWorkflow.slice(
+    this.releaseWorkflow.indexOf('\n  initial-release:')
+  );
+});
+
+Then('タグ push 用の公開処理と競合せず初回版を完了できる', function () {
+  const npmCheck = this.initialReleaseJob.indexOf('npm view');
+  const tagCreation = this.initialReleaseJob.indexOf('git/refs');
+  assert.deepEqual({
+    manualTrigger: /workflow_dispatch:/u.test(this.releaseWorkflow),
+    initialJobOnly: /if: github\.event_name == 'workflow_dispatch'/u.test(this.initialReleaseJob),
+    tagJobsOnlyOnPush: (this.releaseWorkflow.match(/if: github\.event_name == 'push'/gu) ?? []).length,
+    npmCheckedBeforeTag: npmCheck !== -1 && npmCheck < tagCreation,
+    exactTarballChecked: /dist\.integrity/u.test(this.initialReleaseJob) && /LOCAL_INTEGRITY/u.test(this.initialReleaseJob),
+    createsTag: /refs\/tags\/\$\{RELEASE_TAG\}/u.test(this.initialReleaseJob),
+    createsRelease: /gh release create "\$\{RELEASE_TAG\}"/u.test(this.initialReleaseJob),
+    releaseTitle: /--title "pi-formula \$\{VERSION\}"/u.test(this.initialReleaseJob),
+    releaseNotes: /--notes-file \.release\/release-notes\.md/u.test(this.initialReleaseJob),
+    noRepublish: !/npm publish/u.test(this.initialReleaseJob),
+    tokenDoesNotRetrigger: /GITHUB_TOKEN[^\n]*タグ push 用の公開処理は新しく起動せず/u.test(this.releaseGuide),
+    initialProvenanceException: /初回版[^。]*由来証明は付かない/u.test(this.releaseGuide)
+  }, {
+    manualTrigger: true,
+    initialJobOnly: true,
+    tagJobsOnlyOnPush: 2,
+    npmCheckedBeforeTag: true,
+    exactTarballChecked: true,
+    createsTag: true,
+    createsRelease: true,
+    releaseTitle: true,
+    releaseNotes: true,
+    noRepublish: true,
+    tokenDoesNotRetrigger: true,
+    initialProvenanceException: true
+  });
+});
+
 Given('package.json と異なる版の公開タグがある', function () {
   this.releaseTag = 'v9.9.9';
 });
@@ -153,6 +196,48 @@ When('現在の版の Release 本文を取り出す', function () {
 });
 
 Then('現在の版の Release 本文は見つからない', function () {
+  assert.equal(this.releaseNotes, null);
+});
+
+Given('CHANGELOG に継続行を持つ箇条書きと次の箇条書きがある', function () {
+  this.changelog = [
+    '## 0.1.0 - Unreleased',
+    '',
+    '- First change',
+    '  continues on the next line.',
+    '',
+    '- Second change',
+    '  also continues.',
+    '',
+    '## 0.2.0 - Unreleased',
+    '',
+    '- Later release.',
+    ''
+  ].join('\n');
+  this.changelogVersion = '0.1.0';
+});
+
+Given('CHANGELOG の版に空の箇条書きしかない', function () {
+  this.changelog = '## 0.1.0 - Unreleased\n\n- \n';
+  this.changelogVersion = '0.1.0';
+});
+
+When('その版の Release 本文を取り出す', function () {
+  this.releaseNotes = extractReleaseNotes(this.changelog, this.changelogVersion);
+});
+
+Then('継続行と次の箇条書きが同じ順で保持される', function () {
+  assert.equal(this.releaseNotes, [
+    '- First change',
+    '  continues on the next line.',
+    '',
+    '- Second change',
+    '  also continues.',
+    ''
+  ].join('\n'));
+});
+
+Then('Release 本文は見つからない', function () {
   assert.equal(this.releaseNotes, null);
 });
 
