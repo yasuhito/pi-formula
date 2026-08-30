@@ -269,10 +269,14 @@ export function registerFormula(
       if (!cached) return original;
       try {
         const id = stableImageId(cached.key);
-        transfers.set(id, encodeTransfer(
+        const transfer = encodeTransfer(
           cached.image.png, id, cached.image.columns, cached.image.rows
-        ));
-        return encodePlaceholderRows(id, cached.image.columns, cached.image.rows).join("\n");
+        );
+        const placeholder = encodePlaceholderRows(
+          id, cached.image.columns, cached.image.rows
+        ).join("\n");
+        transfers.set(id, transfer);
+        return placeholder;
       } catch {
         state.imageCache.recordFailure(cached.key, "placement failed");
         return original;
