@@ -17,6 +17,7 @@
 ## 原則
 
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
+- 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。
 - Coordinator は実装しない。検査、claim、worker 起動、監視、検証、PR 作成、ラベル操作だけを行う。
 - Worker 起動時にユーザーの表示中タブを奪わない。`orca-ide worktree create` では `--agent` / `--activate` / `--run-hooks` を使わず、worktree を作ってから `orca-ide terminal create` を `--focus` なしで実行し、可能な限りバックグラウンドで agent を開始する。
 - Worker は実装だけを行う。push、ラベル操作、issue / PR コメント、PR 作成、issue close は禁止する。
