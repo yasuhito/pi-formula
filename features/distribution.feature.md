@@ -22,6 +22,12 @@ pi-formula の利用者として
 - When tarball のファイル一覧を調べる
 - Then src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品情報、表示見本だけが配布される
 
+## Scenario: 公開候補 tarball を隔離環境で試験する
+
+- Given pi-formula の公開候補 tarball がある
+- When tarball を新しい一時環境へ導入して本物の Pi で調べる
+- Then 導入した配布物だけから OS 用 Resvg が読み込まれ formula コマンドが発見される
+
 ## Scenario: 直接依存と由来を日付付きで監査する
 
 - Given pi-formula のライセンスと第三者部品情報がある
