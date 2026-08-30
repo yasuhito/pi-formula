@@ -5,11 +5,17 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { After, Before, Given, Then, When } = require('@cucumber/cucumber');
 
-const { fakePi, startWithKitty, startWithText } = require('../../test/support/fake-pi');
 const {
-  additionalMacros,
+  fakePi,
+  resetFormulaState,
+  startWithKitty,
+  startWithText
+} = require('../../test/support/fake-pi');
+const {
+  loadIntegrationExtension,
   registerIntegrationExtension
 } = require('../../test/support/integration-extension');
+const { loadStandaloneExtension } = require('../../test/support/standalone-extension');
 
 const apiPath = require.resolve('../..');
 
@@ -33,6 +39,7 @@ async function registeredImageApi(world, additional = {}) {
 }
 
 Before(function () {
+  resetFormulaState();
   this.originalEnvironment = {
     XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
     PI_FORMULA_MACROS: process.env.PI_FORMULA_MACROS
@@ -57,9 +64,7 @@ Given('XDG 設定と環境変数に異なる利用者マクロがある', functi
 
 When('両方の利用者マクロを使う PNG を公開 API で作る', async function () {
   await registeredImageApi(this);
-  this.image = this.formula.createFormulaPng(
-    this.pi.api, '\\configured+\\temporary', 80
-  );
+  this.image = this.formula.createFormulaPng('\\configured+\\temporary', 80);
 });
 
 Then('XDG 設定と環境変数の利用者マクロが一緒に使える', function () {
@@ -73,11 +78,20 @@ Given('XDG 設定と環境変数に同名の利用者マクロがある', functi
 
 When('同名の利用者マクロを使う PNG を公開 API で作る', async function () {
   await registeredImageApi(this);
-  this.image = this.formula.createFormulaPng(this.pi.api, '\\chosen', 80);
-  this.expectedImage = this.formula.createFormulaPng(this.pi.api, 'x', 80);
+  this.image = this.formula.createFormulaPng('\\chosen', 80);
+  this.expectedImage = this.formula.createFormulaPng('x', 80);
 });
 
 Then('環境変数の利用者マクロで PNG が作られる', function () {
+  assert.deepEqual(this.image?.data, this.expectedImage?.data);
+});
+
+Given('正しい同名 XDG 定義と壊れた環境変数定義がある', function () {
+  writeConfig(this, { chosen: 'x' });
+  process.env.PI_FORMULA_MACROS = JSON.stringify({ chosen: ['#2', 1] });
+});
+
+Then('正しい XDG 定義で PNG が作られる', function () {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
@@ -87,8 +101,8 @@ Given('正しい定義と壊れた定義を含む利用者マクロ設定があ�
 
 When('正しい利用者マクロと壊れた利用者マクロから PNG を作る', async function () {
   await registeredImageApi(this);
-  this.usableImage = this.formula.createFormulaPng(this.pi.api, '\\usable', 80);
-  this.brokenImage = this.formula.createFormulaPng(this.pi.api, '\\broken{x}', 80);
+  this.usableImage = this.formula.createFormulaPng('\\usable', 80);
+  this.brokenImage = this.formula.createFormulaPng('\\broken{x}', 80);
 });
 
 Then('正しい利用者マクロだけが使える', function () {
@@ -105,7 +119,7 @@ Given('正しい XDG 設定と壊れた JSON の環境変数がある', function
 
 When('XDG 設定の利用者マクロを使う PNG を公開 API で作る', async function () {
   await registeredImageApi(this);
-  this.image = this.formula.createFormulaPng(this.pi.api, '\\configured', 80);
+  this.image = this.formula.createFormulaPng('\\configured', 80);
 });
 
 Then('壊れた環境変数に関係なく XDG 設定の利用者マクロが使える', function () {
@@ -117,15 +131,28 @@ Given('試験用の連携拡張と同名の利用者マクロがある', functio
 });
 
 When('連携拡張の追加マクロを使う PNG を公開 API で作る', async function () {
-  await registeredImageApi(this);
+  this.pi = fakePi();
   this.integration = registerIntegrationExtension(this.pi.api);
+  await startWithKitty(this.pi);
+  this.formula = freshApi();
   this.image = this.integration.createPng('\\trial{x}');
-  this.expectedImage = this.formula.createFormulaPng(
-    this.pi.api, '\\left|x\\right\\rangle', 80
-  );
+  this.expectedImage = this.formula.createFormulaPng('\\left|x\\right\\rangle', 80);
 });
 
 Then('利用者設定では追加マクロを上書きできない', function () {
+  assert.deepEqual(this.image?.data, this.expectedImage?.data);
+});
+
+Given('Object prototype と同名の追加マクロがある', async function () {
+  await registeredImageApi(this, { constructor: 'x' });
+});
+
+When('その追加マクロを使う PNG を公開 API で作る', function () {
+  this.image = this.formula.createFormulaPng('\\constructor', 80);
+  this.expectedImage = this.formula.createFormulaPng('x', 80);
+});
+
+Then('Object prototype と同名の追加マクロが使える', function () {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
@@ -144,7 +171,7 @@ Then('拡張登録と同期的な PNG 作成だけが公開される', function 
 Given('画像経路を使う試験用の連携拡張がある', async function () {
   this.pi = fakePi();
   this.integration = registerIntegrationExtension(this.pi.api);
-  await startWithKitty(this.pi);
+  this.started = await startWithKitty(this.pi);
 });
 
 When('連携拡張が公開 API で PNG を作る', function () {
@@ -163,6 +190,16 @@ Then('PNG データと大きさが画面部品なしで返る', function () {
   });
 });
 
+When('テーマの文字色を変えて同じ表示数式の PNG を作る', function () {
+  this.imageBeforeThemeChange = this.integration.createPng('x');
+  this.started.setTextColor('\x1b[38;2;1;2;3m');
+  this.imageAfterThemeChange = this.integration.createPng('x');
+});
+
+Then('変更後の文字色で新しい PNG が作られる', function () {
+  assert.equal(this.imageBeforeThemeChange.data.equals(this.imageAfterThemeChange.data), false);
+});
+
 Given('テキスト経路を使う試験用の連携拡張がある', async function () {
   this.pi = fakePi();
   this.integration = registerIntegrationExtension(this.pi.api);
@@ -174,19 +211,25 @@ Then('公開 API は画像を返さない', function () {
 });
 
 async function loadBoth(world, bundledFirst) {
-  const standalone = freshApi();
-  const bundled = freshApi();
-  world.pi = fakePi();
+  const first = bundledFirst ? loadIntegrationExtension() : loadStandaloneExtension();
+  const second = bundledFirst ? loadStandaloneExtension() : loadIntegrationExtension();
+  const bundled = bundledFirst ? first : second;
+  const standalone = bundledFirst ? second : first;
+  const shared = {};
+  const standalonePi = fakePi({ shared });
+  const bundledPi = fakePi({ shared });
+  let integration;
   if (bundledFirst) {
-    bundled.registerFormula(world.pi.api, additionalMacros);
-    standalone.registerFormula(world.pi.api);
+    integration = bundled.register(bundledPi.api);
+    standalone.register(standalonePi.api);
   } else {
-    standalone.registerFormula(world.pi.api);
-    bundled.registerFormula(world.pi.api, additionalMacros);
+    standalone.register(standalonePi.api);
+    integration = bundled.register(bundledPi.api);
   }
-  await startWithKitty(world.pi);
-  world.counts = world.pi.registrationCounts();
-  world.integrationImage = bundled.createFormulaPng(world.pi.api, '\\trial{x}', 80);
+  await startWithKitty(bundledFirst ? bundledPi : standalonePi);
+  world.counts = standalonePi.registrationCounts();
+  world.integrationImage = integration.createPng('\\trial{x}', 80);
+  world.distinctApis = standalonePi.api !== bundledPi.api;
 }
 
 Given('単体版を同梱版より先に読み込む', async function () {
@@ -198,13 +241,18 @@ Given('同梱版を単体版より先に読み込む', async function () {
 });
 
 When('両方の拡張登録を調べる', function () {
-  this.result = { ...this.counts, additionalMacro: Buffer.isBuffer(this.integrationImage?.data) };
+  this.result = {
+    ...this.counts,
+    additionalMacro: Buffer.isBuffer(this.integrationImage?.data),
+    distinctApis: this.distinctApis
+  };
 });
 
 Then('数式描画と formula コマンドは一つになる', function () {
   assert.deepEqual(this.result, {
     transformerRegistrations: 1,
     commandRegistrations: 1,
-    additionalMacro: true
+    additionalMacro: true,
+    distinctApis: true
   });
 });

@@ -1,44 +1,48 @@
-function fakePi() {
-  const handlers = new Map();
-  const commands = new Map();
-  let transformer;
-  let transformerRegistrations = 0;
-  let commandRegistrations = 0;
+const FORMULA_SHARED_KEY = Symbol.for('pi-formula.shared-api.v1');
+
+function resetFormulaState() {
+  Reflect.deleteProperty(globalThis, FORMULA_SHARED_KEY);
+}
+
+function fakePi(options = {}) {
+  const shared = options.shared ?? {};
+  shared.handlers ??= new Map();
+  shared.commands ??= new Map();
+  shared.entries ??= [];
+  shared.transformerRegistrations ??= 0;
+  shared.commandRegistrations ??= 0;
+  shared.sessionEntries ??= options.sessionEntries ?? [];
   return {
     api: {
-      on(name, handler) { handlers.set(name, handler); },
+      on(name, handler) { shared.handlers.set(name, handler); },
+      appendEntry(customType, data) {
+        shared.entries.push({ type: 'custom', customType, data });
+      },
       registerMarkdownTransformer(value) {
-        transformer = value;
-        transformerRegistrations += 1;
+        shared.transformer = value;
+        shared.transformerRegistrations += 1;
       },
       registerCommand(name, command) {
-        commands.set(name, command);
-        commandRegistrations += 1;
+        shared.commands.set(name, command);
+        shared.commandRegistrations += 1;
       }
     },
-    handlers,
-    commands,
-    registrationCounts: () => ({ transformerRegistrations, commandRegistrations }),
-    transformer: () => transformer
+    entries: shared.entries,
+    handlers: shared.handlers,
+    commands: shared.commands,
+    sessionEntries: shared.sessionEntries,
+    registrationCounts: () => ({
+      transformerRegistrations: shared.transformerRegistrations,
+      commandRegistrations: shared.commandRegistrations
+    }),
+    transformer: () => shared.transformer
   };
 }
 
-async function startWithText(pi) {
-  const widgets = new Map();
-  const ctx = {
-    mode: 'rpc',
-    sessionManager: { getBranch: () => [] },
-    ui: {
-      theme: { getFgAnsi: () => '\x1b[38;2;212;212;212m' },
-      setWidget(name, value) { widgets.set(name, value); }
-    }
-  };
-  await pi.handlers.get('session_start')({ reason: 'startup' }, ctx);
-  return { ctx, widgets };
-}
-
-async function startWithKitty(pi) {
+async function startSession(pi, options = {}) {
   let inputListener;
+  let terminalWrites = 0;
+  let textColor = options.textColor ?? '\x1b[38;2;212;212;212m';
   const tui = {
     addInputListener(listener) {
       inputListener = listener;
@@ -46,17 +50,22 @@ async function startWithKitty(pi) {
     },
     terminal: {
       write(query) {
+        terminalWrites += 1;
         const id = /i=(\d+)/u.exec(query)?.[1];
-        queueMicrotask(() => inputListener?.(`\x1b_Gi=${id};OK\x1b\\`));
+        if (options.response !== undefined) {
+          queueMicrotask(() => inputListener?.(`\x1b_Gi=${id};${options.response}\x1b\\`));
+        }
       }
     }
   };
   const widgets = new Map();
+  const notifications = [];
   const ctx = {
-    mode: 'tui',
-    sessionManager: { getBranch: () => [] },
+    mode: options.mode ?? 'tui',
+    sessionManager: { getBranch: () => pi.sessionEntries },
     ui: {
-      theme: { getFgAnsi: () => '\x1b[38;2;212;212;212m' },
+      notify(message, level) { notifications.push({ message, level }); },
+      theme: { getFgAnsi: () => textColor },
       setWidget(name, value) {
         widgets.set(name, value);
         if (typeof value === 'function') value(tui);
@@ -64,7 +73,27 @@ async function startWithKitty(pi) {
     }
   };
   await pi.handlers.get('session_start')({ reason: 'startup' }, ctx);
-  return { ctx, widgets };
+  return {
+    ctx,
+    notifications,
+    terminalWrites,
+    widgets,
+    setTextColor(value) { textColor = value; }
+  };
 }
 
-module.exports = { fakePi, startWithKitty, startWithText };
+function startWithKitty(pi) {
+  return startSession(pi, { response: 'OK' });
+}
+
+function startWithText(pi) {
+  return startSession(pi, { mode: 'rpc' });
+}
+
+module.exports = {
+  fakePi,
+  resetFormulaState,
+  startSession,
+  startWithKitty,
+  startWithText
+};

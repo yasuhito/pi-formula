@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { formulaConfigPath } from "./path-settings";
 
 export type MacroDefinition = string | readonly [replacement: string, argumentsCount: number];
 export type FormulaMacros = Readonly<Record<string, MacroDefinition>>;
@@ -107,8 +106,7 @@ function parseSource(raw: string, source: string): NormalizedMacros {
 }
 
 function configMacros(env: NodeJS.ProcessEnv): NormalizedMacros {
-  const root = env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  const path = join(root, "pi-formula", "config.json");
+  const path = formulaConfigPath(env);
   if (!existsSync(path)) return { macros: {}, rejected: new Set(), errors: [] };
   let raw: string;
   try {
@@ -143,7 +141,6 @@ export function loadUserMacros(env: NodeJS.ProcessEnv): LoadedUserMacros {
     ? { macros: {}, rejected: new Set<string>(), errors: [] }
     : parseSource(env.PI_FORMULA_MACROS, "PI_FORMULA_MACROS");
   const macros: Record<string, MacroDefinition> = { ...configured.macros };
-  for (const rejected of environment.rejected) delete macros[rejected];
   Object.assign(macros, environment.macros);
   return { macros, errors: [...configured.errors, ...environment.errors] };
 }

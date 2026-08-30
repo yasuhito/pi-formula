@@ -25,7 +25,7 @@ Put persistent user macros in `$XDG_CONFIG_HOME/pi-formula/config.json` (or `~/.
 }
 ```
 
-`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides names from the file. An invalid JSON source is ignored. An invalid individual definition is ignored without disabling the other definitions.
+`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides names from the file. An invalid JSON source is ignored. An invalid individual definition is ignored without disabling the other definitions or a valid file definition with the same name.
 
 ## Extension API
 
@@ -38,7 +38,7 @@ registerFormula(pi, {
   ket: ["\\left|#1\\right\\rangle", 1]
 });
 
-const image = createFormulaPng(pi, "\\ket{0}", availableWidth);
+const image = createFormulaPng("\\ket{0}", availableWidth);
 ```
 
 `image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts; it does not contain a Pi UI component. Additional macros override user macros and remain protected when standalone and bundled copies register in either order.
@@ -52,4 +52,15 @@ npm pack
 pi install npm:pi-formula@file:./pi-formula-0.1.0.tgz
 ```
 
-Use `/formula status` to show the package version and the active `image` or `text` path.
+Formula for Pi checks terminal image support with a PNG query. Ghostty and Kitty responses select the image path. A rejected or unanswered query, tmux, screen, and non-interactive Pi modes select the text path without sending terminal controls.
+
+## Display path command
+
+Use `/formula` with one of these actions:
+
+- `status` shows the version, active path, selection reason, terminal, macro count, in-memory cache size, and latest failure.
+- `image` or `text` selects a path for the current session.
+- `auto` returns the current session to automatic selection.
+- `clear` removes rendered images and failures from the in-memory cache.
+
+Add `--default` to `image`, `text`, or `auto` to update the global default. Formula for Pi writes only explicit defaults to `${XDG_CONFIG_HOME:-~/.config}/pi-formula/config.json`; `auto --default` removes the saved path. Without `--default`, a path selection is saved only in the current Pi session.

@@ -22,6 +22,12 @@ Pi の画面部品に依存せず PNG を配置したい
 - When 正しい利用者マクロと壊れた利用者マクロから PNG を作る
 - Then 正しい利用者マクロだけが使える
 
+## Scenario: 壊れた環境変数の定義では XDG 定義を上書きしない
+
+- Given 正しい同名 XDG 定義と壊れた環境変数定義がある
+- When 同名の利用者マクロを使う PNG を公開 API で作る
+- Then 正しい XDG 定義で PNG が作られる
+
 ## Scenario: JSON 全体が壊れた設定元だけを無効にする
 
 - Given 正しい XDG 設定と壊れた JSON の環境変数がある
@@ -34,6 +40,12 @@ Pi の画面部品に依存せず PNG を配置したい
 - When 連携拡張の追加マクロを使う PNG を公開 API で作る
 - Then 利用者設定では追加マクロを上書きできない
 
+## Scenario: Object prototype と同名の追加マクロを登録する
+
+- Given Object prototype と同名の追加マクロがある
+- When その追加マクロを使う PNG を公開 API で作る
+- Then Object prototype と同名の追加マクロが使える
+
 ## Scenario: 公開 API を登録と PNG 作成に絞る
 
 - Given pi-formula の CommonJS 公開 API がある
@@ -45,6 +57,12 @@ Pi の画面部品に依存せず PNG を配置したい
 - Given 画像経路を使う試験用の連携拡張がある
 - When 連携拡張が公開 API で PNG を作る
 - Then PNG データと大きさが画面部品なしで返る
+
+## Scenario: テーマ変更後は現在の文字色で PNG を作る
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When テーマの文字色を変えて同じ表示数式の PNG を作る
+- Then 変更後の文字色で新しい PNG が作られる
 
 ## Scenario: テキスト経路では PNG を返さない
 
