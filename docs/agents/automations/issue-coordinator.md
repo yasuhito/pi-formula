@@ -252,6 +252,8 @@ Issue #<N> を実装してください。
 - PR を作らない。
 - issue を閉じない。
 - unrelated な変更を戻さない。
+- GUI ウィンドウ（Ghostty / Kitty などの端末エミュレータを含む）を開かない。スクリーンショットを撮らない。`hyprctl` / `grim` などデスクトップ操作コマンドを使わない。実表示の目視確認は人間が行う。
+- 1 コマンドが 10 分を超えそうな処理は `timeout` を付ける。
 
 完了出力:
 - 最終回答を出す前に、結果ファイル `<resultPath>` を書いてください。1行目を `HEAD: <git rev-parse HEAD の値>`、2行目を `RESULT: COMPLETE` または `RESULT: BLOCKED: 理由`、続けて修正・テスト・commit の要約、最終行を `<promise>COMPLETE</promise>` または `<promise>BLOCKED: 理由</promise>` にしてください。
@@ -269,7 +271,7 @@ pi の TUI に対する `orca-ide terminal read` は末尾の数行しか返さ�
 
 ```bash
 result_path=/tmp/pi-formula-implement-<N>.md
-for attempt in $(seq 1 12); do
+for attempt in $(seq 1 24); do
   orca-ide terminal wait --terminal "$worker_terminal" --for tui-idle --timeout-ms 300000 --json || true
   test -s "$result_path" && break
   # 結果ファイルが無くても、worktree に新しい commit があり clean で、worker が idle なら完了とみなす
@@ -286,7 +288,7 @@ cat "$result_path" 2>/dev/null || true
 - 結果ファイルに `RESULT: BLOCKED` があれば Fail へ進む。
 - 結果ファイルがあり `RESULT: COMPLETE` で、`HEAD:` が `git -C "$worktree_path" rev-parse HEAD` と一致すれば Verify へ進む。
 - 結果ファイルが無くても「commit あり・clean・idle」を 2 回連続で確認できたら Verify へ進む（Verify で改めて検証する）。
-- 12 回の待機後も commit が無い、または worker terminal が異常終了した場合は Fail へ進む。
+- 24 回の待機後（約 2 時間）も commit が無い、または worker terminal が異常終了した場合は Fail へ進む。
 
 完了条件: COMPLETE / BLOCKED / 安全に続行できない状態のいずれかが判定できている。
 
