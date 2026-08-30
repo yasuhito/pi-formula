@@ -32,7 +32,11 @@ test('a rejected scaled image keeps only a lightweight cache entry', () => {
     first: undefined,
     second: undefined,
     creates: 1,
-    stats: { entries: 1, bytes: Buffer.byteLength('too-small') }
+    stats: {
+      entries: 1,
+      bytes: Buffer.byteLength('too-small'),
+      lastFailure: 'image would be too small'
+    }
   });
 });
 

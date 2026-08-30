@@ -10,11 +10,12 @@ Formula for Pi の利用者として
 - When セッションを開始する
 - Then 画像経路が選ばれる
 
-### Examples
+### Examples:
 
-| terminal |
-| Ghostty  |
-| Kitty    |
+  | terminal |
+  | -------- |
+  | Ghostty  |
+  | Kitty    |
 
 ## Scenario: 画像を使えない環境でテキスト経路を選ぶ
 
@@ -26,7 +27,7 @@ Formula for Pi の利用者として
 
 - Given 画像経路で数式を描ける Pi がある
 - When formula コマンドの image と text と auto を順に実行する
-- Then すべての指定が現在のセッションへ保存される
+- Then 経路が切り替わり、すべての指定が現在のセッションへ保存される
 
 ## Scenario: default 指定だけを XDG 設定へ保存する
 

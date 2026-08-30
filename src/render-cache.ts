@@ -40,7 +40,7 @@ export class RenderCache {
     try {
       const image = create();
       if (!accept(image)) {
-        this.add(key, { kind: "failure", bytes: Buffer.byteLength(key) });
+        this.recordFailure(key, "image would be too small");
         return undefined;
       }
       this.add(key, {

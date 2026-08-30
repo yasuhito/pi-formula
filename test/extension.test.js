@@ -51,13 +51,17 @@ test('an unreadably scaled formula uses text without retaining image bytes', asy
     messageType: 'assistant', isStreaming: false, availableWidth: 10
   });
   await pi.commands.get('formula').handler('status', started.ctx);
-  const cacheBytes = Number(/cache: 1 entries, (\d+) bytes/u.exec(
-    started.widgets.get('pi-formula-status').join('\n')
-  )?.[1]);
+  const status = started.widgets.get('pi-formula-status');
+  const cacheBytes = Number(/cache: 1 entries, (\d+) bytes/u.exec(status.join('\n'))?.[1]);
 
-  assert.deepEqual({ rendered, lightweightCache: cacheBytes > 0 && cacheBytes < 1000 }, {
+  assert.deepEqual({
+    rendered,
+    lightweightCache: cacheBytes > 0 && cacheBytes < 1000,
+    lastFailure: status.find((line) => line.startsWith('last failure:'))
+  }, {
     rendered: markdown,
-    lightweightCache: true
+    lightweightCache: true,
+    lastFailure: 'last failure: image would be too small'
   });
 });
 

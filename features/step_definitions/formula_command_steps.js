@@ -73,13 +73,22 @@ Then('すべての環境でテキスト経路が選ばれる', function () {
 
 When('formula コマンドの image と text と auto を順に実行する', async function () {
   this.started = await startSession(this.pi, { response: 'OK' });
+  this.selectedPaths = [];
   for (const action of ['image', 'text', 'auto']) {
     await this.pi.commands.get('formula').handler(action, this.started.ctx);
+    const lines = await statusLines(this.pi, this.started);
+    this.selectedPaths.push(lines.find((line) => line.startsWith('path:')));
   }
 });
 
-Then('すべての指定が現在のセッションへ保存される', function () {
-  assert.deepEqual(this.pi.entries.map((entry) => entry.data.path), ['image', 'text', 'auto']);
+Then('経路が切り替わり、すべての指定が現在のセッションへ保存される', function () {
+  assert.deepEqual({
+    selectedPaths: this.selectedPaths,
+    savedPaths: this.pi.entries.map((entry) => entry.data.path)
+  }, {
+    selectedPaths: ['path: image', 'path: text', 'path: image'],
+    savedPaths: ['image', 'text', 'auto']
+  });
 });
 
 Given('一時的な XDG 設定を使う Pi がある', function () {
