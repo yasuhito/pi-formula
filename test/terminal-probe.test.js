@@ -14,12 +14,17 @@ test('a partial PNG response returns preceding user input before timing out', as
     terminal: { write(value) { query = value; } }
   };
 
-  const result = probePngSupport(tui);
-  const imageId = /i=(\d+)/u.exec(query)[1];
-  const handled = listener(`typed-before\x1b_Gi=${imageId}`);
+  const keepEventLoopAlive = setTimeout(() => {}, 1000);
+  try {
+    const result = probePngSupport(tui);
+    const imageId = /i=(\d+)/u.exec(query)[1];
+    const handled = listener(`typed-before\x1b_Gi=${imageId}`);
 
-  assert.deepEqual({ handled, probe: await result }, {
-    handled: { data: 'typed-before' },
-    probe: { path: 'text', reason: 'PNG query timed out', response: 'timeout' }
-  });
+    assert.deepEqual({ handled, probe: await result }, {
+      handled: { data: 'typed-before' },
+      probe: { path: 'text', reason: 'PNG query timed out', response: 'timeout' }
+    });
+  } finally {
+    clearTimeout(keepEventLoopAlive);
+  }
 });
