@@ -9,8 +9,13 @@ test('package exposes a CommonJS typesetter', () => {
   const manifest = require(join(root, 'package.json'));
   const exported = require(root);
 
-  assert.equal(manifest.type, 'commonjs');
-  assert.equal(typeof exported.typesetMath, 'function');
+  assert.deepEqual({
+    moduleType: manifest.type,
+    exportedTypesetter: typeof exported.typesetMath
+  }, {
+    moduleType: 'commonjs',
+    exportedTypesetter: 'function'
+  });
 });
 
 test('source contains no qni-specific execution modules', () => {
@@ -27,6 +32,11 @@ test('source contains no qni-specific execution modules', () => {
   }
   const source = files.map((file) => readFileSync(file, 'utf8')).join('\n');
 
-  assert.ok(files.length > 0);
-  assert.doesNotMatch(source, /qni|workdir|registerTool/iu);
+  assert.deepEqual({
+    hasSource: files.length > 0,
+    hasQniSpecificCode: /qni|workdir|registerTool/iu.test(source)
+  }, {
+    hasSource: true,
+    hasQniSpecificCode: false
+  });
 });

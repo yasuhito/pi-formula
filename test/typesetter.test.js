@@ -9,8 +9,6 @@ const cell = { widthPx: 10, heightPx: 20 };
 test('MathJax display formula becomes a transparent PNG', () => {
   const image = typesetMath('\\frac{1}{\\sqrt{2}}', '#d4d4d4', 80, cell);
 
-  assert.equal(image.png.subarray(1, 4).toString('ascii'), 'PNG');
-  assert.equal(image.png[25], 6, 'PNG must use RGBA color');
   const idat = [];
   for (let offset = 8; offset < image.png.length;) {
     const length = image.png.readUInt32BE(offset);
@@ -19,8 +17,17 @@ test('MathJax display formula becomes a transparent PNG', () => {
     offset += length + 12;
   }
   const firstScanline = inflateSync(Buffer.concat(idat));
-  assert.equal(firstScanline[4], 0, 'top-left background pixel must be transparent');
-  assert.match(image.svg, /<svg/u);
+  assert.deepEqual({
+    signature: image.png.subarray(1, 4).toString('ascii'),
+    colorType: image.png[25],
+    topLeftAlpha: firstScanline[4],
+    hasSvg: /<svg/u.test(image.svg)
+  }, {
+    signature: 'PNG',
+    colorType: 6,
+    topLeftAlpha: 0,
+    hasSvg: true
+  });
 });
 
 test('simple display formula uses 65 percent of the terminal cell height', () => {
