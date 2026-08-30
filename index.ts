@@ -69,6 +69,8 @@ const {
 };
 
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
+// Below this fit ratio, a one-cell image loses too much stroke contrast to read.
+const MIN_READABLE_INLINE_SCALE = 0.65;
 const qniExecutable = resolve(__dirname, "../bin/qni.js");
 
 function rgbFromAnsi(ansi: string): string | undefined {
@@ -157,6 +159,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
   let defaultPath: "image" | "text" | undefined;
   let configPath = mathConfigPath(process.env);
   let textColor = initialTextColor();
+  let currentTextColor = (): string => textColor;
   let userMacros: MathMacros = {};
   let macroError: string | undefined;
   const qniWorkdirs = new QniWorkdirs((customType, data) => pi.appendEntry(customType, data));
@@ -177,7 +180,8 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (event, ctx) => {
     qniWorkdirs.restore(ctx.sessionManager.getBranch(), event.reason);
-    textColor = rgbFromAnsi(ctx.ui.theme.getFgAnsi("text")) ?? textColor;
+    currentTextColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text")) ?? textColor;
+    textColor = currentTextColor();
     configPath = mathConfigPath(process.env);
     defaultPath = readDefaultPath(configPath);
     const loadedMacros = loadMathMacros(configPath, process.env);
@@ -217,13 +221,17 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     }
 
     const transfers = new Map<number, string>();
+    const color = currentTextColor();
     const transformed = transformMathMarkdown(markdown, (latex, display, original) => {
-      const image = cachedImage(latex, display, textColor, context.availableWidth, userMacros);
+      const image = cachedImage(latex, display, color, context.availableWidth, userMacros);
       if (!image) return original;
+      if (!display && image.scale < MIN_READABLE_INLINE_SCALE) {
+        return expandQuantumMacros(original, userMacros);
+      }
       const identity = JSON.stringify([
         latex,
         display,
-        textColor,
+        color,
         context.availableWidth,
         image.rows
       ]);
@@ -312,7 +320,8 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
       const details = result.details as QniToolDetails | undefined;
       const imageForLatex = (latex: string) => {
         if (effectivePath !== "image") return undefined;
-        const color = rgbFromAnsi(theme.fg("toolOutput", "sample")) ?? textColor;
+        const color = rgbFromAnsi(theme.fg("toolOutput", "sample"));
+        if (!color) return undefined;
         const maxWidthCells = expanded ? 120 : 60;
         const image = cachedImage(latex.trim(), true, color, maxWidthCells, userMacros);
         if (!image) return undefined;

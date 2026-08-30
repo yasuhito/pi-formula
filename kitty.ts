@@ -38,14 +38,14 @@ export function encodeTransfer(png: Buffer, id: number, columns: number, rows: n
     chunks.push(payload.slice(offset, offset + CHUNK_SIZE));
   }
 
-  const transfers = chunks.map((chunk, index) => {
+  const placement = `a=T,f=100,q=2,U=1,i=${id},p=${id},c=${columns},r=${rows}`;
+  return chunks.map((chunk, index) => {
     const more = index < chunks.length - 1;
     const control = index === 0
-      ? `a=t,f=100,q=2,i=${id}${more ? ",m=1" : ""}`
-      : `q=2,m=${more ? 1 : 0}`;
+      ? `${placement}${more ? ",m=1" : ""}`
+      : `m=${more ? 1 : 0},q=2`;
     return command(control, chunk);
   }).join("");
-  return transfers + command(`a=p,U=1,q=2,i=${id},p=${id},c=${columns},r=${rows}`);
 }
 
 export function encodePlaceholderRows(id: number, columns: number, rows: number): string[] {
@@ -56,12 +56,13 @@ export function encodePlaceholderRows(id: number, columns: number, rows: number)
   const green = (id >> 8) & 0xff;
   const blue = id & 0xff;
   const foreground = `${ESC}[38;2;${red};${green};${blue}m`;
+  const underline = `${ESC}[58;2;${red};${green};${blue}m`;
 
   return Array.from({ length: rows }, (_, row) => {
     const cells = Array.from(
       { length: columns },
       (_, column) => PLACEHOLDER + DIACRITICS[row] + DIACRITICS[column]
     ).join("");
-    return `${foreground}${cells}${ESC}[39m`;
+    return `${foreground}${underline}${cells}${ESC}[39;59m`;
   });
 }
