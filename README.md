@@ -12,6 +12,39 @@ Formula for Pi recognizes only `$...$`, `\(...\)`, `$$...$$`, and `\[...\]`. It 
 
 If one display formula is invalid, Formula for Pi leaves that formula as LaTeX and continues rendering the rest of the message.
 
+## Macros
+
+Put persistent user macros in `$XDG_CONFIG_HOME/pi-formula/config.json` (or `~/.config/pi-formula/config.json`):
+
+```json
+{
+  "macros": {
+    "RR": "\\mathbb{R}",
+    "pair": ["\\left(#1,#2\\right)", 2]
+  }
+}
+```
+
+`PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides names from the file. An invalid JSON source is ignored. An invalid individual definition is ignored without disabling the other definitions or a valid file definition with the same name.
+
+## Extension API
+
+The CommonJS package exports only `registerFormula` and synchronous `createFormulaPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+
+```js
+const { createFormulaPng, registerFormula } = require("pi-formula");
+
+registerFormula(pi, {
+  ket: ["\\left|#1\\right\\rangle", 1]
+});
+
+const image = createFormulaPng("\\ket{0}", availableWidth);
+```
+
+Additional macro names contain ASCII letters, with an optional leading backslash. A definition is either a replacement string (including an empty string) or `[replacement, argumentCount]`, where `argumentCount` is an integer from 0 through 9. References such as `#1` must not exceed that count; write `\\#` for a literal hash. `registerFormula` throws `TypeError` if any additional macro is invalid.
+
+`image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts; it does not contain a Pi UI component. Each call returns an independent PNG buffer. Additional macros override user macros and remain protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
+
 ## Try a local tarball
 
 Requires Pi 0.84 or later and Node.js 22.19 or later.

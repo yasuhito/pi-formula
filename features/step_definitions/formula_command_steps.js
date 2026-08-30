@@ -6,7 +6,11 @@ const { join } = require('node:path');
 const { Given, Then, When } = require('@cucumber/cucumber');
 
 const registerFormula = require('../../dist/extension.js').default;
-const { fakePi, startSession } = require('../../test/support/fake-pi');
+const {
+  fakePi,
+  resetFormulaState,
+  startSession
+} = require('../../test/support/fake-pi');
 
 function withEnvironment(changes, run) {
   const original = {};
@@ -60,6 +64,7 @@ When('各環境でセッションを開始する', async function () {
     { env: { TMUX: undefined, TERM: 'xterm-kitty' }, options: { mode: 'rpc' } }
   ];
   for (const item of cases) {
+    resetFormulaState();
     const pi = fakePi();
     registerFormula(pi.api);
     const started = await withEnvironment(item.env, () => startSession(pi, item.options));

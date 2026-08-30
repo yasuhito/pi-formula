@@ -1,35 +1,48 @@
+const FORMULA_SHARED_KEY = Symbol.for('pi-formula.shared-api.v1');
+
+function resetFormulaState() {
+  Reflect.deleteProperty(globalThis, FORMULA_SHARED_KEY);
+}
+
 function fakePi(options = {}) {
-  const handlers = new Map();
-  const commands = new Map();
-  const entries = [];
-  let transformer;
-  let transformerRegistrations = 0;
-  let commandRegistrations = 0;
+  const shared = options.shared ?? {};
+  shared.handlers ??= new Map();
+  shared.commands ??= new Map();
+  shared.entries ??= [];
+  shared.transformerRegistrations ??= 0;
+  shared.commandRegistrations ??= 0;
+  shared.sessionEntries ??= options.sessionEntries ?? [];
   return {
     api: {
-      on(name, handler) { handlers.set(name, handler); },
-      appendEntry(customType, data) { entries.push({ type: 'custom', customType, data }); },
+      on(name, handler) { shared.handlers.set(name, handler); },
+      appendEntry(customType, data) {
+        shared.entries.push({ type: 'custom', customType, data });
+      },
       registerMarkdownTransformer(value) {
-        transformer = value;
-        transformerRegistrations += 1;
+        shared.transformer = value;
+        shared.transformerRegistrations += 1;
       },
       registerCommand(name, command) {
-        commands.set(name, command);
-        commandRegistrations += 1;
+        shared.commands.set(name, command);
+        shared.commandRegistrations += 1;
       }
     },
-    entries,
-    handlers,
-    commands,
-    sessionEntries: options.sessionEntries ?? [],
-    registrationCounts: () => ({ transformerRegistrations, commandRegistrations }),
-    transformer: () => transformer
+    entries: shared.entries,
+    handlers: shared.handlers,
+    commands: shared.commands,
+    sessionEntries: shared.sessionEntries,
+    registrationCounts: () => ({
+      transformerRegistrations: shared.transformerRegistrations,
+      commandRegistrations: shared.commandRegistrations
+    }),
+    transformer: () => shared.transformer
   };
 }
 
 async function startSession(pi, options = {}) {
   let inputListener;
   let terminalWrites = 0;
+  let textColor = options.textColor ?? '\x1b[38;2;212;212;212m';
   const tui = {
     addInputListener(listener) {
       inputListener = listener;
@@ -52,7 +65,7 @@ async function startSession(pi, options = {}) {
     sessionManager: { getBranch: () => pi.sessionEntries },
     ui: {
       notify(message, level) { notifications.push({ message, level }); },
-      theme: { getFgAnsi: () => '\x1b[38;2;212;212;212m' },
+      theme: { getFgAnsi: () => textColor },
       setWidget(name, value) {
         widgets.set(name, value);
         if (typeof value === 'function') value(tui);
@@ -60,11 +73,27 @@ async function startSession(pi, options = {}) {
     }
   };
   await pi.handlers.get('session_start')({ reason: 'startup' }, ctx);
-  return { ctx, notifications, terminalWrites, widgets };
+  return {
+    ctx,
+    notifications,
+    terminalWrites,
+    widgets,
+    setTextColor(value) { textColor = value; }
+  };
 }
 
 function startWithKitty(pi) {
   return startSession(pi, { response: 'OK' });
 }
 
-module.exports = { fakePi, startSession, startWithKitty };
+function startWithText(pi) {
+  return startSession(pi, { mode: 'rpc' });
+}
+
+module.exports = {
+  fakePi,
+  resetFormulaState,
+  startSession,
+  startWithKitty,
+  startWithText
+};

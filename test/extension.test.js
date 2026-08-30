@@ -5,7 +5,14 @@ const { join } = require('node:path');
 const test = require('node:test');
 
 const registerFormula = require('../dist/extension.js').default;
-const { fakePi, startSession, startWithKitty } = require('./support/fake-pi');
+const {
+  fakePi,
+  resetFormulaState,
+  startSession,
+  startWithKitty
+} = require('./support/fake-pi');
+
+test.beforeEach(() => resetFormulaState());
 
 test('inline formulas stay in Pi Markdown without image transfer', async () => {
   const pi = fakePi();
@@ -102,7 +109,7 @@ test('the display-only hook leaves persistence and model-context hooks untouched
   const pi = fakePi();
   registerFormula(pi.api);
 
-  assert.deepEqual([...pi.handlers.keys()], ['session_start']);
+  assert.deepEqual([...pi.handlers.keys()], ['session_shutdown', 'session_start']);
 });
 
 test('registering the package twice does not duplicate formula rendering', () => {
@@ -173,6 +180,7 @@ test('invalid config is preserved when changing or clearing the default path', a
     for (const raw of ['{ broken JSON', '[]']) {
       for (const action of ['auto --default', 'text --default']) {
         writeFileSync(configPath, raw);
+        resetFormulaState();
         const pi = fakePi();
         registerFormula(pi.api);
         const started = await startSession(pi, { response: 'OK' });

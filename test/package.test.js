@@ -8,16 +8,18 @@ const test = require('node:test');
 
 const root = resolve(__dirname, '..');
 
-test('package exposes a CommonJS typesetter', () => {
+test('package exposes the CommonJS registration and PNG creation API', () => {
   const manifest = require(join(root, 'package.json'));
   const exported = require(root);
 
   assert.deepEqual({
     moduleType: manifest.type,
-    exportedTypesetter: typeof exported.typesetMath
+    registerFormula: typeof exported.registerFormula,
+    createFormulaPng: typeof exported.createFormulaPng
   }, {
     moduleType: 'commonjs',
-    exportedTypesetter: 'function'
+    registerFormula: 'function',
+    createFormulaPng: 'function'
   });
 });
 
