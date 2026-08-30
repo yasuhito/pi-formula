@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -10,7 +11,7 @@ const { getCellDimensions } = require("@earendil-works/pi-tui") as {
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
 import { transformDisplayMath } from "./markdown";
 import { multiplexerProbeResult, probePngSupport, type TerminalProbe } from "./terminal-probe";
-import { typesetMath, type TypesetImage } from "./typesetter";
+import { FORMULA_SAFETY_LIMITS, typesetMath, type TypesetImage } from "./typesetter";
 
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../package.json"), "utf8")
@@ -19,41 +20,99 @@ if (typeof manifest.version !== "string") {
   throw new Error("pi-formula could not read its package version");
 }
 
-const MAX_CACHE_ENTRIES = 64;
-const MAX_LATEX_LENGTH = 16_384;
 const REGISTRATION_KEY = Symbol.for("pi-formula.registered");
-const imageCache = new Map<string, TypesetImage | null>();
+
+interface FormulaRendering {
+  id: number;
+  image: TypesetImage;
+  placeholder: string;
+  transfer: string;
+}
+
+interface CacheEntry {
+  bytes: number;
+  rendering: FormulaRendering | null;
+}
+
+const imageCache = new Map<string, CacheEntry>();
+let imageCacheBytes = 0;
 
 function rgbFromAnsi(ansi: string): string | undefined {
-  const match = ansi.match(/38;2;(\d+);(\d+);(\d+)/u);
+  const match = ansi.match(/(?:^|[;[])38;2;(\d{1,3});(\d{1,3});(\d{1,3})(?=m|;)/u);
   if (!match) return undefined;
-  return `#${match.slice(1).map((part) =>
-    Number(part).toString(16).padStart(2, "0")
+  const channels = match.slice(1).map(Number);
+  if (channels.some((channel) => !Number.isInteger(channel) || channel > 255)) {
+    return undefined;
+  }
+  return `#${channels.map((channel) =>
+    channel.toString(16).padStart(2, "0")
   ).join("")}`;
 }
 
-function cachedImage(
+function cacheKey(
+  latex: string,
+  color: string,
+  availableWidth: number,
+  cell: { widthPx: number; heightPx: number }
+): string {
+  return createHash("sha256").update(JSON.stringify([
+    latex, color, availableWidth, cell.widthPx, cell.heightPx
+  ])).digest("hex");
+}
+
+function renderingBytes(key: string, rendering: FormulaRendering | null): number {
+  if (!rendering) return Buffer.byteLength(key);
+  return Buffer.byteLength(key) + rendering.image.png.byteLength +
+    Buffer.byteLength(rendering.image.svg) + Buffer.byteLength(rendering.transfer) +
+    Buffer.byteLength(rendering.placeholder);
+}
+
+function storeRendering(key: string, rendering: FormulaRendering | null): FormulaRendering | undefined {
+  let stored = rendering;
+  let bytes = renderingBytes(key, stored);
+  if (bytes > FORMULA_SAFETY_LIMITS.cacheBytes) {
+    stored = null;
+    bytes = renderingBytes(key, null);
+  }
+  imageCache.set(key, { bytes, rendering: stored });
+  imageCacheBytes += bytes;
+  while (imageCache.size > FORMULA_SAFETY_LIMITS.cacheEntries ||
+         imageCacheBytes > FORMULA_SAFETY_LIMITS.cacheBytes) {
+    const oldest = imageCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    const evicted = imageCache.get(oldest);
+    imageCache.delete(oldest);
+    imageCacheBytes -= evicted?.bytes ?? 0;
+  }
+  return stored ?? undefined;
+}
+
+function cachedRendering(
   latex: string,
   color: string,
   availableWidth: number
-): TypesetImage | undefined {
-  if (latex.length > MAX_LATEX_LENGTH) return undefined;
+): FormulaRendering | undefined {
   const cell = getCellDimensions();
-  const key = JSON.stringify([latex, color, availableWidth, cell.widthPx, cell.heightPx]);
+  const key = cacheKey(latex, color, availableWidth, cell);
   const cached = imageCache.get(key);
-  if (cached !== undefined) return cached ?? undefined;
+  if (cached) {
+    imageCache.delete(key);
+    imageCache.set(key, cached);
+    return cached.rendering ?? undefined;
+  }
   try {
     const image = typesetMath(latex, color, availableWidth, cell);
-    imageCache.set(key, image.scale >= 0.5 ? image : null);
+    if (image.scale < 0.5) return storeRendering(key, null);
+    const id = stableImageId(key);
+    return storeRendering(key, {
+      id,
+      image,
+      transfer: encodeTransfer(image.png, id, image.columns, image.rows),
+      placeholder: encodePlaceholderRows(id, image.columns, image.rows).join("\n")
+    });
   } catch {
-    imageCache.set(key, null);
+    return storeRendering(key, null);
   }
-  while (imageCache.size > MAX_CACHE_ENTRIES) {
-    const oldest = imageCache.keys().next().value as string | undefined;
-    if (oldest === undefined) break;
-    imageCache.delete(oldest);
-  }
-  return imageCache.get(key) ?? undefined;
 }
 
 export default function registerFormula(pi: ExtensionAPI): void {
@@ -95,18 +154,10 @@ export default function registerFormula(pi: ExtensionAPI): void {
     if (!color) return markdown;
     const transfers = new Map<number, string>();
     const transformed = transformDisplayMath(markdown, (latex, original) => {
-      const image = cachedImage(latex, color, context.availableWidth);
-      if (!image) return original;
-      try {
-        const identity = JSON.stringify([
-          latex, color, context.availableWidth, image.columns, image.rows
-        ]);
-        const id = stableImageId(identity);
-        transfers.set(id, encodeTransfer(image.png, id, image.columns, image.rows));
-        return encodePlaceholderRows(id, image.columns, image.rows).join("\n");
-      } catch {
-        return original;
-      }
+      const rendering = cachedRendering(latex, color, context.availableWidth);
+      if (!rendering) return original;
+      transfers.set(rendering.id, rendering.transfer);
+      return rendering.placeholder;
     });
     return transfers.size === 0
       ? transformed

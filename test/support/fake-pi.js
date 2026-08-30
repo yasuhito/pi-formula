@@ -23,7 +23,7 @@ function fakePi() {
   };
 }
 
-async function startWithKitty(pi) {
+async function startWithKitty(pi, options = {}) {
   let inputListener;
   const tui = {
     addInputListener(listener) {
@@ -42,7 +42,7 @@ async function startWithKitty(pi) {
     mode: 'tui',
     sessionManager: { getBranch: () => [] },
     ui: {
-      theme: { getFgAnsi: () => '\x1b[38;2;212;212;212m' },
+      theme: { getFgAnsi: () => options.foregroundAnsi ?? '\x1b[38;2;212;212;212m' },
       setWidget(name, value) {
         widgets.set(name, value);
         if (typeof value === 'function') value(tui);

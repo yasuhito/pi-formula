@@ -1,54 +1,110 @@
-import { Resvg } from "@resvg/resvg-js";
-import { liteAdaptor } from "@mathjax/src/js/adaptors/liteAdaptor.js";
-import { RegisterHTMLHandler } from "@mathjax/src/js/handlers/html.js";
-import { TeX } from "@mathjax/src/js/input/tex.js";
-import "@mathjax/src/js/input/tex/ams/AmsConfiguration.js";
-import "@mathjax/src/js/input/tex/base/BaseConfiguration.js";
-import "@mathjax/src/js/input/tex/configmacros/ConfigMacrosConfiguration.js";
-import "@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js";
-import { mathjax } from "@mathjax/src/js/mathjax.js";
-import { SVG } from "@mathjax/src/js/output/svg.js";
-
 import type { CellDimensions, RasterLayout } from "./layout";
 
 const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
 const DEVICE_SCALE = 2;
 
-const adaptor = liteAdaptor({ fontSize: 16 });
-RegisterHTMLHandler(adaptor);
+export const FORMULA_SAFETY_LIMITS = Object.freeze({
+  latexCharacters: 16_384,
+  imageColumns: 255,
+  imageRows: 255,
+  cacheEntries: 64,
+  cacheBytes: 32 * 1024 * 1024
+});
 
 export interface TypesetImage extends RasterLayout {
   svg: string;
   png: Buffer;
 }
 
-function mathDocument() {
-  const tex = new TeX({
-    packages: ["base", "ams", "newcommand", "configmacros"],
-    formatError: (_jax: unknown, error: unknown) => {
-      throw error;
-    }
-  });
-  const svgOutput = new SVG({
-    fontCache: "local",
-    linebreaks: { inline: false }
-  });
-  return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
+interface MathAdaptor {
+  outerHTML(node: unknown): string;
+}
+
+interface MathDocument {
+  convert(latex: string, options: {
+    display: boolean;
+    em: number;
+    ex: number;
+    containerWidth: number;
+  }): unknown;
+}
+
+interface PreparedTypesetter {
+  adaptor: MathAdaptor;
+  createDocument(): MathDocument;
+  rasterize(svg: string): Buffer;
+}
+
+let prepared: PreparedTypesetter | undefined;
+
+function prepareTypesetter(): PreparedTypesetter {
+  if (prepared) return prepared;
+
+  const { Resvg } = require("@resvg/resvg-js") as {
+    Resvg: new (svg: string, options: {
+      shapeRendering: number;
+      textRendering: number;
+    }) => { render(): { asPng(): Uint8Array } };
+  };
+  const { liteAdaptor } = require("@mathjax/src/js/adaptors/liteAdaptor.js") as {
+    liteAdaptor(options: { fontSize: number }): MathAdaptor;
+  };
+  const { RegisterHTMLHandler } = require("@mathjax/src/js/handlers/html.js") as {
+    RegisterHTMLHandler(adaptor: MathAdaptor): void;
+  };
+  const { TeX } = require("@mathjax/src/js/input/tex.js") as {
+    TeX: new (options: Record<string, unknown>) => unknown;
+  };
+  require("@mathjax/src/js/input/tex/ams/AmsConfiguration.js");
+  require("@mathjax/src/js/input/tex/base/BaseConfiguration.js");
+  require("@mathjax/src/js/input/tex/configmacros/ConfigMacrosConfiguration.js");
+  require("@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js");
+  const { mathjax } = require("@mathjax/src/js/mathjax.js") as {
+    mathjax: { document(source: string, options: Record<string, unknown>): MathDocument };
+  };
+  const { SVG } = require("@mathjax/src/js/output/svg.js") as {
+    SVG: new (options: Record<string, unknown>) => unknown;
+  };
+
+  const adaptor = liteAdaptor({ fontSize: 16 });
+  RegisterHTMLHandler(adaptor);
+  prepared = {
+    adaptor,
+    createDocument: () => {
+      const tex = new TeX({
+        packages: ["base", "ams", "newcommand", "configmacros"],
+        formatError: (_jax: unknown, error: unknown) => {
+          throw error;
+        }
+      });
+      const svgOutput = new SVG({
+        fontCache: "local",
+        linebreaks: { inline: false }
+      });
+      return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
+    },
+    rasterize: (svg) => Buffer.from(new Resvg(svg, {
+      shapeRendering: 2,
+      textRendering: 2
+    }).render().asPng())
+  };
+  return prepared;
 }
 
 function svgFor(
   latex: string,
   color: string,
   widthPx: number,
+  typesetter: PreparedTypesetter
 ): string {
-  const node = mathDocument().convert(latex, {
+  const node = typesetter.createDocument().convert(latex, {
     display: true,
     em: 16,
     ex: 8,
     containerWidth: widthPx
   });
-  const container = adaptor.outerHTML(node);
+  const container = typesetter.adaptor.outerHTML(node);
   const start = container.indexOf("<svg ");
   const end = container.lastIndexOf("</svg>");
   if (start < 0 || end < 0) throw new Error("MathJax did not produce an SVG");
@@ -101,7 +157,9 @@ function rasterLayout(
   availableWidth: number,
   cell: CellDimensions
 ): { layout: RasterLayout; padded: string } {
-  const maxWidthCells = Math.max(1, Math.min(Math.floor(availableWidth), 255));
+  const maxWidthCells = Math.max(1, Math.min(
+    Math.floor(availableWidth), FORMULA_SAFETY_LIMITS.imageColumns
+  ));
   const widthEx = exDimension(svg, "width");
   const heightEx = exDimension(svg, "height");
   const innerWidth = maxWidthCells * cell.widthPx - CONTENT_BLEED_PX * 2;
@@ -116,6 +174,10 @@ function rasterLayout(
     1,
     Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9)
   );
+  if (columns > FORMULA_SAFETY_LIMITS.imageColumns ||
+      rows > FORMULA_SAFETY_LIMITS.imageRows) {
+    throw new Error("Formula image exceeds the fixed cell limits");
+  }
   const canvasWidth = Math.ceil(columns * cell.widthPx * DEVICE_SCALE);
   const canvasHeight = Math.ceil(rows * cell.heightPx * DEVICE_SCALE);
   const layout = {
@@ -138,18 +200,30 @@ function rasterLayout(
   };
 }
 
+function validCellDimensions(cell: CellDimensions): boolean {
+  return Number.isFinite(cell.widthPx) && cell.widthPx > 0 &&
+    Number.isFinite(cell.heightPx) && cell.heightPx > 0;
+}
+
 export function typesetMath(
   latex: string,
   color: string,
   availableWidth: number,
   cell: CellDimensions
 ): TypesetImage {
-  const svg = svgFor(latex, color, availableWidth * cell.widthPx);
-  const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
-  const png = new Resvg(padded, {
-    shapeRendering: 2,
-    textRendering: 2
-  }).render().asPng();
+  if (latex.length > FORMULA_SAFETY_LIMITS.latexCharacters) {
+    throw new Error("Formula input exceeds the fixed character limit");
+  }
+  if (!/^#[\da-f]{6}$/iu.test(color)) {
+    throw new Error("Formula color is not an exact RGB value");
+  }
+  if (!Number.isFinite(availableWidth) || availableWidth <= 0 || !validCellDimensions(cell)) {
+    throw new Error("Formula layout dimensions must be finite and positive");
+  }
 
+  const typesetter = prepareTypesetter();
+  const svg = svgFor(latex, color, availableWidth * cell.widthPx, typesetter);
+  const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
+  const png = typesetter.rasterize(padded);
   return { ...layout, svg, png };
 }
