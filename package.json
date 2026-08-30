@@ -19,8 +19,8 @@
     "terminal"
   ],
   "type": "commonjs",
-  "main": "./dist/typesetter.js",
-  "types": "./dist/typesetter.d.ts",
+  "main": "./dist/api.js",
+  "types": "./dist/api.d.ts",
   "pi": {
     "extensions": [
       "./src/extension.ts"

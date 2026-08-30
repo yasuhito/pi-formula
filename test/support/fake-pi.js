@@ -23,6 +23,20 @@ function fakePi() {
   };
 }
 
+async function startWithText(pi) {
+  const widgets = new Map();
+  const ctx = {
+    mode: 'rpc',
+    sessionManager: { getBranch: () => [] },
+    ui: {
+      theme: { getFgAnsi: () => '\x1b[38;2;212;212;212m' },
+      setWidget(name, value) { widgets.set(name, value); }
+    }
+  };
+  await pi.handlers.get('session_start')({ reason: 'startup' }, ctx);
+  return { ctx, widgets };
+}
+
 async function startWithKitty(pi) {
   let inputListener;
   const tui = {
@@ -53,4 +67,4 @@ async function startWithKitty(pi) {
   return { ctx, widgets };
 }
 
-module.exports = { fakePi, startWithKitty };
+module.exports = { fakePi, startWithKitty, startWithText };

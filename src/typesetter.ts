@@ -10,6 +10,7 @@ import { mathjax } from "@mathjax/src/js/mathjax.js";
 import { SVG } from "@mathjax/src/js/output/svg.js";
 
 import type { CellDimensions, RasterLayout } from "./layout";
+import type { FormulaMacros } from "./macros";
 
 const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
@@ -23,9 +24,14 @@ export interface TypesetImage extends RasterLayout {
   png: Buffer;
 }
 
-function mathDocument() {
+function mathDocument(macros: FormulaMacros) {
+  const configured = Object.fromEntries(Object.entries(macros).map(([name, definition]) => [
+    name,
+    typeof definition === "string" ? definition : [definition[0], definition[1]]
+  ]));
   const tex = new TeX({
     packages: ["base", "ams", "newcommand", "configmacros"],
+    macros: configured,
     formatError: (_jax: unknown, error: unknown) => {
       throw error;
     }
@@ -41,8 +47,9 @@ function svgFor(
   latex: string,
   color: string,
   widthPx: number,
+  macros: FormulaMacros
 ): string {
-  const node = mathDocument().convert(latex, {
+  const node = mathDocument(macros).convert(latex, {
     display: true,
     em: 16,
     ex: 8,
@@ -142,9 +149,10 @@ export function typesetMath(
   latex: string,
   color: string,
   availableWidth: number,
-  cell: CellDimensions
+  cell: CellDimensions,
+  macros: FormulaMacros = {}
 ): TypesetImage {
-  const svg = svgFor(latex, color, availableWidth * cell.widthPx);
+  const svg = svgFor(latex, color, availableWidth * cell.widthPx, macros);
   const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
   const png = new Resvg(padded, {
     shapeRendering: 2,
