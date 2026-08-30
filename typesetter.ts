@@ -13,8 +13,7 @@ import type { CachedImage } from "./cache";
 import type { CellDimensions, RasterLayout } from "./layout";
 import type { MathMacros } from "./macros";
 
-const DISPLAY_EX_TO_CELL_HEIGHT = 0.65;
-const INLINE_EX_TO_CELL_HEIGHT = 0.65;
+const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
 const DEVICE_SCALE = 2;
 
@@ -49,13 +48,12 @@ function mathDocument(macros: MathMacros) {
 
 function svgFor(
   latex: string,
-  display: boolean,
   color: string,
   widthPx: number,
   macros: MathMacros
 ): string {
   const node = mathDocument(macros).convert(latex, {
-    display,
+    display: true,
     em: 16,
     ex: 8,
     containerWidth: widthPx
@@ -109,7 +107,6 @@ function paddedSvg(
 
 function rasterLayout(
   svg: string,
-  display: boolean,
   color: string,
   availableWidth: number,
   cell: CellDimensions
@@ -118,23 +115,17 @@ function rasterLayout(
   const widthEx = exDimension(svg, "width");
   const heightEx = exDimension(svg, "height");
   const innerWidth = maxWidthCells * cell.widthPx - CONTENT_BLEED_PX * 2;
-  const innerHeight = cell.heightPx - CONTENT_BLEED_PX * 2;
-  const basePixelsPerEx = cell.heightPx * (
-    display ? DISPLAY_EX_TO_CELL_HEIGHT : INLINE_EX_TO_CELL_HEIGHT
-  );
-  const pixelsPerEx = Math.min(
-    basePixelsPerEx,
-    innerWidth / widthEx,
-    display ? Number.POSITIVE_INFINITY : innerHeight / heightEx
-  );
+  const basePixelsPerEx = cell.heightPx * EX_TO_CELL_HEIGHT;
+  const pixelsPerEx = Math.min(basePixelsPerEx, innerWidth / widthEx);
   const widthPx = Math.max(1, widthEx * pixelsPerEx);
   const heightPx = Math.max(1, heightEx * pixelsPerEx);
   const columns = Math.max(1, Math.ceil(
     (widthPx + CONTENT_BLEED_PX * 2) / cell.widthPx - 1e-9
   ));
-  const rows = display
-    ? Math.max(1, Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9))
-    : 1;
+  const rows = Math.max(
+    1,
+    Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9)
+  );
   const canvasWidth = Math.ceil(columns * cell.widthPx * DEVICE_SCALE);
   const canvasHeight = Math.ceil(rows * cell.heightPx * DEVICE_SCALE);
   const layout = {
@@ -159,14 +150,13 @@ function rasterLayout(
 
 export function typesetMath(
   latex: string,
-  display: boolean,
   color: string,
   availableWidth: number,
   cell: CellDimensions,
   macros: MathMacros = {}
 ): TypesetImage {
-  const svg = svgFor(latex, display, color, availableWidth * cell.widthPx, macros);
-  const { layout, padded } = rasterLayout(svg, display, color, availableWidth, cell);
+  const svg = svgFor(latex, color, availableWidth * cell.widthPx, macros);
+  const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
   const png = new Resvg(padded, {
     shapeRendering: 2,
     textRendering: 2

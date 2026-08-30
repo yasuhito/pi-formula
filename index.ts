@@ -69,8 +69,6 @@ const {
 };
 
 const imageCache = new RenderCache<TypesetImage>(128, 32 * 1024 * 1024);
-// Below this fit ratio, a one-cell image loses too much stroke contrast to read.
-const MIN_READABLE_INLINE_SCALE = 0.65;
 const qniExecutable = resolve(__dirname, "../bin/qni.js");
 
 function rgbFromAnsi(ansi: string): string | undefined {
@@ -99,7 +97,6 @@ function rgbFromAnsi(ansi: string): string | undefined {
 
 function cachedImage(
   latex: string,
-  display: boolean,
   color: string,
   availableWidth: number,
   macros: MathMacros
@@ -107,7 +104,6 @@ function cachedImage(
   const cell = getCellDimensions();
   const key = JSON.stringify([
     latex,
-    display,
     color,
     availableWidth,
     cell.widthPx,
@@ -116,7 +112,7 @@ function cachedImage(
   ]);
   return imageCache.getOrCreate(
     key,
-    () => typesetMath(latex, display, color, availableWidth, cell, macros)
+    () => typesetMath(latex, color, availableWidth, cell, macros)
   );
 }
 
@@ -223,14 +219,11 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
     const transfers = new Map<number, string>();
     const color = currentTextColor();
     const transformed = transformMathMarkdown(markdown, (latex, display, original) => {
-      const image = cachedImage(latex, display, color, context.availableWidth, userMacros);
+      if (!display) return expandQuantumMacros(original, userMacros);
+      const image = cachedImage(latex, color, context.availableWidth, userMacros);
       if (!image) return original;
-      if (!display && image.scale < MIN_READABLE_INLINE_SCALE) {
-        return expandQuantumMacros(original, userMacros);
-      }
       const identity = JSON.stringify([
         latex,
-        display,
         color,
         context.availableWidth,
         image.rows
@@ -242,7 +235,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
         const id = stableImageId(identity);
         const rows = encodePlaceholderRows(id, image.columns, image.rows);
         transfers.set(id, encodeTransfer(image.png, id, image.columns, image.rows));
-        return display ? rows.join("\n") : rows[0]!;
+        return rows.join("\n");
       } catch (error) {
         imageCache.recordFailure(placementFailureKey, error);
         return original;
@@ -323,7 +316,7 @@ export default function qniMathExtension(pi: ExtensionAPI): void {
         const color = rgbFromAnsi(theme.fg("toolOutput", "sample"));
         if (!color) return undefined;
         const maxWidthCells = expanded ? 120 : 60;
-        const image = cachedImage(latex.trim(), true, color, maxWidthCells, userMacros);
+        const image = cachedImage(latex.trim(), color, maxWidthCells, userMacros);
         if (!image) return undefined;
         return new Image(
           image.png.toString("base64"),
