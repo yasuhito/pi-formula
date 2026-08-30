@@ -13,9 +13,9 @@ export type FormulaPathMode = "auto" | "image" | "text";
 
 export function formulaConfigPath(env: NodeJS.ProcessEnv): string {
   const base = env.XDG_CONFIG_HOME
-    ?? (env.HOME ? join(env.HOME, ".config") : undefined)
-    ?? (env.USERPROFILE ? join(env.USERPROFILE, ".config") : undefined)
-    ?? join(homedir(), ".config");
+    || (env.HOME ? join(env.HOME, ".config") : undefined)
+    || (env.USERPROFILE ? join(env.USERPROFILE, ".config") : undefined)
+    || join(homedir(), ".config");
   return join(base, "pi-formula", "config.json");
 }
 
@@ -53,5 +53,10 @@ export function writeDefaultPath(path: string, mode: FormulaPathMode): void {
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
-  renameSync(temporary, path);
+  try {
+    renameSync(temporary, path);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
 }

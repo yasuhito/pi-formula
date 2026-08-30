@@ -143,10 +143,12 @@ Then('版、経路、理由、端末、マクロ数、一時保存、直近の�
   assert.deepEqual({
     fields: this.lines.map((line) => line.split(':')[0]),
     english: this.lines.every((line) => /^[\x20-\x7e]+$/u.test(line)),
+    macroCount: this.lines.includes('macros: 1'),
     leaksSecret: this.lines.join('\n').includes('do-not-show-this')
   }, {
     fields: ['pi-formula 0.1.0', 'path', 'reason', 'terminal', 'macros', 'cache', 'last failure'],
     english: true,
+    macroCount: true,
     leaksSecret: false
   });
 });

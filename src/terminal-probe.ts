@@ -57,7 +57,11 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
         response += data;
       }
       const end = response.indexOf("\x1b\\");
-      if (end < 0) return { consume: true };
+      if (end < 0) {
+        const pendingInput = leadingInput;
+        leadingInput = "";
+        return pendingInput ? { data: pendingInput } : { consume: true };
+      }
       const value = response.slice(prefix.length, end);
       const remaining = leadingInput + response.slice(end + 2);
       finish(value === "OK"

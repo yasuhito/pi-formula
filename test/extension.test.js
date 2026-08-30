@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict');
+const { mkdirSync, mkdtempSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 const test = require('node:test');
 
 const registerFormula = require('../dist/extension.js').default;
@@ -101,6 +104,37 @@ test('a saved session path overrides a rejected automatic probe', async () => {
   await pi.commands.get('formula').handler('status', ctx);
 
   assert.equal(widgets.get('pi-formula-status').includes('path: image'), true);
+});
+
+test('a default rename failure leaves the session path unchanged and reports the error', async () => {
+  const xdg = mkdtempSync(join(tmpdir(), 'pi-formula-write-failure-'));
+  mkdirSync(join(xdg, 'pi-formula', 'config.json'), { recursive: true });
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  try {
+    const pi = fakePi();
+    registerFormula(pi.api);
+    const started = await startSession(pi, { response: 'OK' });
+
+    await pi.commands.get('formula').handler('text --default', started.ctx);
+    await pi.commands.get('formula').handler('status', started.ctx);
+
+    assert.deepEqual({
+      savedEntries: pi.entries.length,
+      path: started.widgets.get('pi-formula-status').find((line) => line.startsWith('path:')),
+      notification: started.notifications.at(-1)
+    }, {
+      savedEntries: 0,
+      path: 'path: image',
+      notification: {
+        message: 'Could not save the pi-formula default; the session path was not changed.',
+        level: 'error'
+      }
+    });
+  } finally {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+  }
 });
 
 test('/formula status reports the package version and image path in English', async () => {

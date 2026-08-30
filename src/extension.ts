@@ -8,6 +8,7 @@ const { getCellDimensions } = require("@earendil-works/pi-tui") as {
 };
 
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
+import { countConfiguredMacros } from "./macro-settings";
 import { transformDisplayMath } from "./markdown";
 import {
   formulaConfigPath,
@@ -94,6 +95,7 @@ export default function registerFormula(pi: ExtensionAPI): void {
   let terminal = "unknown";
   let hasTerminalScreen = false;
   let imagePathForbidden = true;
+  let macroCount = 0;
   let textColor: (() => string | undefined) = () => undefined;
 
   const selectPath = (): void => {
@@ -116,6 +118,7 @@ export default function registerFormula(pi: ExtensionAPI): void {
     textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
     configPath = formulaConfigPath(process.env);
     defaultPath = readDefaultPath(configPath);
+    macroCount = countConfiguredMacros(configPath, process.env);
     sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
     terminal = terminalName(process.env);
     hasTerminalScreen = ctx.mode === "tui";
@@ -181,12 +184,20 @@ export default function registerFormula(pi: ExtensionAPI): void {
 
       if ((action === "auto" || action === "image" || action === "text")
           && (tokens.length === 1 || saveDefault)) {
+        if (saveDefault) {
+          try {
+            writeDefaultPath(configPath, action);
+            defaultPath = readDefaultPath(configPath);
+          } catch {
+            ctx.ui.notify(
+              "Could not save the pi-formula default; the session path was not changed.",
+              "error"
+            );
+            return;
+          }
+        }
         sessionMode = action;
         pi.appendEntry(PATH_ENTRY, { path: action });
-        if (saveDefault) {
-          writeDefaultPath(configPath, action);
-          defaultPath = readDefaultPath(configPath);
-        }
         selectPath();
         ctx.ui.notify(`pi-formula path: ${path} (${selectionReason})`, "info");
         return;
@@ -206,7 +217,7 @@ export default function registerFormula(pi: ExtensionAPI): void {
         `path: ${path}`,
         `reason: ${selectionReason}`,
         `terminal: ${terminal}`,
-        "macros: 0",
+        `macros: ${macroCount}`,
         `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
         `last failure: ${stats.lastFailure ?? "none"}`
       ], { placement: "belowEditor" });
