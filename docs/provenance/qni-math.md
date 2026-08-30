@@ -24,11 +24,12 @@ ed471fb15a82cf3b6f140ce825d7829b0d25fa6e feat: 数式描画に利用者マクロ
 2f12594e80b9e7baff0c85ecfecb4dd34d06f737 fix: インライン数式をUnicode表示に統一
 ```
 
-履歴は次のコマンドで確認できる。
+関連履歴は`src/qni-math`だけを残した履歴へ書き換え、`chore: qni-mathの関連履歴を接続`というmerge commitの第2親としてこのリポジトリへ接続した。元のcommit hashは上の一覧で追跡でき、書き換え後の履歴は単独cloneでも次のコマンドで確認できる。
 
 ```sh
-git -C ../qni-cli log --follow -- src/qni-math/typesetter.ts
-git -C ../qni-cli show 2f12594:src/qni-math/typesetter.ts
+merge=$(git log --merges --grep='qni-mathの関連履歴を接続' --format=%H -1)
+git log --follow "$merge^2" -- typesetter.ts
+git show "$merge^2:typesetter.ts"
 ```
 
-取り込み時に量子系マクロを削除した。qni実行、qni専用ツール、一時作業場所のコードは取り込んでいない。
+取り込み時に量子系マクロを削除した。qni実行、qni専用ツール、一時作業場所のコードは現在の`src/`に含めていない。
