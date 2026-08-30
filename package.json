@@ -1,0 +1,43 @@
+{
+  "name": "pi-formula",
+  "version": "0.1.0",
+  "description": "Readable LaTeX in Pi: terminal-native inline math and MathJax display images.",
+  "license": "MIT",
+  "author": "Yasuhito Takamiya <yasuhito@hey.com> (https://github.com/yasuhito)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yasuhito/pi-formula.git"
+  },
+  "homepage": "https://github.com/yasuhito/pi-formula#readme",
+  "bugs": {
+    "url": "https://github.com/yasuhito/pi-formula/issues"
+  },
+  "keywords": ["pi-package", "latex", "mathjax", "terminal"],
+  "type": "commonjs",
+  "main": "./dist/typesetter.js",
+  "types": "./dist/typesetter.d.ts",
+  "files": [
+    "src/",
+    "dist/",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.js",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@mathjax/src": "^4.1.3",
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
