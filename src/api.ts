@@ -179,11 +179,14 @@ export function createFormulaPng(
   availableWidth: number
 ): FormulaPng | undefined {
   const state = sharedStore().current;
-  if (!state || !Number.isFinite(availableWidth) || availableWidth <= 0) return undefined;
+  if (typeof latex !== "string"
+      || !state
+      || !Number.isFinite(availableWidth)
+      || availableWidth <= 0) return undefined;
   const image = cachedImage(state, latex, availableWidth);
   if (!image) return undefined;
   return {
-    data: image.png,
+    data: Buffer.from(image.png),
     widthPx: image.widthPx,
     heightPx: image.heightPx,
     columns: image.columns,
@@ -206,6 +209,12 @@ export function registerFormula(
   const state = newState();
   addProtectedMacros(state, additionalMacros);
   store.current = state;
+
+  pi.on("session_shutdown", () => {
+    if (store.current !== state) return;
+    state.imageCache.clear();
+    store.current = undefined;
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     state.textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));

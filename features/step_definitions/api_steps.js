@@ -86,6 +86,19 @@ Then('環境変数の利用者マクロで PNG が作られる', function () {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
+Given('エスケープしたハッシュ記号の利用者マクロがある', function () {
+  writeConfig(this, { hash: '\\#' });
+});
+
+When('その利用者マクロを使う PNG を公開 API で作る', async function () {
+  await registeredImageApi(this);
+  this.image = this.formula.createFormulaPng('\\hash', 80);
+});
+
+Then('ハッシュ記号の PNG が作られる', function () {
+  assert.equal(Buffer.isBuffer(this.image?.data), true);
+});
+
 Given('正しい同名 XDG 定義と壊れた環境変数定義がある', function () {
   writeConfig(this, { chosen: 'x' });
   process.env.PI_FORMULA_MACROS = JSON.stringify({ chosen: ['#2', 1] });
@@ -174,6 +187,17 @@ Given('画像経路を使う試験用の連携拡張がある', async function (
   this.started = await startWithKitty(this.pi);
 });
 
+When('公開 API へ文字列以外の LaTeX を渡す', function () {
+  this.invalidImages = [
+    this.integration.createPng(null),
+    this.integration.createPng({ latex: 'x' })
+  ];
+});
+
+Then('公開 API は例外を出さず画像を返さない', function () {
+  assert.deepEqual(this.invalidImages, [undefined, undefined]);
+});
+
 When('連携拡張が公開 API で PNG を作る', function () {
   this.image = this.integration.createPng('\\trial{x}');
 });
@@ -188,6 +212,22 @@ Then('PNG データと大きさが画面部品なしで返る', function () {
     png: 'PNG',
     positiveSize: true
   });
+});
+
+When('返された PNG データを変更して同じ表示数式を再び描く', function () {
+  const first = this.integration.createPng('x');
+  first.data[0] = 0;
+  this.imageAfterMutation = this.integration.createPng('x');
+  this.markdownAfterMutation = this.pi.transformer()('$$x$$', {
+    messageType: 'assistant', isStreaming: false, availableWidth: 80
+  });
+});
+
+Then('次の公開 PNG と通常の表示数式は壊れない', function () {
+  assert.deepEqual({
+    signature: this.imageAfterMutation.data.subarray(0, 4).toString('hex'),
+    markdownHasPngSignature: this.markdownAfterMutation.includes('iVBOR')
+  }, { signature: '89504e47', markdownHasPngSignature: true });
 });
 
 When('テーマの文字色を変えて同じ表示数式の PNG を作る', function () {
@@ -208,6 +248,42 @@ Given('テキスト経路を使う試験用の連携拡張がある', async func
 
 Then('公開 API は画像を返さない', function () {
   assert.equal(this.image, undefined);
+});
+
+Given('利用者マクロを読む拡張 runtime がある', async function () {
+  writeConfig(this, { original: 'x' });
+  this.firstRuntime = loadStandaloneExtension();
+  this.firstPi = fakePi();
+  this.firstRuntime.register(this.firstPi.api);
+  this.firstStarted = await startWithKitty(this.firstPi);
+});
+
+When('runtime を終了して別の利用者マクロを使う runtime を登録する', async function () {
+  await this.firstPi.handlers.get('session_shutdown')(
+    { reason: 'reload' }, this.firstStarted.ctx
+  );
+  writeConfig(this, { reloaded: 'x' });
+  process.env.PI_FORMULA_MACROS = JSON.stringify({ temporary: 'y' });
+  this.secondRuntime = loadStandaloneExtension();
+  this.secondPi = fakePi();
+  this.secondRuntime.register(this.secondPi.api);
+  await startWithKitty(this.secondPi);
+  this.reloadedImage = this.secondRuntime.formula.createFormulaPng(
+    '\\reloaded+\\temporary', 80
+  );
+});
+
+Then('新しい runtime に描画と formula コマンドが一つずつ登録される', function () {
+  assert.deepEqual({
+    ...this.secondPi.registrationCounts(),
+    formulaCommand: this.secondPi.commands.has('formula'),
+    reloadedMacro: Buffer.isBuffer(this.reloadedImage?.data)
+  }, {
+    transformerRegistrations: 1,
+    commandRegistrations: 1,
+    formulaCommand: true,
+    reloadedMacro: true
+  });
 });
 
 async function loadBoth(world, bundledFirst) {

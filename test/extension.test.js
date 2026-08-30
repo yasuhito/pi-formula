@@ -109,7 +109,7 @@ test('the display-only hook leaves persistence and model-context hooks untouched
   const pi = fakePi();
   registerFormula(pi.api);
 
-  assert.deepEqual([...pi.handlers.keys()], ['session_start']);
+  assert.deepEqual([...pi.handlers.keys()], ['session_shutdown', 'session_start']);
 });
 
 test('registering the package twice does not duplicate formula rendering', () => {

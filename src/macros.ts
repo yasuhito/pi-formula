@@ -21,11 +21,13 @@ function invalidParameterReference(
 ): string | undefined {
   for (let index = 0; index < replacement.length; index += 1) {
     if (replacement[index] !== "#") continue;
-    const reference = replacement[index + 1];
-    if (reference === "#") {
-      index += 1;
-      continue;
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && replacement[cursor] === "\\"; cursor -= 1) {
+      backslashes += 1;
     }
+    if (backslashes % 2 === 1) continue;
+
+    const reference = replacement[index + 1];
     const number = reference ? Number.parseInt(reference, 10) : Number.NaN;
     if (number >= 1 && number <= argumentsCount && reference === String(number)) {
       index += 1;
