@@ -1,10 +1,13 @@
 const assert = require('node:assert/strict');
 const { mkdirSync, mkdtempSync, readFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { isAbsolute, join, relative, resolve } = require('node:path');
-const { spawn, spawnSync } = require('node:child_process');
+const { join, resolve } = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { After, Given, Then, When } = require('@cucumber/cucumber');
+const { After, Given, setDefaultTimeout, Then, When } = require('@cucumber/cucumber');
+const { commandsFromRealPi, isInside } = require('../../test/support/package-trial');
+
+setDefaultTimeout(30_000);
 
 const root = resolve(__dirname, '../..');
 const readProjectFile = (path) => readFileSync(join(root, path), 'utf8');
@@ -20,37 +23,6 @@ function packedPackage(packOutput) {
     throw new Error(`npm pack did not report a filename: ${JSON.stringify(packOutput)}`);
   }
   return candidate;
-}
-
-function isInside(directory, path) {
-  const route = relative(directory, path);
-  return route !== '' && !route.startsWith('..') && !isAbsolute(route);
-}
-
-async function commandsFromRealPi(cwd, env) {
-  const agent = spawn('pi', [
-    '--mode', 'rpc', '--no-session', '--offline', '--no-context-files',
-    '--no-skills', '--no-prompt-templates', '--no-themes'
-  ], { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
-  let stdout = '';
-  let stderr = '';
-  agent.stdout.on('data', (chunk) => { stdout += chunk; });
-  agent.stderr.on('data', (chunk) => { stderr += chunk; });
-  const exit = new Promise((resolveExit) => agent.on('exit', resolveExit));
-  agent.stdin.end('{"type":"get_commands"}\n');
-  for (let attempt = 0; attempt < 400 && !stdout.includes('"command":"get_commands"'); attempt += 1) {
-    await new Promise((resolveWait) => setTimeout(resolveWait, 25));
-  }
-  agent.kill('SIGTERM');
-  await exit;
-  const response = stdout.split('\n').filter(Boolean).flatMap((line) => {
-    try {
-      return [JSON.parse(line)];
-    } catch {
-      return [];
-    }
-  }).find((event) => event.command === 'get_commands');
-  return { response, stderr, stdout };
 }
 
 After(function () {
@@ -173,12 +145,16 @@ Given('pi-formula の公開候補 tarball がある', function () {
 
 When('tarball を新しい一時環境へ導入して本物の Pi で調べる', async function () {
   const work = join(this.packageTrialRoot, 'work');
+  const home = join(this.packageTrialRoot, 'home');
+  const config = join(this.packageTrialRoot, 'config');
   const agentDirectory = join(this.packageTrialRoot, 'agent');
-  mkdirSync(work);
+  for (const directory of [work, home, config, agentDirectory]) {
+    mkdirSync(directory, { recursive: true });
+  }
   const env = {
     ...process.env,
-    HOME: join(this.packageTrialRoot, 'home'),
-    XDG_CONFIG_HOME: join(this.packageTrialRoot, 'config'),
+    HOME: home,
+    XDG_CONFIG_HOME: config,
     PI_CODING_AGENT_DIR: agentDirectory
   };
   if (!this.packageTrial.tarball) return;
@@ -238,6 +214,8 @@ Then('導入した配布物だけから OS 用 Resvg が読み込まれ formula 
       )
       : false,
     pngSignature: probeResult?.pngSignature,
+    piClosed: pi?.closed,
+    piResponseTimedOut: pi?.responseTimedOut,
     formulaDiscovered: pi?.response?.data?.commands?.some(({ name }) => name === 'formula') ?? false
   };
   assert.deepEqual(actual, {
@@ -248,13 +226,23 @@ Then('導入した配布物だけから OS 用 Resvg が読み込まれ formula 
     nativeResvgFromTemporaryInstall: true,
     nativeResvgMatchesOs: true,
     pngSignature: 'PNG',
+    piClosed: true,
+    piResponseTimedOut: false,
     formulaDiscovered: true
   }, JSON.stringify({
     actual,
     packError: packed.stderr,
     installError: installed?.stderr || installed?.stdout,
     probeError: probe?.stderr || probe?.stdout,
-    piError: pi?.stderr || pi?.stdout
+    piError: pi?.error || pi?.stderr || pi?.stdout,
+    piLifecycle: pi && {
+      closed: pi.closed,
+      code: pi.code,
+      signal: pi.signal,
+      responseTimedOut: pi.responseTimedOut,
+      sentSigterm: pi.sentSigterm,
+      sentSigkill: pi.sentSigkill
+    }
   }));
 });
 
