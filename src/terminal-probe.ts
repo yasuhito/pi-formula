@@ -1,5 +1,6 @@
 export interface TerminalUi {
-  addInputListener(listener: (data: string) => { consume: true } | undefined): () => void;
+  addInputListener(listener: (data: string) =>
+    { consume: true } | { data: string } | undefined): () => void;
   terminal: { write(data: string): void };
 }
 
@@ -25,6 +26,7 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
   const query = `\x1b_Ga=q,t=d,f=100,i=${imageId},s=1,v=1;${PROBE_PNG}\x1b\\`;
   return new Promise((resolve) => {
     const prefix = `\x1b_Gi=${imageId};`;
+    let leadingInput = "";
     let response = "";
     let settled = false;
     let unsubscribe = () => {};
@@ -40,16 +42,28 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
     }), PROBE_TIMEOUT_MS);
     timeout.unref?.();
     unsubscribe = tui.addInputListener((data) => {
-      const start = response.length === 0 ? data.indexOf(prefix) : 0;
-      if (start < 0) return undefined;
-      response += data.slice(start);
+      if (response.length === 0) {
+        const start = data.indexOf(prefix);
+        if (start < 0) {
+          const marker = data.indexOf("\x1b_G");
+          if (marker < 0 || !prefix.startsWith(data.slice(marker))) return undefined;
+          leadingInput = data.slice(0, marker);
+          response = data.slice(marker);
+        } else {
+          leadingInput = data.slice(0, start);
+          response = data.slice(start);
+        }
+      } else {
+        response += data;
+      }
       const end = response.indexOf("\x1b\\");
       if (end < 0) return { consume: true };
       const value = response.slice(prefix.length, end);
+      const remaining = leadingInput + response.slice(end + 2);
       finish(value === "OK"
         ? { path: "image", reason: "PNG query returned OK", response: value }
-        : { path: "text", reason: `PNG query returned ${value}`, response: value });
-      return { consume: true };
+        : { path: "text", reason: "PNG query was rejected", response: value });
+      return remaining ? { data: remaining } : { consume: true };
     });
     tui.terminal.write(query);
   });

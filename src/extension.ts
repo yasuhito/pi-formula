@@ -9,6 +9,13 @@ const { getCellDimensions } = require("@earendil-works/pi-tui") as {
 
 import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
 import { transformDisplayMath } from "./markdown";
+import {
+  formulaConfigPath,
+  readDefaultPath,
+  writeDefaultPath,
+  type FormulaPathMode
+} from "./path-settings";
+import { RenderCache } from "./render-cache";
 import { multiplexerProbeResult, probePngSupport, type TerminalProbe } from "./terminal-probe";
 import { typesetMath, type TypesetImage } from "./typesetter";
 
@@ -21,8 +28,9 @@ if (typeof manifest.version !== "string") {
 
 const MAX_CACHE_ENTRIES = 64;
 const MAX_LATEX_LENGTH = 16_384;
+const PATH_ENTRY = "pi-formula-path";
 const REGISTRATION_KEY = Symbol.for("pi-formula.registered");
-const imageCache = new Map<string, TypesetImage | null>();
+const imageCache = new RenderCache(MAX_CACHE_ENTRIES);
 
 function rgbFromAnsi(ansi: string): string | undefined {
   const match = ansi.match(/38;2;(\d+);(\d+);(\d+)/u);
@@ -40,20 +48,35 @@ function cachedImage(
   if (latex.length > MAX_LATEX_LENGTH) return undefined;
   const cell = getCellDimensions();
   const key = JSON.stringify([latex, color, availableWidth, cell.widthPx, cell.heightPx]);
-  const cached = imageCache.get(key);
-  if (cached !== undefined) return cached ?? undefined;
-  try {
-    const image = typesetMath(latex, color, availableWidth, cell);
-    imageCache.set(key, image.scale >= 0.5 ? image : null);
-  } catch {
-    imageCache.set(key, null);
+  const image = imageCache.getOrCreate(
+    key,
+    () => typesetMath(latex, color, availableWidth, cell)
+  );
+  return image && image.scale >= 0.5 ? image : undefined;
+}
+
+function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index] as {
+      type?: unknown;
+      customType?: unknown;
+      data?: { path?: unknown };
+    };
+    if (entry.type !== "custom" || entry.customType !== PATH_ENTRY) continue;
+    const path = entry.data?.path;
+    if (path === "auto" || path === "image" || path === "text") return path;
   }
-  while (imageCache.size > MAX_CACHE_ENTRIES) {
-    const oldest = imageCache.keys().next().value as string | undefined;
-    if (oldest === undefined) break;
-    imageCache.delete(oldest);
-  }
-  return imageCache.get(key) ?? undefined;
+  return "auto";
+}
+
+function terminalName(env: NodeJS.ProcessEnv): string {
+  const program = env.TERM_PROGRAM?.toLowerCase() ?? "";
+  const term = env.TERM?.toLowerCase() ?? "";
+  if (env.TMUX || term.startsWith("tmux")) return "tmux";
+  if (term.startsWith("screen")) return "screen";
+  if (program.includes("ghostty") || env.GHOSTTY_RESOURCES_DIR) return "Ghostty";
+  if (program.includes("kitty") || term.includes("kitty")) return "Kitty";
+  return "unknown";
 }
 
 export default function registerFormula(pi: ExtensionAPI): void {
@@ -61,17 +84,47 @@ export default function registerFormula(pi: ExtensionAPI): void {
   if (sharedApi[REGISTRATION_KEY]) return;
   sharedApi[REGISTRATION_KEY] = true;
   let path: "image" | "text" = "text";
+  let selectionReason = "session has not started";
   let probe: TerminalProbe = {
     path: "text", reason: "session has not started", response: "not started"
   };
+  let sessionMode: FormulaPathMode = "auto";
+  let defaultPath: "image" | "text" | undefined;
+  let configPath = formulaConfigPath(process.env);
+  let terminal = "unknown";
+  let hasTerminalScreen = false;
+  let imagePathForbidden = true;
   let textColor: (() => string | undefined) = () => undefined;
+
+  const selectPath = (): void => {
+    if (imagePathForbidden) {
+      path = "text";
+      selectionReason = probe.reason;
+    } else if (sessionMode !== "auto") {
+      path = sessionMode;
+      selectionReason = "manual session setting";
+    } else if (defaultPath) {
+      path = defaultPath;
+      selectionReason = "default setting";
+    } else {
+      path = probe.path;
+      selectionReason = probe.reason;
+    }
+  };
 
   pi.on("session_start", async (_event, ctx) => {
     textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
+    configPath = formulaConfigPath(process.env);
+    defaultPath = readDefaultPath(configPath);
+    sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
+    terminal = terminalName(process.env);
+    hasTerminalScreen = ctx.mode === "tui";
+
     const multiplexer = multiplexerProbeResult(process.env);
+    imagePathForbidden = !hasTerminalScreen || multiplexer !== undefined;
     if (multiplexer) {
       probe = multiplexer;
-    } else if (ctx.mode === "tui") {
+    } else if (hasTerminalScreen) {
       let pending: Promise<TerminalProbe> | undefined;
       ctx.ui.setWidget("pi-formula-probe", (tui) => {
         pending = probePngSupport(tui);
@@ -83,10 +136,10 @@ export default function registerFormula(pi: ExtensionAPI): void {
       ctx.ui.setWidget("pi-formula-probe", undefined);
     } else {
       probe = {
-        path: "text", reason: `${ctx.mode} mode has no terminal image path`, response: "not queried"
+        path: "text", reason: `${ctx.mode} mode has no terminal screen`, response: "not queried"
       };
     }
-    path = probe.path;
+    selectPath();
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
@@ -114,17 +167,48 @@ export default function registerFormula(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("formula", {
-    description: "Show the pi-formula version and current rendering path",
+    description: "Show status, select auto/image/text, or clear the image cache",
     handler: async (args, ctx) => {
-      if (args.trim() && args.trim() !== "status") {
-        ctx.ui.notify("Usage: /formula status", "warning");
+      const tokens = args.trim().split(/\s+/u).filter(Boolean);
+      const action = tokens[0] ?? "status";
+      const saveDefault = tokens.length === 2 && tokens[1] === "--default";
+
+      if (action === "clear" && tokens.length === 1) {
+        imageCache.clear();
+        ctx.ui.notify("pi-formula cache cleared", "info");
         return;
       }
+
+      if ((action === "auto" || action === "image" || action === "text")
+          && (tokens.length === 1 || saveDefault)) {
+        sessionMode = action;
+        pi.appendEntry(PATH_ENTRY, { path: action });
+        if (saveDefault) {
+          writeDefaultPath(configPath, action);
+          defaultPath = readDefaultPath(configPath);
+        }
+        selectPath();
+        ctx.ui.notify(`pi-formula path: ${path} (${selectionReason})`, "info");
+        return;
+      }
+
+      if (action !== "status" || tokens.length !== 1) {
+        ctx.ui.notify(
+          "Usage: /formula status|clear|auto|image|text [--default]",
+          "warning"
+        );
+        return;
+      }
+
+      const stats = imageCache.stats();
       ctx.ui.setWidget("pi-formula-status", [
         `pi-formula ${manifest.version}`,
         `path: ${path}`,
-        `reason: ${probe.reason}`,
-        `probe: ${probe.response}`
+        `reason: ${selectionReason}`,
+        `terminal: ${terminal}`,
+        "macros: 0",
+        `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
+        `last failure: ${stats.lastFailure ?? "none"}`
       ], { placement: "belowEditor" });
     }
   });

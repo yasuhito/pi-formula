@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const registerFormula = require('../dist/extension.js').default;
-const { fakePi, startWithKitty } = require('./support/fake-pi');
+const { fakePi, startSession, startWithKitty } = require('./support/fake-pi');
 
 test('inline formulas stay in Pi Markdown without image transfer', async () => {
   const pi = fakePi();
@@ -87,6 +87,20 @@ test('registering the package twice does not duplicate formula rendering', () =>
     transformerRegistrations: 1,
     commandRegistrations: 1
   });
+});
+
+test('a saved session path overrides a rejected automatic probe', async () => {
+  const pi = fakePi({
+    sessionEntries: [{
+      type: 'custom', customType: 'pi-formula-path', data: { path: 'image' }
+    }]
+  });
+  registerFormula(pi.api);
+  const { ctx, widgets } = await startSession(pi, { response: 'EINVAL' });
+
+  await pi.commands.get('formula').handler('status', ctx);
+
+  assert.equal(widgets.get('pi-formula-status').includes('path: image'), true);
 });
 
 test('/formula status reports the package version and image path in English', async () => {
