@@ -1,13 +1,39 @@
 const assert = require('node:assert/strict');
-const { readFileSync, rmSync } = require('node:fs');
+const { mkdirSync, mkdtempSync, readFileSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { Given, Then, When } = require('@cucumber/cucumber');
+const { After, Given, setDefaultTimeout, Then, When } = require('@cucumber/cucumber');
+const {
+  commandsFromRealPi,
+  isInside,
+  PACKAGE_TRIAL_STEP_TIMEOUT_MS
+} = require('../../test/support/package-trial');
+
+setDefaultTimeout(30_000);
 
 const root = resolve(__dirname, '../..');
 const readProjectFile = (path) => readFileSync(join(root, path), 'utf8');
 const readProjectBinary = (path) => readFileSync(join(root, path));
+
+function packedPackage(packOutput) {
+  const candidate = Array.isArray(packOutput)
+    ? packOutput[0]
+    : typeof packOutput?.filename === 'string'
+      ? packOutput
+      : packOutput?.['pi-formula'];
+  if (typeof candidate?.filename !== 'string' || candidate.filename.trim() === '') {
+    throw new Error(`npm pack did not report a filename: ${JSON.stringify(packOutput)}`);
+  }
+  return candidate;
+}
+
+After(function () {
+  if (this.packageTrialRoot) {
+    rmSync(this.packageTrialRoot, { recursive: true, force: true });
+  }
+});
 
 Given('pi-formula の英語と日本語の README がある', function () {
   this.englishReadme = readProjectFile('README.md');
@@ -104,6 +130,126 @@ Then('src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品�
     'src'
   ]);
   assert.equal(this.packedFiles.includes('assets/ghostty-formulas.png'), true);
+});
+
+Given('pi-formula の公開候補 tarball がある', function () {
+  this.packageTrialRoot = mkdtempSync(join(tmpdir(), 'pi-formula-candidate-'));
+  const release = join(this.packageTrialRoot, 'release');
+  mkdirSync(release);
+  const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', release], {
+    cwd: root,
+    encoding: 'utf8'
+  });
+  this.packageTrial = { packed };
+  if (packed.status === 0) {
+    const candidate = packedPackage(JSON.parse(packed.stdout));
+    this.packageTrial.tarball = join(release, candidate.filename);
+  }
+});
+
+When('tarball を新しい一時環境へ導入して本物の Pi で調べる', {
+  timeout: PACKAGE_TRIAL_STEP_TIMEOUT_MS
+}, async function () {
+  const work = join(this.packageTrialRoot, 'work');
+  const home = join(this.packageTrialRoot, 'home');
+  const config = join(this.packageTrialRoot, 'config');
+  const agentDirectory = join(this.packageTrialRoot, 'agent');
+  for (const directory of [work, home, config, agentDirectory]) {
+    mkdirSync(directory, { recursive: true });
+  }
+  const env = {
+    ...process.env,
+    HOME: home,
+    XDG_CONFIG_HOME: config,
+    PI_CODING_AGENT_DIR: agentDirectory
+  };
+  if (!this.packageTrial.tarball) return;
+  const installed = spawnSync('pi', [
+    'install', `npm:pi-formula@file:${this.packageTrial.tarball}`
+  ], { cwd: work, env, encoding: 'utf8' });
+  this.packageTrial.installed = installed;
+  if (installed.status !== 0) return;
+
+  const packagePath = join(agentDirectory, 'npm', 'node_modules', 'pi-formula');
+  const probeScript = `
+    const { createRequire } = require('node:module');
+    const { join } = require('node:path');
+    const packagePath = process.env.PI_FORMULA_PACKAGE_PATH;
+    const installedRequire = createRequire(join(packagePath, 'package.json'));
+    const { Resvg } = installedRequire('@resvg/resvg-js');
+    const png = Buffer.from(new Resvg(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">' +
+      '<rect width="1" height="1"/></svg>'
+    ).render().asPng());
+    const nativePath = Object.keys(require.cache).find((path) => path.endsWith('.node'));
+    process.stdout.write(JSON.stringify({
+      apiPath: installedRequire.resolve(packagePath),
+      nativePath,
+      pngSignature: png.subarray(1, 4).toString('ascii'),
+      platform: process.platform,
+      architecture: process.arch
+    }));
+  `;
+  const probe = spawnSync(process.execPath, ['--eval', probeScript], {
+    cwd: work,
+    env: { ...env, PI_FORMULA_PACKAGE_PATH: packagePath },
+    encoding: 'utf8'
+  });
+  this.packageTrial.packagePath = packagePath;
+  this.packageTrial.probe = probe;
+  if (probe.status === 0) this.packageTrial.probeResult = JSON.parse(probe.stdout);
+  this.packageTrial.pi = await commandsFromRealPi(work, env);
+});
+
+Then('導入した配布物だけから OS 用 Resvg が読み込まれ formula コマンドが発見される', function () {
+  const { packed, installed, packagePath, pi, probe, probeResult } = this.packageTrial;
+  const nodeModules = join(this.packageTrialRoot, 'agent', 'npm', 'node_modules');
+  const actual = {
+    packStatus: packed.status,
+    installStatus: installed?.status,
+    probeStatus: probe?.status,
+    apiFromTemporaryInstall: probeResult?.apiPath
+      ? isInside(packagePath, probeResult.apiPath)
+      : false,
+    nativeResvgFromTemporaryInstall: probeResult?.nativePath
+      ? isInside(nodeModules, probeResult.nativePath)
+      : false,
+    nativeResvgMatchesOs: probeResult?.nativePath
+      ? probeResult.nativePath.includes(
+        `resvg-js-${probeResult.platform}-${probeResult.architecture}`
+      )
+      : false,
+    pngSignature: probeResult?.pngSignature,
+    piClosed: pi?.closed,
+    piResponseTimedOut: pi?.responseTimedOut,
+    formulaDiscovered: pi?.response?.data?.commands?.some(({ name }) => name === 'formula') ?? false
+  };
+  assert.deepEqual(actual, {
+    packStatus: 0,
+    installStatus: 0,
+    probeStatus: 0,
+    apiFromTemporaryInstall: true,
+    nativeResvgFromTemporaryInstall: true,
+    nativeResvgMatchesOs: true,
+    pngSignature: 'PNG',
+    piClosed: true,
+    piResponseTimedOut: false,
+    formulaDiscovered: true
+  }, JSON.stringify({
+    actual,
+    packError: packed.stderr,
+    installError: installed?.stderr || installed?.stdout,
+    probeError: probe?.stderr || probe?.stdout,
+    piError: pi?.error || pi?.stderr || pi?.stdout,
+    piLifecycle: pi && {
+      closed: pi.closed,
+      code: pi.code,
+      signal: pi.signal,
+      responseTimedOut: pi.responseTimedOut,
+      sentSigterm: pi.sentSigterm,
+      sentSigkill: pi.sentSigkill
+    }
+  }));
 });
 
 Given('pi-formula のライセンスと第三者部品情報がある', function () {
