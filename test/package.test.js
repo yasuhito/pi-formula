@@ -13,7 +13,7 @@ function packedPackage(packOutput) {
       : packOutput?.["pi-formula"];
 }
 
-test("package exposes the CommonJS registration and PNG creation API", () => {
+test("package exposes the compatible Formula API and existing-PNG API", () => {
   const manifest = require(join(root, "package.json"));
   const exported = require(root);
 
@@ -22,11 +22,15 @@ test("package exposes the CommonJS registration and PNG creation API", () => {
       moduleType: manifest.type,
       registerFormula: typeof exported.registerFormula,
       createFormulaPng: typeof exported.createFormulaPng,
+      getFormulaPath: typeof exported.getFormulaPath,
+      renderPng: typeof exported.renderPng,
     },
     {
       moduleType: "commonjs",
       registerFormula: "function",
       createFormulaPng: "function",
+      getFormulaPath: "function",
+      renderPng: "function",
     },
   );
 });

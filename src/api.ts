@@ -24,6 +24,14 @@ import {
   readDefaultPath,
   writeDefaultPath,
 } from "./path-settings";
+import {
+  type PngRenderResult,
+  type PngSource,
+  renderPngForTerminal,
+} from "./png-renderer";
+
+export type { PngRenderResult, PngSource } from "./png-renderer";
+
 import { RenderCache } from "./render-cache";
 import {
   multiplexerProbeResult,
@@ -45,6 +53,8 @@ if (typeof manifest.version !== "string") {
 
 const PATH_ENTRY = "pi-formula-path";
 const SHARED_KEY = Symbol.for("pi-formula.shared-api.v1");
+
+export type FormulaPath = "image" | "text";
 
 export interface FormulaPng {
   data: Buffer;
@@ -213,6 +223,26 @@ function addProtectedMacros(state: FormulaState, macros: FormulaMacros): void {
     changed = true;
   }
   if (changed) state.imageCache.clear();
+}
+
+/** Return the registered extension's current display path. */
+export function getFormulaPath(): FormulaPath {
+  return sharedStore().current?.path ?? "text";
+}
+
+/** Render an existing PNG for the current image path. */
+export function renderPng(
+  source: PngSource,
+  availableWidth: number,
+): PngRenderResult {
+  if (getFormulaPath() !== "image") {
+    return { rendered: false, reason: "image-unavailable" };
+  }
+  try {
+    return renderPngForTerminal(source, availableWidth, getCellDimensions());
+  } catch {
+    return { rendered: false, reason: "invalid-png" };
+  }
 }
 
 /** Create one display-formula PNG using the registered extension's current path and theme. */
