@@ -3,3 +3,9 @@ dist/
 *.tgz
 coverage/
 .release/
+
+# OpenClaw agent workspace state
+IDENTITY.md
+SOUL.md
+USER.md
+memory/
