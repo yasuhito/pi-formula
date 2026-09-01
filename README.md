@@ -98,7 +98,7 @@ The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows,
 
 ## Extension API
 
-The CommonJS package exports synchronous `registerFormula`, `createFormulaPng`, `getFormulaPath`, and `renderPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+The CommonJS package root exports synchronous `registerFormula`, `createFormulaPng`, `getFormulaPath`, and `renderPng` operations. Internal subpaths are not public. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
 
 ```js
 const {
@@ -133,7 +133,7 @@ Additional macro names contain ASCII letters, with an optional leading backslash
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records source provenance, direct dependency versions, update status, licenses, and the dated vulnerability check.
 - [LICENSE](LICENSE) contains the MIT License.
 
-To inspect the exact npm payload locally:
+`npm run build` removes the previous `dist` directory before compiling, so deleted sources cannot leave stale files in a release. To inspect the exact npm payload locally:
 
 ```sh
 npm pack --dry-run

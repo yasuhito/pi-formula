@@ -21,6 +21,12 @@
   "type": "commonjs",
   "main": "./dist/api.js",
   "types": "./dist/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
   "pi": {
     "extensions": [
       "./src/extension.ts"
@@ -41,7 +47,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/clean-dist.js && tsc",
     "prepack": "npm run build",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
