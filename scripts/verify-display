@@ -13,7 +13,26 @@ WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
 ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
-CORPUS=${1:-}
+MODE=corpus
+CORPUS=
+PROMPT=
+RESPONSE_DESTINATION=
+SAVE_RESPONSE=false
+ARGUMENT_ERROR=
+if [[ "${1:-}" == --prompt ]]; then
+  MODE=prompt
+  PROMPT=${2:-}
+  shift 2 || true
+  if [[ "${1:-}" == --save-response ]]; then
+    SAVE_RESPONSE=true
+    RESPONSE_DESTINATION=${2:-}
+    shift 2 || true
+  fi
+else
+  CORPUS=${1:-}
+  shift || true
+fi
+[[ $# -eq 0 ]] || ARGUMENT_ERROR="未対応の引数です: $*"
 TEMP_DIR=
 CAGE_PID=
 
@@ -61,13 +80,22 @@ fail() {
   exit 2
 }
 
-[[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
-[[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
+USAGE="Usage: scripts/verify-display <corpus.md> | --prompt <prompt> [--save-response <corpus.md>]"
+[[ -z "$ARGUMENT_ERROR" ]] || fail "$ARGUMENT_ERROR\n$USAGE"
+if [[ "$MODE" == corpus ]]; then
+  [[ -n "$CORPUS" ]] || fail "$USAGE"
+  [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
+else
+  [[ -n "$PROMPT" ]] || fail "$USAGE"
+  [[ "$SAVE_RESPONSE" == false || -n "$RESPONSE_DESTINATION" ]] || fail "$USAGE"
+fi
 for command in timeout cage wlr-randr ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
-CORPUS=$(run realpath -- "$CORPUS")
+if [[ "$MODE" == corpus ]]; then
+  CORPUS=$(run realpath -- "$CORPUS")
+fi
 TEMP_DIR=$(run mktemp -d -t pi-formula-verify.XXXXXXXX)
 SESSION_FILE="$TEMP_DIR/session.jsonl"
 CAPTURE_FILE="$TEMP_DIR/full-history.png"
@@ -82,14 +110,19 @@ CAGE_LOG="$TEMP_DIR/cage.log"
 run mkdir -p "$CONFIG_HOME"
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
-PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
-  || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
-HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
-IMAGE_ROWS=$(printf '%s' "$PLAN" | run jq -r '.imageRows')
-[[ "$HEIGHT" =~ ^[0-9]+$ && "$HEIGHT" -le 16000 ]] \
-  || fail "表示計画の出力高が不正です"
-[[ "$IMAGE_ROWS" =~ ^[1-9][0-9]*$ ]] \
-  || fail "コーパスに表示数式の画像行がありません"
+if [[ "$MODE" == corpus ]]; then
+  PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
+    || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
+  HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
+  IMAGE_ROWS=$(printf '%s' "$PLAN" | run jq -r '.imageRows')
+  [[ "$HEIGHT" =~ ^[0-9]+$ && "$HEIGHT" -le 16000 ]] \
+    || fail "表示計画の出力高が不正です"
+  [[ "$IMAGE_ROWS" =~ ^[1-9][0-9]*$ ]] \
+    || fail "コーパスに表示数式の画像行がありません"
+else
+  # 応答は事前に分からないため、探索モードは検証上限の全履歴を用意する。
+  HEIGHT=16000
+fi
 
 run cat >"$GHOSTTY_CONFIG" <<'CONFIG'
 font-size = 12
@@ -102,8 +135,8 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\n' \
-  "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_MODE=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_PROMPT=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\n' \
+  "$WINDOW_TITLE" "$SESSION_FILE" "$MODE" "$CORPUS" "$PROMPT" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
   "$ROOT/src/extension.ts" "$ROOT/scripts/verify-extensions/pi-formula-verify-macros.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
   "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" >"$RUNNER"
@@ -128,11 +161,17 @@ args=(
   --no-context-files
   --approve
   --thinking off
-  --system-prompt '添付された Markdown だけを、一字一句そのまま出力してください。説明、前置き、コードフェンスを追加しないでください。'
 )
 if [[ -n "${PI_FORMULA_VERIFY_MODEL:-}" ]]; then
   args+=(--model "$PI_FORMULA_VERIFY_MODEL")
 fi
+if [[ "$PI_FORMULA_VERIFY_MODE" == prompt ]]; then
+  exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
+    pi "${args[@]}" "$PI_FORMULA_VERIFY_PROMPT"
+fi
+args+=(
+  --system-prompt '添付された Markdown だけを、一字一句そのまま出力してください。説明、前置き、コードフェンスを追加しないでください。'
+)
 exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
   pi "${args[@]}" "@$PI_FORMULA_VERIFY_CORPUS" \
   '次の Markdown を一字一句そのまま出力してください。'
@@ -214,8 +253,14 @@ for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
   run sleep 1
 done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
-run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
-  || fail "Pi の応答がコーパスと一字一句一致しません"
+if [[ "$MODE" == corpus ]]; then
+  run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
+    || fail "Pi の応答がコーパスと一字一句一致しません"
+elif [[ -n "$RESPONSE_DESTINATION" ]]; then
+  run node "$ROOT/scripts/save-display-response.js" "$SESSION_FILE" "$RESPONSE_DESTINATION" \
+    || fail "探索で得た応答をコーパスへ保存できませんでした"
+  printf 'コーパス: %s\n' "$RESPONSE_DESTINATION"
+fi
 
 display_rendered=false
 rendered_options=(--background=250,248,240 --background=238,235,224)

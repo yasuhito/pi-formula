@@ -94,7 +94,20 @@ When("ハーネスの安全条件を調べる", function () {
       /キャプチャを開いて表示を確認してください/u.test(this.harness),
     imagePath: /verify-image-path\.js/u.test(this.harness),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
-    exactEcho: /verify-echo\.js/u.test(this.harness),
+    exactEcho:
+      /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u.test(
+        this.harness,
+      ),
+    promptExploration:
+      /--prompt/u.test(this.harness) &&
+      /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == prompt \]\]/u.test(this.harness) &&
+      /pi "\$\{args\[@\]\}" "\$PI_FORMULA_VERIFY_PROMPT"/u.test(this.harness),
+    exitStatuses:
+      /run-display-command" detector detect-display-bands/u.test(
+        this.harness,
+      ) &&
+      /exit "\$detector_status"/u.test(this.harness) &&
+      /fail\(\)[\s\S]*exit 2/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
       /kill -- "-\$CAGE_PID"/u.test(this.harness),
@@ -157,9 +170,64 @@ Then("ピクセル判定前に描画完了を確認する", function () {
   assert.equal(this.safety.capturedImage, true);
 });
 
-Then("キャプチャ前に応答一致を確認する", function () {
+Then("コーパスモードではキャプチャ前に応答一致を確認する", function () {
   assert.equal(this.safety.exactEcho, true);
 });
+
+Then(
+  "探索モードでは自由なプロンプトの応答を一致検証せずに描画する",
+  function () {
+    assert.equal(this.safety.promptExploration, true);
+  },
+);
+
+Given("探索で得た完了済みの応答がある", function () {
+  this.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-response-"),
+  );
+  this.savedResponse = path.join(this.directory, "response.md");
+  this.explorationResponse = "説明です。\n\n$$\\frac{1}{2}$$";
+  this.explorationSession = path.join(this.directory, "session.jsonl");
+  fs.writeFileSync(
+    this.explorationSession,
+    `${JSON.stringify({
+      type: "message",
+      message: {
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: this.explorationResponse }],
+      },
+    })}\n`,
+  );
+});
+
+When("応答をコーパスファイルへ保存する", function () {
+  this.saveResponseResult = spawnSync(
+    process.execPath,
+    [
+      path.join(root, "scripts/save-display-response.js"),
+      this.explorationSession,
+      this.savedResponse,
+    ],
+    { encoding: "utf8", timeout: 5_000 },
+  );
+});
+
+Then("保存したコーパスは応答と一字一句一致する", function () {
+  const actual =
+    this.saveResponseResult.status === 0
+      ? fs.readFileSync(this.savedResponse, "utf8")
+      : this.saveResponseResult.stderr;
+  fs.rmSync(this.directory, { recursive: true, force: true });
+  assert.equal(actual, this.explorationResponse);
+});
+
+Then(
+  "探索モードでも正常は0、異常な水平帯は1、検証作業の失敗は2にする",
+  function () {
+    assert.equal(this.safety.exitStatuses, true);
+  },
+);
 
 Then("失敗時も検証セッションの process group を止める", function () {
   assert.equal(this.safety.cleanup, true);

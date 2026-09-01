@@ -106,8 +106,28 @@ test("画像経路を確認してからキャプチャする", () => {
   );
 });
 
-test("応答一致を確認してからキャプチャする", () => {
-  assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run_inside grim"));
+test("コーパスモードだけ応答一致を確認する", () => {
+  assert.match(
+    harness,
+    /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u,
+  );
+});
+
+test("探索モードは自由なプロンプトをPiへ直接渡す", () => {
+  assert.match(
+    harness,
+    /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == prompt \]\][\s\S]*pi "\$\{args\[@\]\}" "\$PI_FORMULA_VERIFY_PROMPT"/u,
+  );
+});
+
+test("探索で得た応答をキャプチャ前にコーパスへ保存する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "save-display-response.js",
+      "run_inside grim",
+    ),
+  );
 });
 
 test("描画完了をピクセル判定前に確認する", () => {
