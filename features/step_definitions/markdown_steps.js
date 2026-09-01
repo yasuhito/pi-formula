@@ -69,6 +69,28 @@ When("コードフェンスと文中コードに数式がある本文を変換�
   );
 });
 
+When(
+  "混在文字、深い字下げ、末尾空白を含む長いコードフェンスを変換する",
+  function () {
+    transform(
+      this,
+      [
+        "````text",
+        "$$x^2$$",
+        "````~~~",
+        "    `````",
+        "  `````   ",
+        "$$y^2$$",
+      ].join("\n"),
+    );
+  },
+);
+
+Then("正しい閉じフェンスの後にある表示数式だけが画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+  assert.match(this.rendered, /\$\$x\^2\$\$/u);
+});
+
 When("thinking の本文を変換する", function () {
   transform(this, "考える: $$x$$", { messageType: "assistant-thinking" });
 });
