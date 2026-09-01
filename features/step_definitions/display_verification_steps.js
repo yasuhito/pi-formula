@@ -30,7 +30,8 @@ Given("実表示検証ハーネスと Issue 21 の再現コーパスがある", 
 When("ハーネスの安全条件を調べる", function () {
   this.safety = {
     headless: /output create headless/u.test(this.harness),
-    tallOutput: /16000/u.test(this.harness) && /grim -o/u.test(this.harness),
+    tallOutput:
+      /plan-display\.js/u.test(this.harness) && /grim -o/u.test(this.harness),
     launchRule:
       /workspace = .* silent/u.test(this.harness) &&
       /monitor = .* silent/u.test(this.harness) &&
@@ -43,6 +44,10 @@ When("ハーネスの安全条件を調べる", function () {
       /--no-extensions/u.test(this.harness) &&
       /--extension "\$PI_FORMULA_VERIFY_EXTENSION"/u.test(this.harness) &&
       /src\/extension\.ts/u.test(this.harness),
+    isolatedSettings:
+      /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u.test(this.harness) &&
+      /PI_FORMULA_MACROS='\{\}'/u.test(this.harness),
+    imagePath: /verify-image-path\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
@@ -53,7 +58,7 @@ When("ハーネスの安全条件を調べる", function () {
 });
 
 Then(
-  "現在の画像経路だけを使う headless 起動、全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている",
+  "隔離した設定で現在の画像経路だけを確認する headless 起動、画像行数を含む全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている",
   function () {
     assert.ok(this.corpus.includes("F_8"));
     assert.deepEqual(this.safety, {
@@ -63,11 +68,38 @@ Then(
       timeouts: true,
       focusGuard: true,
       isolatedExtension: true,
+      isolatedSettings: true,
+      imagePath: true,
       exactEcho: true,
       cleanup: true,
     });
   },
 );
+
+Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
+  this.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
+  );
+  this.tallCorpus = path.join(this.directory, "tall.md");
+  fs.writeFileSync(
+    this.tallCorpus,
+    ["$$\\rule{1em}{300ex}$$", "$$\\rule{1em}{300ex}$$"].join("\n\n"),
+  );
+});
+
+When("表示数式の画像行数を含む出力高を計画する", function () {
+  this.planResult = spawnSync(
+    process.execPath,
+    [path.join(root, "scripts/plan-display.js"), this.tallCorpus],
+    { encoding: "utf8", timeout: 5_000 },
+  );
+  fs.rmSync(this.directory, { recursive: true, force: true });
+});
+
+Then("全履歴が収まらないコーパスは描画前に拒否される", function () {
+  assert.equal(this.planResult.status, 2);
+  assert.match(this.planResult.stderr, /16000px/u);
+});
 
 Given(
   /^コーパスへ `([^`]+)` を加えた assistant のセッション記録がある$/u,

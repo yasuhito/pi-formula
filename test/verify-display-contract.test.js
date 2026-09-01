@@ -15,8 +15,20 @@ test("現在の pi-formula だけを公開 Pi CLI から読み込む", () => {
   assert.match(harness, /"\$ROOT\/src\/extension\.ts"/u);
 });
 
-test("応答一致を確認してからキャプチャする", () => {
+test("保存済み path text と利用者マクロを隔離して画像経路と応答一致を確認してからキャプチャする", () => {
+  assert.match(harness, /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u);
+  assert.match(harness, /PI_FORMULA_MACROS='\{\}'/u);
+  assert.ok(
+    harness.indexOf("verify-image-path.js") < harness.indexOf("run grim"),
+  );
   assert.ok(harness.indexOf("verify-echo.js") < harness.indexOf("run grim"));
+});
+
+test("表示数式の画像行数で出力高を決めてから headless 出力を作る", () => {
+  assert.ok(
+    harness.indexOf("plan-display.js") <
+      harness.indexOf("output create headless"),
+  );
 });
 
 test("process group とウィンドウを止めてから headless 出力を削除する", () => {

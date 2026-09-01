@@ -60,7 +60,7 @@ fail() {
 
 [[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
 [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
-for command in timeout hyprctl ghostty grim pi jq node mktemp realpath rm sleep install setsid ps; do
+for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
@@ -72,15 +72,15 @@ RUNNER="$TEMP_DIR/run-pi"
 LAUNCHER="$TEMP_DIR/launch-ghostty"
 PID_FILE="$TEMP_DIR/window.pid"
 GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
-
-HEIGHT=$(run node -e '
-const fs = require("node:fs");
-const text = fs.readFileSync(process.argv[1], "utf8");
-const rows = text.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil([...line].length / 120)), 0);
-const required = 2600 + rows * 56;
-if (required > 16000) process.exit(3);
-process.stdout.write(String(Math.max(8000, required)));
-' "$CORPUS") || fail "コーパス全体を 16000px 以下の headless 出力へ収められません"
+CONFIG_HOME="$TEMP_DIR/config"
+IMAGE_MARKER="$TEMP_DIR/image-path"
+run mkdir -p "$CONFIG_HOME"
+run npm run build >/dev/null
+PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
+  || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
+HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
+[[ "$HEIGHT" =~ ^[0-9]+$ && "$HEIGHT" -le 16000 ]] \
+  || fail "表示計画の出力高が不正です"
 
 timeout --signal=TERM "$COMMAND_TIMEOUT" cat >"$GHOSTTY_CONFIG" <<'CONFIG'
 font-size = 12
@@ -93,16 +93,22 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
-  "$ROOT/src/extension.ts" "$ROOT/scripts/verify-display-theme.json" >"$RUNNER"
+  "$ROOT/src/extension.ts" "$ROOT/.pi/extensions/pi-formula-verify-image-path.ts" \
+  "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" >"$RUNNER"
 timeout --signal=TERM "$COMMAND_TIMEOUT" cat >>"$RUNNER" <<'RUNNER'
+export XDG_CONFIG_HOME="$PI_FORMULA_VERIFY_CONFIG_HOME"
+export PI_FORMULA_MACROS='{}'
+export PI_FORMULA_VERIFY_IMAGE_MARKER
+unset TMUX STY
 args=(
   --name "$PI_FORMULA_VERIFY_TITLE"
   --session "$PI_FORMULA_VERIFY_SESSION"
   --no-tools
   --no-extensions
   --extension "$PI_FORMULA_VERIFY_EXTENSION"
+  --extension "$PI_FORMULA_VERIFY_PATH_EXTENSION"
   --no-themes
   --theme "$PI_FORMULA_VERIFY_THEME"
   --use-theme pi-formula-verify
@@ -164,6 +170,13 @@ AFTER_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
 run hyprctl eval "hl.get_monitor(\"$OUTPUT_NAME\"):set_workspace({ workspace = $WORKSPACE_ID })" >/dev/null
 ACTIVE_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
 [[ "$ACTIVE_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+
+for _ in {1..15}; do
+  [[ -s "$IMAGE_MARKER" ]] && break
+  run sleep 1
+done
+run node "$ROOT/scripts/verify-image-path.js" "$IMAGE_MARKER" \
+  || fail "現在の pi-formula が画像経路を選べませんでした"
 
 completed=false
 for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do

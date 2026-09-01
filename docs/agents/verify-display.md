@@ -26,6 +26,8 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
 
 既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` だけを読み込む。qni-cli など、導入済み package の状態は検証結果へ影響しない。
 
+pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。現在の checkout の公開 API で試験用 PNG を作れたことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
+
 ```sh
 PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
   scripts/verify-display docs/agents/verify-corpus/issue-21.md
@@ -39,7 +41,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ## 履歴全体
 
-コーパスの行数と折り返し量から、8000〜16000 px の縦長 headless 出力を実行前に選ぶ。入力メッセージ、応答、Pi の画面部品を含む保守的な余白を加える。16000 px に収まらないコーパスは、ビューポートだけを撮らず実行前に拒否する。受理したコーパスはスクロールや画像結合を使わず、`grim -o` の 1 枚で履歴全体を取得する。キャプチャ前には session JSONL の最後の完了した assistant message から text content を取り出し、コーパスと一字一句比較する。コードフェンス、Unicode 化、前置き、欠落を含む不一致は exit 2 とし、キャプチャへ進まない。
+コーパスを現在の typesetter で事前に組版し、各表示数式の実際の画像行数を求める。Markdown の行数・折り返し量、入力と応答の2回分の画像行数、Pi の画面部品を含む保守的な余白から、8000〜16000 px の縦長 headless 出力を選ぶ。短い LaTeX でも画像が高ければ必要高へ加算する。16000 px に収まらないコーパスは、ビューポートだけを撮らず描画前に拒否する。受理したコーパスはスクロールや画像結合を使わず、`grim -o` の 1 枚で履歴全体を取得する。キャプチャ前には session JSONL の最後の完了した assistant message から text content を取り出し、コーパスと一字一句比較する。コードフェンス、Unicode 化、前置き、欠落を含む不一致は exit 2 とし、キャプチャへ進まない。
 
 この方式は GPU の最大テクスチャ寸法以下に限られる。長大な会話履歴一般を撮る道具ではなく、指定コーパスを一度だけ回帰検証するためのものとする。
 
