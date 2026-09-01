@@ -60,7 +60,22 @@ test("display formulas use a Kitty PNG transfer and placeholder rows", async () 
   );
 });
 
-test("the same display formula transfers before every placement", async () => {
+test("streaming display formulas stay in the text path until finalized", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+  const markdown = "tool output\n\n$$x$$\n\n$$y$$\n\n$$z$$";
+
+  const streaming = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal(streaming, markdown);
+});
+
+test("the same display formula transfers once and keeps every placement", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   await startWithKitty(pi);
@@ -79,7 +94,7 @@ test("the same display formula transfers before every placement", async () => {
       hasPlaceholder: rendered.includes(String.fromCodePoint(0x10eeee)),
     },
     {
-      transfers: 2,
+      transfers: 1,
       placeholderRows: 2,
       hasPlaceholder: true,
     },
@@ -93,7 +108,7 @@ test("a display formula keeps each Kitty transfer line free of other drawing out
 
   const transformed = pi.transformer()("Before\n$$x$$\nAfter", {
     messageType: "assistant",
-    isStreaming: true,
+    isStreaming: false,
     availableWidth: 80,
   });
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });

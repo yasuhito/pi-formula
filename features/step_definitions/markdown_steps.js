@@ -9,7 +9,9 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
+  inspectPlacementBlocks,
   inspectStreamingRegression,
+  issue26Updates,
   renderStreamingRegression,
 } = require("../support/streaming-regression");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
@@ -214,8 +216,8 @@ Then("画像は引用の階層に残る", function () {
   assert.equal(placeholderLines(this.rendered)[0]?.startsWith("> "), true);
 });
 
-Then("閉じた表示数式は画像になる", function () {
-  assert.equal(placeholderLines(this.rendered).length, 1);
+Then("閉じた表示数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 Then("未完成な数式は原文のまま残る", function () {
@@ -460,35 +462,71 @@ Then(
   },
 );
 
-When("ツール出力に続けて同じ表示数式を二度配置する", function () {
-  transform(
-    this,
-    ["qni のツール出力", "$$x_{cached}$$", "描画更新", "$$x_{cached}$$"].join(
-      "\n\n",
-    ),
+When(
+  "先行するツール描画後にIssue 26の異なる3式を逐次更新して確定する",
+  function () {
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+    });
+    this.issue26Updates = issue26Updates(this.pi);
+  },
+);
+
+Then("逐次更新中は文字を保ち確定後に3式の転送と配置が対応する", function () {
+  const blocks = inspectPlacementBlocks(this.issue26Updates.finalized);
+  assert.deepEqual(
+    {
+      precedingToolDrawn:
+        this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
+      streamingImages: this.issue26Updates.streaming.map(imageCount),
+      streamingTuiImages:
+        this.issue26Updates.tuiWrites.streaming.map(imageCount),
+      finalizedTuiImages: imageCount(this.issue26Updates.tuiWrites.finalized),
+      placements: blocks.length,
+      multipleRows: blocks.some((block) => block.rows > 1),
+      matching: blocks.every(
+        (block) =>
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
+    },
+    {
+      precedingToolDrawn: true,
+      streamingImages: [0, 0, 0],
+      streamingTuiImages: [0, 0, 0],
+      finalizedTuiImages: 3,
+      placements: 3,
+      multipleRows: true,
+      matching: true,
+    },
   );
 });
 
-Then("各プレースホルダーの直前で表示数式を転送する", function () {
+When("一時保存済みの複数行表示数式を別の確定描画で再配置する", function () {
+  const source = String.raw`$$\begin{pmatrix}1&0\\0&1\end{pmatrix}$$`;
+  transform(this, source);
+  const first = this.rendered;
+  transform(this, source);
+  this.cachedPlacementBlocks = [first, this.rendered].map(
+    inspectPlacementBlocks,
+  );
+});
+
+Then("各確定描画で複数行の転送と配置が対応する", function () {
   assert.equal(
-    imageCount(this.rendered),
-    placeholderLines(this.rendered).length,
+    this.cachedPlacementBlocks.every(
+      (blocks) =>
+        blocks.length === 1 &&
+        blocks[0].rows > 1 &&
+        blocks[0].id === blocks[0].transferId &&
+        blocks[0].rows === blocks[0].declaredRows &&
+        blocks[0].completeTransfer &&
+        blocks[0].adjacentTransfer,
+    ),
+    true,
   );
-});
-
-When("一時保存済みの表示数式を端末から失った後に再配置する", function () {
-  transform(this, "$$x_{cached}$$\n\n端末から画像を破棄\n\n$$x_{cached}$$");
-  const lines = this.rendered.split("\n");
-  const secondPlaceholder = lines.findLastIndex((line) =>
-    line.includes(PLACEHOLDER),
-  );
-  this.secondPlacement = lines
-    .slice(secondPlaceholder - 2, secondPlaceholder + 1)
-    .join("\n");
-});
-
-Then("再配置する表示数式を転送してからプレースホルダーを置く", function () {
-  assert.equal(imageCount(this.secondPlacement), 1);
 });
 
 When("外部作用を監視しながら表示数式を変換する", function () {

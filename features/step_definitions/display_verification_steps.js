@@ -6,6 +6,7 @@ const { spawnSync } = require("node:child_process");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
 const { createPng } = require("../../test/support/png-fixture");
+const { planDisplay } = require("../../scripts/plan-display");
 const root = path.resolve(__dirname, "../..");
 
 function normalDisplay(x, y) {
@@ -23,6 +24,10 @@ Given("実表示検証ハーネスと Issue 21 の再現コーパスがある", 
   );
   this.corpus = fs.readFileSync(
     path.join(root, "docs/agents/verify-corpus/issue-21.md"),
+    "utf8",
+  );
+  this.macrosExtension = fs.readFileSync(
+    path.join(root, ".pi/extensions/pi-formula-verify-macros.ts"),
     "utf8",
   );
 });
@@ -47,6 +52,14 @@ When("ハーネスの安全条件を調べる", function () {
     isolatedSettings:
       /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u.test(this.harness) &&
       /PI_FORMULA_MACROS='\{\}'/u.test(this.harness),
+    additionalMacros:
+      /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u.test(
+        this.harness,
+      ) &&
+      /from "\.\.\/\.\.\/src\/api"/u.test(this.macrosExtension) &&
+      /registerFormula\(pi, VERIFY_DISPLAY_MACROS\)/u.test(
+        this.macrosExtension,
+      ),
     imagePath: /verify-image-path\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
@@ -84,6 +97,10 @@ Then("一時設定と空の利用者マクロを使う", function () {
   assert.equal(this.safety.isolatedSettings, true);
 });
 
+Then("公開 API で追加マクロを登録する拡張を読み込む", function () {
+  assert.equal(this.safety.additionalMacros, true);
+});
+
 Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
 });
@@ -107,8 +124,12 @@ Given("Issue 26 の再現コーパスがある", function () {
   );
 });
 
-Then("最初の表示数式と後続二式がコーパスに含まれる", function () {
-  assert.equal([...this.corpus.matchAll(/^\$\$$/gmu)].length / 2, 3);
+Then("追加マクロを含む3つの表示数式を組版できる", function () {
+  const plan = planDisplay(this.corpus, { source: true });
+  assert.deepEqual(
+    { displayFormulas: plan.displayFormulas, hasImageRows: plan.imageRows > 0 },
+    { displayFormulas: 3, hasImageRows: true },
+  );
 });
 
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
