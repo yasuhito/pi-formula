@@ -145,7 +145,10 @@ function svgFor(
 }
 
 function exDimension(svg: string, name: "width" | "height"): number {
-  const match = new RegExp(`\\b${name}="([\\d.]+)ex"`).exec(svg);
+  const match =
+    name === "width"
+      ? /\bwidth="([\d.]+)ex"/u.exec(svg)
+      : /\bheight="([\d.]+)ex"/u.exec(svg);
   const value = Number.parseFloat(match?.[1] ?? "");
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`MathJax SVG has no positive ${name}`);
