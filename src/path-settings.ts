@@ -4,7 +4,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  writeFileSync
+  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
@@ -12,11 +12,12 @@ import { dirname, isAbsolute, join } from "node:path";
 export type FormulaPathMode = "auto" | "image" | "text";
 
 export function formulaConfigPath(env: NodeJS.ProcessEnv): string {
-  const base = env.XDG_CONFIG_HOME && isAbsolute(env.XDG_CONFIG_HOME)
-    ? env.XDG_CONFIG_HOME
-    : (env.HOME ? join(env.HOME, ".config") : undefined)
-    || (env.USERPROFILE ? join(env.USERPROFILE, ".config") : undefined)
-    || join(homedir(), ".config");
+  const base =
+    env.XDG_CONFIG_HOME && isAbsolute(env.XDG_CONFIG_HOME)
+      ? env.XDG_CONFIG_HOME
+      : (env.HOME ? join(env.HOME, ".config") : undefined) ||
+        (env.USERPROFILE ? join(env.USERPROFILE, ".config") : undefined) ||
+        join(homedir(), ".config");
   return join(base, "pi-formula", "config.json");
 }
 
@@ -24,7 +25,9 @@ export function readDefaultPath(path: string): "image" | "text" | undefined {
   if (!existsSync(path)) return undefined;
   try {
     const value = JSON.parse(readFileSync(path, "utf8")) as { path?: unknown };
-    return value.path === "image" || value.path === "text" ? value.path : undefined;
+    return value.path === "image" || value.path === "text"
+      ? value.path
+      : undefined;
   } catch {
     return undefined;
   }
@@ -50,7 +53,9 @@ export function writeDefaultPath(path: string, mode: FormulaPathMode): void {
 
   mkdirSync(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, {
+    mode: 0o600,
+  });
   try {
     renameSync(temporary, path);
   } catch (error) {

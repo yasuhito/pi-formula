@@ -1,4 +1,4 @@
-const FORMULA_SHARED_KEY = Symbol.for('pi-formula.shared-api.v1');
+const FORMULA_SHARED_KEY = Symbol.for("pi-formula.shared-api.v1");
 
 function resetFormulaState() {
   Reflect.deleteProperty(globalThis, FORMULA_SHARED_KEY);
@@ -14,9 +14,11 @@ function fakePi(options = {}) {
   shared.sessionEntries ??= options.sessionEntries ?? [];
   return {
     api: {
-      on(name, handler) { shared.handlers.set(name, handler); },
+      on(name, handler) {
+        shared.handlers.set(name, handler);
+      },
       appendEntry(customType, data) {
-        shared.entries.push({ type: 'custom', customType, data });
+        shared.entries.push({ type: "custom", customType, data });
       },
       registerMarkdownTransformer(value) {
         shared.transformer = value;
@@ -25,7 +27,7 @@ function fakePi(options = {}) {
       registerCommand(name, command) {
         shared.commands.set(name, command);
         shared.commandRegistrations += 1;
-      }
+      },
     },
     entries: shared.entries,
     handlers: shared.handlers,
@@ -33,65 +35,73 @@ function fakePi(options = {}) {
     sessionEntries: shared.sessionEntries,
     registrationCounts: () => ({
       transformerRegistrations: shared.transformerRegistrations,
-      commandRegistrations: shared.commandRegistrations
+      commandRegistrations: shared.commandRegistrations,
     }),
-    transformer: () => shared.transformer
+    transformer: () => shared.transformer,
   };
 }
 
 async function startSession(pi, options = {}) {
   let inputListener;
   let terminalWrites = 0;
-  let textColor = options.textColor ?? '\x1b[38;2;212;212;212m';
+  let textColor = options.textColor ?? "\x1b[38;2;212;212;212m";
   const tui = {
     addInputListener(listener) {
       inputListener = listener;
-      return () => { inputListener = undefined; };
+      return () => {
+        inputListener = undefined;
+      };
     },
     terminal: {
       write(query) {
         terminalWrites += 1;
         const id = /i=(\d+)/u.exec(query)?.[1];
         if (options.response !== undefined) {
-          queueMicrotask(() => inputListener?.(`\x1b_Gi=${id};${options.response}\x1b\\`));
+          queueMicrotask(() =>
+            inputListener?.(`\x1b_Gi=${id};${options.response}\x1b\\`),
+          );
         }
-      }
-    }
+      },
+    },
   };
   const widgets = new Map();
   const notifications = [];
   const ctx = {
-    mode: options.mode ?? 'tui',
+    mode: options.mode ?? "tui",
     sessionManager: { getBranch: () => pi.sessionEntries },
     ui: {
-      notify(message, level) { notifications.push({ message, level }); },
+      notify(message, level) {
+        notifications.push({ message, level });
+      },
       theme: { getFgAnsi: () => textColor },
       setWidget(name, value) {
         widgets.set(name, value);
-        if (typeof value === 'function') value(tui);
-      }
-    }
+        if (typeof value === "function") value(tui);
+      },
+    },
   };
-  await pi.handlers.get('session_start')({ reason: 'startup' }, ctx);
+  await pi.handlers.get("session_start")({ reason: "startup" }, ctx);
   return {
     ctx,
     notifications,
     terminalWrites,
     widgets,
-    setTextColor(value) { textColor = value; }
+    setTextColor(value) {
+      textColor = value;
+    },
   };
 }
 
 function startWithKitty(pi, options = {}) {
   return startSession(pi, {
     ...options,
-    response: options.response ?? 'OK',
-    textColor: options.foregroundAnsi ?? options.textColor
+    response: options.response ?? "OK",
+    textColor: options.foregroundAnsi ?? options.textColor,
   });
 }
 
 function startWithText(pi) {
-  return startSession(pi, { mode: 'rpc' });
+  return startSession(pi, { mode: "rpc" });
 }
 
 module.exports = {
@@ -99,5 +109,5 @@ module.exports = {
   resetFormulaState,
   startSession,
   startWithKitty,
-  startWithText
+  startWithText,
 };

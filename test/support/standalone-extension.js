@@ -1,6 +1,6 @@
 function loadStandaloneExtension() {
-  const apiPath = require.resolve('../..');
-  const extensionPath = require.resolve('../../dist/extension.js');
+  const apiPath = require.resolve("../..");
+  const extensionPath = require.resolve("../../dist/extension.js");
   delete require.cache[apiPath];
   delete require.cache[extensionPath];
   const register = require(extensionPath).default;

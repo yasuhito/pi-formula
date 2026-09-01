@@ -1,4 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with { "resolution-mode": "import" };
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with {
+  "resolution-mode": "import",
+};
 
 import { registerFormula } from "./api";
 

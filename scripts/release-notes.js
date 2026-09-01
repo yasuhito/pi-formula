@@ -1,8 +1,8 @@
 function extractReleaseNotes(changelog, version) {
-  const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const heading = new RegExp(
     `^## ${escapedVersion}(?:[ \\t][^\\n]*)?(?:\\n|$)`,
-    'mu'
+    "mu",
   ).exec(changelog);
   if (!heading) return null;
 

@@ -1,12 +1,12 @@
-const { realpathSync } = require('node:fs');
-const { spawn } = require('node:child_process');
-const { isAbsolute, relative } = require('node:path');
+const { realpathSync } = require("node:fs");
+const { spawn } = require("node:child_process");
+const { isAbsolute, relative } = require("node:path");
 
 const PACKAGE_TRIAL_STEP_TIMEOUT_MS = 90_000;
 
 function isInside(directory, path) {
   const route = relative(realpathSync(directory), realpathSync(path));
-  return route !== '' && !route.startsWith('..') && !isAbsolute(route);
+  return route !== "" && !route.startsWith("..") && !isAbsolute(route);
 }
 
 function delay(milliseconds) {
@@ -24,39 +24,61 @@ async function waitUntil(condition, closed, timeoutMs) {
 }
 
 function rpcResponse(stdout) {
-  return stdout.split('\n').filter(Boolean).flatMap((line) => {
-    try {
-      return [JSON.parse(line)];
-    } catch {
-      return [];
-    }
-  }).find((event) => event.command === 'get_commands');
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    })
+    .find((event) => event.command === "get_commands");
 }
 
 async function commandsFromRealPi(cwd, env, options = {}) {
-  const command = options.command ?? 'pi';
+  const command = options.command ?? "pi";
   const args = options.args ?? [
-    '--mode', 'rpc', '--no-session', '--offline', '--no-context-files',
-    '--no-skills', '--no-prompt-templates', '--no-themes'
+    "--mode",
+    "rpc",
+    "--no-session",
+    "--offline",
+    "--no-context-files",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-themes",
   ];
   const responseTimeoutMs = options.responseTimeoutMs ?? 10_000;
   const terminateTimeoutMs = options.terminateTimeoutMs ?? 500;
   const killTimeoutMs = options.killTimeoutMs ?? 500;
-  const agent = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const agent = spawn(command, args, {
+    cwd,
+    env,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
   const state = {
     closed: false,
     sentSigterm: false,
-    sentSigkill: false
+    sentSigkill: false,
   };
-  let stdout = '';
-  let stderr = '';
+  let stdout = "";
+  let stderr = "";
   let spawnError;
   let stdinError;
-  agent.stdout.on('data', (chunk) => { stdout += chunk; });
-  agent.stderr.on('data', (chunk) => { stderr += chunk; });
-  agent.on('error', (error) => { spawnError = error; });
-  agent.stdin.on('error', (error) => { stdinError = error; });
-  agent.on('close', (code, signal) => {
+  agent.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  agent.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  agent.on("error", (error) => {
+    spawnError = error;
+  });
+  agent.stdin.on("error", (error) => {
+    stdinError = error;
+  });
+  agent.on("close", (code, signal) => {
     state.closed = true;
     state.code = code;
     state.signal = signal;
@@ -68,20 +90,32 @@ async function commandsFromRealPi(cwd, env, options = {}) {
     const received = await waitUntil(
       () => stdout.includes('"command":"get_commands"'),
       () => state.closed || spawnError !== undefined,
-      responseTimeoutMs
+      responseTimeoutMs,
     );
     responseTimedOut = !received && !state.closed && spawnError === undefined;
   } finally {
     if (!state.closed && spawnError === undefined) {
-      state.sentSigterm = agent.kill('SIGTERM');
-      await waitUntil(() => state.closed, () => false, terminateTimeoutMs);
+      state.sentSigterm = agent.kill("SIGTERM");
+      await waitUntil(
+        () => state.closed,
+        () => false,
+        terminateTimeoutMs,
+      );
     }
     if (!state.closed && spawnError === undefined) {
-      state.sentSigkill = agent.kill('SIGKILL');
-      await waitUntil(() => state.closed, () => false, killTimeoutMs);
+      state.sentSigkill = agent.kill("SIGKILL");
+      await waitUntil(
+        () => state.closed,
+        () => false,
+        killTimeoutMs,
+      );
     }
     if (!state.closed && spawnError !== undefined) {
-      await waitUntil(() => state.closed, () => false, killTimeoutMs);
+      await waitUntil(
+        () => state.closed,
+        () => false,
+        killTimeoutMs,
+      );
     }
   }
 
@@ -91,12 +125,12 @@ async function commandsFromRealPi(cwd, env, options = {}) {
     stdout,
     stderr,
     error: spawnError?.message ?? stdinError?.message,
-    ...state
+    ...state,
   };
 }
 
 module.exports = {
   commandsFromRealPi,
   isInside,
-  PACKAGE_TRIAL_STEP_TIMEOUT_MS
+  PACKAGE_TRIAL_STEP_TIMEOUT_MS,
 };
