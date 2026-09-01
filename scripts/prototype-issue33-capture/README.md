@@ -23,6 +23,7 @@ f27043a 時点の「headless 出力に surface が合成されない」は現環
 | 2. 瞬間 focusmonitor | ✅ 写った | ✅ | ✅ | 50 ms・完全復帰 | ❌ 同上 |
 | 3a. 入れ子 headless Hyprland | ❌ 起動不可 | — | — | — | — |
 | 3b. Xvfb + Ghostty(X11) + import | ✅ 写った | ✅ | ✅ | 奪わない | ✅ 可能なはず（親セッション非依存） |
+| 3c. cage 入れ子 headless Wayland | ✅ 写った | ✅ | ✅ | 奪わない | ✅ 可能なはず（親セッション非依存） |
 
 ## 各ルートの詳細
 
@@ -51,9 +52,8 @@ f27043a 時点の「headless 出力に surface が合成されない」は現環
 - headless フォールバックは `Cannot open backend: no allocator available` で失敗。
   aquamarine の allocator は DRM fd 必須で、これを与える環境変数はない
   （AQ_DRM_DEVICES は DRM backend 用で seat が先に必要）。
-- wlroots 系 compositor（sway/cage/labwc/niri）は未インストール。
-  `cage`（66 KiB + wlroots0.20）を入れれば `WLR_BACKENDS=headless cage` で
-  Wayland のまま入れ子にできる見込み（未検証）。
+- wlroots 系 compositor は当初未インストールだったが、`cage` 0.3.1 を導入して
+  ルート 3c として検証済み（下記）。
 
 ### ルート 3b: Xvfb + Ghostty(X11)（route3b.sh）— 動く
 
@@ -66,13 +66,25 @@ f27043a 時点の「headless 出力に surface が合成されない」は現環
   離れる。「Ghostty が Kitty graphics を描けたか」の検証には十分だが、
   「Hyprland 上での見え方」の検証としては忠実度が下がる。
 
+### ルート 3c: cage 入れ子 headless Wayland（route3c.sh）— 動く（検証済み）
+
+- `WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 cage -- <wrapper>` で入れ子の
+  Wayland compositor を起動。wlroots headless は seat 不要で、GPU レンダラ
+  （GLES2, render node 経由）も確保できる。wrapper が cage の中で Ghostty を
+  起動し、同じ WAYLAND_DISPLAY で grim を実行して完結する。
+- テキストも Kitty graphics も写る（1280x720、wlroots 既定の headless 出力寸法。
+  寸法を変えたい場合は要調査 — wlroots 0.20 の headless 出力サイズ指定方法）。
+- Wayland のまま・Ghostty + grim という本番と同じ部品で、親セッション非依存。
+  ロック中でも動くはず（ロック中の実測のみ未実施）。
+
 ## 採用推奨
 
 - **主経路: ルート 1（現行ハーネスの構成のまま）**。修正すべきは合成待ちではなく
   「Ghostty の描画完了を確認してからキャプチャする」こと。render_unfocused は
   外してもよいが、害もないので残して構わない。
-- **ロック中も動かしたい場合の逃げ道: ルート 3b（Xvfb）**、または cage を
-  インストールして Wayland のまま入れ子にする（要検証）。
+- **ロック制約まで消したい場合はルート 3c（cage）へ移行**。Wayland のまま
+  Ghostty + grim を入れ子で完結でき、検証済み。3b（Xvfb）は cage が使えない
+  環境向けの予備。
 - ルート 2 は不要。
 
 ## 再実行方法
@@ -81,6 +93,7 @@ f27043a 時点の「headless 出力に surface が合成されない」は現環
 scripts/prototype-issue33-capture/route1c.sh   # ルート 1 の 3 変種
 scripts/prototype-issue33-capture/route2.sh    # ルート 2
 scripts/prototype-issue33-capture/route3b.sh   # ルート 3b (Xvfb)
+scripts/prototype-issue33-capture/route3c.sh   # ルート 3c (cage)
 ```
 
 各スクリプトは自己完結（headless 出力の作成〜削除まで面倒を見る）。
