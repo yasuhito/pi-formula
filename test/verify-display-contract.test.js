@@ -11,6 +11,10 @@ const cleanupHarness = fs.readFileSync(
   path.resolve(__dirname, "../scripts/cleanup-display"),
   "utf8",
 );
+const runFunction = harness.slice(
+  harness.indexOf("run()"),
+  harness.indexOf("cleanup()"),
+);
 
 function markersAppearInOrder(source, ...markers) {
   let previous = -1;
@@ -117,6 +121,21 @@ test("Ghostty の process group ID を保存する", () => {
   assert.match(harness, /read -r WINDOW_PID/u);
 });
 
+test("通常コマンドの失敗を実行基盤エラーへ正規化する", () => {
+  assert.match(runFunction, /run-display-command" infrastructure/u);
+});
+
+test("grim を通常コマンドとして実行する", () => {
+  assert.match(harness, /^run grim -o/mu);
+});
+
+test("ビルド出力を捨てない", () => {
+  const build = harness.match(
+    /run-display-command" infrastructure \\\n {2}timeout[^\n]*npm run build[^\n]*/u,
+  )?.[0];
+  assert.equal(build?.includes("/dev/null"), false);
+});
+
 test("ビルドへ独立した長い時間上限を使う", () => {
   assert.match(
     harness,
@@ -132,6 +151,13 @@ test("キャプチャの前後で検証ウィンドウの存在を確認する",
   assert.match(
     harness,
     /verify-display-window[\s\S]*run grim[\s\S]*verify-display-window/u,
+  );
+});
+
+test("ピクセル判定だけ専用の終了コード規則を使う", () => {
+  assert.match(
+    harness,
+    /run-display-command" detector[\s\S]*detect-display-bands\.js/u,
   );
 });
 

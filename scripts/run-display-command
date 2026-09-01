@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+MODE=${1:-}
+shift || true
+[[ "$MODE" == infrastructure || "$MODE" == detector ]] || {
+  printf 'Usage: run-display-command <infrastructure|detector> <command> [args...]\n' >&2
+  exit 2
+}
+[[ $# -gt 0 ]] || {
+  printf 'run-display-command: command がありません\n' >&2
+  exit 2
+}
+
+"$@"
+status=$?
+if [[ "$status" -eq 0 || ("$MODE" == detector && "$status" -eq 1) ]]; then
+  exit "$status"
+fi
+printf 'verify-display: %s が終了コード %s で失敗しました\n' "$1" "$status" >&2
+exit 2
