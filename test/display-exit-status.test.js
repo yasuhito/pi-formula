@@ -36,11 +36,11 @@ test("準備コマンドのtimeoutを実コマンド名付きの終了コード2
   );
 });
 
-test("grimの無応答を打ち切って終了コード2へ正規化する", () => {
+test("grimのtimeout終了を終了コード2へ正規化する", () => {
   const result = spawnSync(
     wrapper,
-    ["infrastructure", "grim", "timeout", "0.05", "sleep", "1"],
-    { encoding: "utf8", timeout: 1_000 },
+    ["infrastructure", "grim", process.execPath, "-e", "process.exit(124)"],
+    { encoding: "utf8" },
   );
   assert.deepEqual(
     {
