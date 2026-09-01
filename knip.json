@@ -4,8 +4,10 @@
     "src/extension.ts",
     ".pi/extensions/**/*.ts",
     "scripts/check-display-session.js",
+    "scripts/crop-display-capture.js",
     "scripts/detect-display-bands.js",
     "scripts/plan-display.js",
+    "scripts/verify-display-capture.js",
     "scripts/verify-display-dimensions.js",
     "scripts/verify-echo.js",
     "scripts/verify-image-path.js"

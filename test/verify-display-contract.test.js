@@ -84,6 +84,49 @@ test("計画した monitor 寸法を確認してから起動する", () => {
   );
 });
 
+test("画面ロック状態を描画とheadless出力作成より前に確認する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "check-display-lock",
+      "npm run build",
+      "output create headless",
+    ),
+  );
+});
+
+test("キャプチャ直前にも画面ロック状態を再確認する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "verify-echo.js",
+      "check-display-lock",
+      'grim -o "$OUTPUT_NAME"',
+    ),
+  );
+});
+
+test("headless 出力から検証ウィンドウの矩形だけを切り出す", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      'grim -o "$OUTPUT_NAME"',
+      "crop-display-capture.js",
+      '"$CAPTURE_FILE"',
+    ),
+  );
+});
+
+test("表示数式の画像行をピクセル判定前に確認する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "verify-display-capture.js",
+      "detect-display-bands.js",
+    ),
+  );
+});
+
 test("キャプチャの PNG 寸法をピクセル判定前に確認する", () => {
   assert.ok(
     markersAppearInOrder(
@@ -132,8 +175,14 @@ test("後片付けで外部trコマンドを使わない", () => {
   assert.doesNotMatch(cleanupHarness, /\btr\b/u);
 });
 
-test("grim を通常コマンドとして実行する", () => {
-  assert.match(harness, /^run grim -o/mu);
+test("grim を時間上限付きの通常コマンドとして実行する", () => {
+  assert.deepEqual(
+    {
+      runUsesTimeout: /run\(\).*timeout/su.test(harness),
+      grimUsesRun: /^run grim -o/mu.test(harness),
+    },
+    { runUsesTimeout: true, grimUsesRun: true },
+  );
 });
 
 test("ビルド出力を捨てない", () => {

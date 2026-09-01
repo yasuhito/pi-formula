@@ -47,7 +47,24 @@ When("ハーネスの安全条件を調べる", function () {
     isolatedSettings:
       /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u.test(this.harness) &&
       /PI_FORMULA_MACROS='\{\}'/u.test(this.harness),
+    windowCapture:
+      /verify-display-window[^\n]*[\s\S]*"\$window_address" "1920" "\$HEIGHT"/u.test(
+        this.harness,
+      ) &&
+      /grim -o "\$OUTPUT_NAME" "\$OUTPUT_CAPTURE_FILE"/u.test(this.harness) &&
+      /crop-display-capture\.js/u.test(this.harness),
+    lockGuard:
+      /check-display-lock/u.test(this.harness) &&
+      this.harness.indexOf("check-display-lock") <
+        this.harness.indexOf("output create headless"),
+    captureTimeout:
+      /run\(\).*timeout/su.test(this.harness) &&
+      /run grim -o/u.test(this.harness) &&
+      /run-display-command[\s\S]*exit 2/u.test(
+        fs.readFileSync(path.join(root, "scripts/run-display-command"), "utf8"),
+      ),
     imagePath: /verify-image-path\.js/u.test(this.harness),
+    capturedImage: /verify-display-capture\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
@@ -84,8 +101,24 @@ Then("一時設定と空の利用者マクロを使う", function () {
   assert.equal(this.safety.isolatedSettings, true);
 });
 
+Then("headless 出力の検証ウィンドウ矩形だけをキャプチャする", function () {
+  assert.equal(this.safety.windowCapture, true);
+});
+
+Then("描画前に画面ロック状態を確認する", function () {
+  assert.equal(this.safety.lockGuard, true);
+});
+
+Then("キャプチャへ時間上限と検証不能の終了コードを使う", function () {
+  assert.equal(this.safety.captureTimeout, true);
+});
+
 Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
+});
+
+Then("ピクセル判定前に表示数式の画像行を確認する", function () {
+  assert.equal(this.safety.capturedImage, true);
 });
 
 Then("キャプチャ前に応答一致を確認する", function () {

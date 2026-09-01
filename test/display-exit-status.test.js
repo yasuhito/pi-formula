@@ -36,6 +36,21 @@ test("準備コマンドのtimeoutを実コマンド名付きの終了コード2
   );
 });
 
+test("grimの無応答を打ち切って終了コード2へ正規化する", () => {
+  const result = spawnSync(
+    wrapper,
+    ["infrastructure", "grim", "timeout", "0.05", "sleep", "1"],
+    { encoding: "utf8", timeout: 1_000 },
+  );
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsCause: /grim.*終了コード 124/u.test(result.stderr),
+    },
+    { status: 2, reportsCause: true },
+  );
+});
+
 test("ピクセル判定の帯検出だけは終了コード1を保つ", () => {
   assert.equal(run("detector", 1).status, 1);
 });
