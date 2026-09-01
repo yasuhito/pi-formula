@@ -70,7 +70,7 @@ test("a placement failure is visible in image renderer statistics", () => {
   assert.equal(result.stats.lastFailure, "placement failed");
 });
 
-test("a transfer failure does not mark the image ID as transferred", () => {
+test("a transfer failure does not prevent a later placement", () => {
   let transferAttempts = 0;
   const renderer = new FormulaImageRenderer({
     getCellDimensions: () => ({ widthPx: 8, heightPx: 16 }),

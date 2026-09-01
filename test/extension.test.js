@@ -75,7 +75,7 @@ test("streaming display formulas stay in the text path until finalized", async (
   assert.equal(streaming, markdown);
 });
 
-test("the same display formula transfers once and keeps every placement", async () => {
+test("the same display formula transfers before every placement", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   await startWithKitty(pi);
@@ -94,7 +94,7 @@ test("the same display formula transfers once and keeps every placement", async 
       hasPlaceholder: rendered.includes(String.fromCodePoint(0x10eeee)),
     },
     {
-      transfers: 1,
+      transfers: 2,
       placeholderRows: 2,
       hasPlaceholder: true,
     },

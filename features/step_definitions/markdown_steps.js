@@ -504,27 +504,25 @@ Then("逐次更新中は文字を保ち確定後に3式の転送と配置が対�
   );
 });
 
-When("一時保存済みの複数行表示数式を別の確定描画で再配置する", function () {
-  const source = String.raw`$$\begin{pmatrix}1&0\\0&1\end{pmatrix}$$`;
-  transform(this, source);
-  const first = this.rendered;
-  transform(this, source);
-  this.cachedPlacementBlocks = [first, this.rendered].map(
-    inspectPlacementBlocks,
-  );
+When("同じ複数行表示数式を一回の確定応答内に二回配置する", function () {
+  const formula = String.raw`$$\begin{pmatrix}1&0\\0&1\end{pmatrix}$$`;
+  transform(this, [formula, "端末上の画像を破棄", formula].join("\n\n"));
+  this.cachedPlacementBlocks = inspectPlacementBlocks(this.rendered);
 });
 
-Then("各確定描画で複数行の転送と配置が対応する", function () {
+Then("各配置で同じ画像IDの複数行転送とプレースホルダーが対応する", function () {
+  const [first, second] = this.cachedPlacementBlocks;
   assert.equal(
-    this.cachedPlacementBlocks.every(
-      (blocks) =>
-        blocks.length === 1 &&
-        blocks[0].rows > 1 &&
-        blocks[0].id === blocks[0].transferId &&
-        blocks[0].rows === blocks[0].declaredRows &&
-        blocks[0].completeTransfer &&
-        blocks[0].adjacentTransfer,
-    ),
+    this.cachedPlacementBlocks.length === 2 &&
+      first.id === second.id &&
+      this.cachedPlacementBlocks.every(
+        (block) =>
+          block.rows > 1 &&
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
     true,
   );
 });
