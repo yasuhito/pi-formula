@@ -69,6 +69,38 @@ When("コードフェンスと文中コードに数式がある本文を変換�
   );
 });
 
+When("長い区切りと字下げと末尾空白を持つコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "$$backtick$$",
+      "````  \t",
+      "   ~~~~text",
+      "   $$tilde$$",
+      "   ~~~~~   ",
+      "$$x+1$$",
+    ].join("\n"),
+  );
+});
+
+When("正規表現メタ文字を含む行があるコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "```.*",
+      "$$afterBacktickMetacharacters$$",
+      "```",
+      "~~~text",
+      "~~~[a-z]+",
+      "$$afterTildeMetacharacters$$",
+      "~~~",
+      "$$x+1$$",
+    ].join("\n"),
+  );
+});
+
 When("thinking の本文を変換する", function () {
   transform(this, "考える: $$x$$", { messageType: "assistant-thinking" });
 });
@@ -123,6 +155,43 @@ Then("インライン数式は残り、2 つの表示数式だけが画像にな
 
 Then("コード内の本文は変更されない", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then(
+  "2 種類のコードフェンスが閉じて後続の表示数式だけが画像になる",
+  function () {
+    assert.deepEqual(
+      {
+        backtickFormulaRemains: this.rendered.includes("$$backtick$$"),
+        tildeFormulaRemains: this.rendered.includes("$$tilde$$"),
+        imageCount: imageCount(this.rendered),
+      },
+      {
+        backtickFormulaRemains: true,
+        tildeFormulaRemains: true,
+        imageCount: 1,
+      },
+    );
+  },
+);
+
+Then("正規表現メタ文字を含む行の後もコード内の表示数式は残る", function () {
+  assert.deepEqual(
+    {
+      backtickFormulaRemains: this.rendered.includes(
+        "$$afterBacktickMetacharacters$$",
+      ),
+      tildeFormulaRemains: this.rendered.includes(
+        "$$afterTildeMetacharacters$$",
+      ),
+      imageCount: imageCount(this.rendered),
+    },
+    {
+      backtickFormulaRemains: true,
+      tildeFormulaRemains: true,
+      imageCount: 1,
+    },
+  );
 });
 
 Then("thinking の本文は変更されない", function () {

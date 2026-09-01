@@ -35,6 +35,23 @@ function indentationWidth(value: string): number {
   );
 }
 
+function isFenceClosingCandidate(
+  candidate: string,
+  character: string,
+  minimumLength: number,
+): boolean {
+  const value = candidate.trimEnd();
+  let delimiterStart = 0;
+  while (value[delimiterStart] === " ") delimiterStart += 1;
+  if (delimiterStart > 3 || value.length - delimiterStart < minimumLength) {
+    return false;
+  }
+  for (let index = delimiterStart; index < value.length; index += 1) {
+    if (value[index] !== character) return false;
+  }
+  return true;
+}
+
 function protectCode(markdown: string): ProtectedMarkdown {
   const parts: string[] = [];
   const token = (value: string): string =>
@@ -55,13 +72,9 @@ function protectCode(markdown: string): ProtectedMarkdown {
     if (fence) {
       fence.content += line;
       const candidate = line.startsWith(fence.continuation)
-        ? line.slice(fence.continuation.length).trimEnd()
+        ? line.slice(fence.continuation.length)
         : "";
-      const closing = new RegExp(
-        `^ {0,3}${fence.character}{${fence.length},}\\s*$`,
-        "u",
-      );
-      if (closing.test(candidate)) {
+      if (isFenceClosingCandidate(candidate, fence.character, fence.length)) {
         withoutFences += token(fence.content);
         fence = undefined;
       }
