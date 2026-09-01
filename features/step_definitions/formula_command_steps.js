@@ -1,6 +1,11 @@
 const assert = require("node:assert/strict");
-const { existsSync, readFileSync } = require("node:fs");
-const { mkdtempSync } = require("node:fs");
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { Given, Then, When } = require("@cucumber/cucumber");
@@ -121,6 +126,32 @@ Then(
     );
   },
 );
+
+Given("テキスト経路の全体既定と画像対応端末がある", function () {
+  const directory = join(this.xdg, "pi-formula");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "config.json"),
+    JSON.stringify({ path: "text" }),
+  );
+  this.pi = fakePi();
+  registerFormula(this.pi.api);
+});
+
+When("セッションで formula auto を実行する", async function () {
+  this.started = await startSession(this.pi, { response: "OK" });
+  await this.pi.commands.get("formula").handler("auto", this.started.ctx);
+  this.lines = await statusLines(this.pi, this.started);
+});
+
+Then("PNG 問い合わせによる画像経路へ戻る", function () {
+  assert.deepEqual(
+    this.lines.filter(
+      (line) => line.startsWith("path:") || line.startsWith("reason:"),
+    ),
+    ["path: image", "reason: PNG query returned OK"],
+  );
+});
 
 Given("一時的な XDG 設定を使う Pi がある", function () {
   this.xdg = mkdtempSync(join(tmpdir(), "pi-formula-xdg-"));

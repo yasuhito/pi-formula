@@ -29,6 +29,12 @@ Formula for Pi の利用者として
 - When formula コマンドの image と text と auto を順に実行する
 - Then 経路が切り替わり、すべての指定が現在のセッションへ保存される
 
+## Scenario: セッションの auto 指定で全体既定から自動判定へ戻す
+
+- Given テキスト経路の全体既定と画像対応端末がある
+- When セッションで formula auto を実行する
+- Then PNG 問い合わせによる画像経路へ戻る
+
 ## Scenario: default 指定だけを XDG 設定へ保存する
 
 - Given 一時的な XDG 設定を使う Pi がある

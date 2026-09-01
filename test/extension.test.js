@@ -3,6 +3,7 @@ const {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } = require("node:fs");
 const { tmpdir } = require("node:os");
@@ -19,6 +20,30 @@ const {
 } = require("./support/fake-pi");
 
 test.beforeEach(() => resetFormulaState());
+
+function configureDefaultPath(t, defaultPath) {
+  const xdg = mkdtempSync(join(tmpdir(), "pi-formula-default-path-"));
+  const directory = join(xdg, "pi-formula");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "config.json"),
+    JSON.stringify({ path: defaultPath }),
+  );
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  t.after(() => {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+    rmSync(xdg, { recursive: true, force: true });
+  });
+}
+
+async function selectedPathAndReason(pi, started) {
+  await pi.commands.get("formula").handler("status", started.ctx);
+  return started.widgets
+    .get("pi-formula-status")
+    .filter((line) => line.startsWith("path:") || line.startsWith("reason:"));
+}
 
 test("inline formulas stay in Pi Markdown without image transfer", async () => {
   const pi = fakePi();
@@ -228,6 +253,57 @@ test("registering the package twice does not duplicate formula rendering", () =>
     transformerRegistrations: 1,
     commandRegistrations: 1,
   });
+});
+
+test("a saved global default applies without a session path preference", async (t) => {
+  configureDefaultPath(t, "text");
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startSession(pi, { response: "OK" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: text",
+    "reason: default setting",
+  ]);
+});
+
+test("a restored auto session preference bypasses the saved global default", async (t) => {
+  configureDefaultPath(t, "text");
+  const pi = fakePi({
+    sessionEntries: [
+      {
+        type: "custom",
+        customType: "pi-formula-path",
+        data: { path: "auto" },
+      },
+    ],
+  });
+  registerFormula(pi.api);
+  const started = await startSession(pi, { response: "OK" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: image",
+    "reason: PNG query returned OK",
+  ]);
+});
+
+test("image path prohibition overrides a restored auto session preference", async () => {
+  const pi = fakePi({
+    sessionEntries: [
+      {
+        type: "custom",
+        customType: "pi-formula-path",
+        data: { path: "auto" },
+      },
+    ],
+  });
+  registerFormula(pi.api);
+  const started = await startSession(pi, { mode: "rpc" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: text",
+    "reason: rpc mode has no terminal screen",
+  ]);
 });
 
 test("a saved session path overrides a rejected automatic probe", async () => {
