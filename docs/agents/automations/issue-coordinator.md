@@ -233,6 +233,22 @@ for attempt in $(seq 1 30); do
   orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' && break
   sleep 2
 done
+
+# 30 回待ってもフッターが出ない場合、pi が起動していない可能性がある。
+# `terminal create --command` が実行されず、コマンド文字列がシェルの入力行に
+# 残るだけの状態が実際に起きた（2026-09-02 issue #17。1 時間半放置された）。
+# 画面にシェルプロンプトと未実行の pi コマンドが見えるなら Enter を 1 回送って起動し、
+# 再度フッターを待つ。それでも起動しなければ Fail へ進む。
+if ! orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol'; then
+  orca-ide terminal send --terminal "$worker_terminal" --text "" --enter --json
+  for attempt in $(seq 1 30); do
+    orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' && break
+    sleep 2
+  done
+fi
+orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' || {
+  echo "pi が起動しないため Fail へ進む"
+}
 orca-ide terminal send --terminal "$worker_terminal" --text "$IMPLEMENT_PROMPT" --enter --json
 
 # 送信が受理されたか確認する。pi が動き出すと画面に「Working」や tool 実行の行が出る。
