@@ -120,17 +120,20 @@ printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nsetsid timeout --signal=TERM %q
 run chmod +x "$LAUNCHER"
 
 BEFORE_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
-run hyprctl output create headless "$OUTPUT_NAME" >/dev/null
 OUTPUT_CREATED=true
+run hyprctl output create headless "$OUTPUT_NAME" >/dev/null
 run hyprctl eval "hl.monitor({ output = \"$OUTPUT_NAME\", mode = \"1920x${HEIGHT}@60\", position = \"auto\", scale = \"1\" })" >/dev/null
 
 monitor_id=
 for _ in {1..8}; do
-  monitor_id=$(run hyprctl monitors all -j | run jq -r --arg name "$OUTPUT_NAME" '.[] | select(.name == $name and .disabled == false) | .id')
-  [[ -n "$monitor_id" ]] && break
+  monitors=$(run hyprctl monitors all -j)
+  if monitor_id=$(printf '%s' "$monitors" | run node \
+    "$ROOT/scripts/verify-display-dimensions.js" monitor "$OUTPUT_NAME" 1920 "$HEIGHT" 2>/dev/null); then
+    break
+  fi
   run sleep 1
 done
-[[ -n "$monitor_id" ]] || fail "headless 出力を有効にできませんでした"
+[[ -n "$monitor_id" ]] || fail "headless 出力を 1920x${HEIGHT} で有効にできませんでした"
 
 run hyprctl dispatch "hl.dsp.exec_cmd(\"$LAUNCHER\", { workspace = \"$WORKSPACE_ID silent\", monitor = \"$OUTPUT_NAME silent\", no_initial_focus = true, no_focus = true, render_unfocused = true, no_anim = true })" >/dev/null
 for _ in {1..8}; do
@@ -185,6 +188,8 @@ CURRENT_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
 run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
   "$window_address" >/dev/null || fail "キャプチャ前に Ghostty が終了しました"
 run grim -o "$OUTPUT_NAME" "$CAPTURE_FILE"
+run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" 1920 "$HEIGHT" \
+  || fail "キャプチャに全履歴の寸法がありません"
 run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
   "$window_address" >/dev/null || fail "キャプチャ中に Ghostty が終了しました"
 

@@ -54,9 +54,40 @@ test("応答一致を確認してからキャプチャする", () => {
   assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run grim"));
 });
 
+test("出力作成を始める前に後片付けを有効にする", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "OUTPUT_CREATED=true",
+      "output create headless",
+    ),
+  );
+});
+
 test("表示数式の画像行数で出力高を決めてから headless 出力を作る", () => {
   assert.ok(
     markersAppearInOrder(harness, "plan-display.js", "output create headless"),
+  );
+});
+
+test("計画した monitor 寸法を確認してから起動する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      'verify-display-dimensions.js" monitor',
+      "hl.dsp.exec_cmd",
+    ),
+  );
+});
+
+test("キャプチャの PNG 寸法をピクセル判定前に確認する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "run grim",
+      'verify-display-dimensions.js" png',
+      "detect-display-bands.js",
+    ),
   );
 });
 

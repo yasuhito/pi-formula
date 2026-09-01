@@ -153,12 +153,37 @@ test("行が欠けた PNG を破損 PNG として拒否する", () => {
   );
 });
 
+test("compression method が非0の PNG を拒否する", () => {
+  const png = createPng(1, 1, () => [250, 248, 240]);
+  png[26] = 1;
+
+  assert.equal(runPng(png).status, 2);
+});
+
+test("filter method が非0の PNG を拒否する", () => {
+  const png = createPng(1, 1, () => [250, 248, 240]);
+  png[27] = 1;
+
+  assert.equal(runPng(png).status, 2);
+});
+
 test("宣言寸法を超えて展開する PNG を拒否する", () => {
   const result = runPng(
     createPngFromScanlines(1, 1, Buffer.alloc(1024 * 1024)),
   );
 
   assert.equal(result.status, 2);
+});
+
+test("離れた複数行の非 palette 色を水平帯と誤認しない", () => {
+  const result = runPng(
+    createPng(120, 80, (x, y) => {
+      if ([10, 34, 58].includes(y) && x >= 10 && x <= 100) return [43, 42, 38];
+      return normalDisplay(x, y);
+    }),
+  );
+
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("色変化が多い最大寸法を判定器の時間上限内で判定する", {

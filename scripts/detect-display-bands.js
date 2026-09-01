@@ -44,8 +44,16 @@ function decodePng(png) {
   const bitDepth = header[8];
   const colorType = header[9];
   const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : undefined;
-  if (bitDepth !== 8 || channels === undefined || header[12] !== 0) {
-    throw new Error("8-bit RGB/RGBA の非インターレース PNG だけを判定できます");
+  if (
+    bitDepth !== 8 ||
+    channels === undefined ||
+    header[10] !== 0 ||
+    header[11] !== 0 ||
+    header[12] !== 0
+  ) {
+    throw new Error(
+      "標準圧縮・filter の 8-bit RGB/RGBA 非インターレース PNG だけを判定できます",
+    );
   }
   if (width === 0 || height === 0 || width * height > MAX_PIXELS) {
     throw new Error(`PNG の画素数が上限 ${MAX_PIXELS} を超えています`);
@@ -211,7 +219,7 @@ function mergeRuns(runs) {
       .find(
         (band) =>
           band.color === run.color &&
-          run.y1 - band.y2 <= 24 &&
+          run.y1 - band.y2 === 1 &&
           run.x1 <= band.x2 &&
           run.x2 >= band.x1,
       );
@@ -231,7 +239,7 @@ function mergeRuns(runs) {
     if (
       previous &&
       previous.color === band.color &&
-      band.y1 - previous.y2 <= 24 &&
+      band.y1 <= previous.y2 + 1 &&
       band.x1 <= previous.x2 &&
       band.x2 >= previous.x1
     ) {

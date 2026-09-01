@@ -5,6 +5,7 @@
     ".pi/extensions/**/*.ts",
     "scripts/detect-display-bands.js",
     "scripts/plan-display.js",
+    "scripts/verify-display-dimensions.js",
     "scripts/verify-echo.js",
     "scripts/verify-image-path.js"
   ],
