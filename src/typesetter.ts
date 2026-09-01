@@ -10,7 +10,7 @@ export const FORMULA_SAFETY_LIMITS = Object.freeze({
   imageColumns: 255,
   imageRows: 255,
   cacheEntries: 64,
-  cacheBytes: 32 * 1024 * 1024
+  cacheBytes: 32 * 1024 * 1024,
 });
 
 export interface TypesetImage extends RasterLayout {
@@ -23,12 +23,15 @@ interface MathAdaptor {
 }
 
 interface MathDocument {
-  convert(latex: string, options: {
-    display: boolean;
-    em: number;
-    ex: number;
-    containerWidth: number;
-  }): unknown;
+  convert(
+    latex: string,
+    options: {
+      display: boolean;
+      em: number;
+      ex: number;
+      containerWidth: number;
+    },
+  ): unknown;
 }
 
 interface PreparedTypesetter {
@@ -39,28 +42,39 @@ interface PreparedTypesetter {
 
 let prepared: PreparedTypesetter | undefined;
 
-function configuredMacros(macros: FormulaMacros): Record<string, string | [string, number]> {
-  return Object.fromEntries(Object.entries(macros).map(([name, definition]) => [
-    name,
-    typeof definition === "string" ? definition : [definition[0], definition[1]]
-  ]));
+function configuredMacros(
+  macros: FormulaMacros,
+): Record<string, string | [string, number]> {
+  return Object.fromEntries(
+    Object.entries(macros).map(([name, definition]) => [
+      name,
+      typeof definition === "string"
+        ? definition
+        : [definition[0], definition[1]],
+    ]),
+  );
 }
 
 function prepareTypesetter(): PreparedTypesetter {
   if (prepared) return prepared;
 
   const { Resvg } = require("@resvg/resvg-js") as {
-    Resvg: new (svg: string, options: {
-      shapeRendering: number;
-      textRendering: number;
-    }) => { render(): { asPng(): Uint8Array } };
+    Resvg: new (
+      svg: string,
+      options: {
+        shapeRendering: number;
+        textRendering: number;
+      },
+    ) => { render(): { asPng(): Uint8Array } };
   };
-  const { liteAdaptor } = require("@mathjax/src/js/adaptors/liteAdaptor.js") as {
-    liteAdaptor(options: { fontSize: number }): MathAdaptor;
-  };
-  const { RegisterHTMLHandler } = require("@mathjax/src/js/handlers/html.js") as {
-    RegisterHTMLHandler(adaptor: MathAdaptor): void;
-  };
+  const { liteAdaptor } =
+    require("@mathjax/src/js/adaptors/liteAdaptor.js") as {
+      liteAdaptor(options: { fontSize: number }): MathAdaptor;
+    };
+  const { RegisterHTMLHandler } =
+    require("@mathjax/src/js/handlers/html.js") as {
+      RegisterHTMLHandler(adaptor: MathAdaptor): void;
+    };
   const { TeX } = require("@mathjax/src/js/input/tex.js") as {
     TeX: new (options: Record<string, unknown>) => unknown;
   };
@@ -69,7 +83,9 @@ function prepareTypesetter(): PreparedTypesetter {
   require("@mathjax/src/js/input/tex/configmacros/ConfigMacrosConfiguration.js");
   require("@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js");
   const { mathjax } = require("@mathjax/src/js/mathjax.js") as {
-    mathjax: { document(source: string, options: Record<string, unknown>): MathDocument };
+    mathjax: {
+      document(source: string, options: Record<string, unknown>): MathDocument;
+    };
   };
   const { SVG } = require("@mathjax/src/js/output/svg.js") as {
     SVG: new (options: Record<string, unknown>) => unknown;
@@ -85,18 +101,23 @@ function prepareTypesetter(): PreparedTypesetter {
         macros: configuredMacros(macros),
         formatError: (_jax: unknown, error: unknown) => {
           throw error;
-        }
+        },
       });
       const svgOutput = new SVG({
         fontCache: "local",
-        linebreaks: { inline: false }
+        linebreaks: { inline: false },
       });
       return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
     },
-    rasterize: (svg) => Buffer.from(new Resvg(svg, {
-      shapeRendering: 2,
-      textRendering: 2
-    }).render().asPng())
+    rasterize: (svg) =>
+      Buffer.from(
+        new Resvg(svg, {
+          shapeRendering: 2,
+          textRendering: 2,
+        })
+          .render()
+          .asPng(),
+      ),
   };
   return prepared;
 }
@@ -106,13 +127,13 @@ function svgFor(
   color: string,
   widthPx: number,
   macros: FormulaMacros,
-  typesetter: PreparedTypesetter
+  typesetter: PreparedTypesetter,
 ): string {
   const node = typesetter.createDocument(macros).convert(latex, {
     display: true,
     em: 16,
     ex: 8,
-    containerWidth: widthPx
+    containerWidth: widthPx,
   });
   const container = typesetter.adaptor.outerHTML(node);
   const start = container.indexOf("<svg ");
@@ -125,7 +146,7 @@ function svgFor(
 
 function exDimension(svg: string, name: "width" | "height"): number {
   const match = new RegExp(`\\b${name}="([\\d.]+)ex"`).exec(svg);
-  const value = match ? Number.parseFloat(match[1]!) : Number.NaN;
+  const value = Number.parseFloat(match?.[1] ?? "");
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`MathJax SVG has no positive ${name}`);
   }
@@ -138,11 +159,12 @@ function paddedSvg(
   contentWidth: number,
   contentHeight: number,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
 ): string {
   const openingEnd = source.indexOf(">");
   if (openingEnd < 0) throw new Error("MathJax SVG has no opening element");
-  const attributes = source.slice(0, openingEnd + 1)
+  const attributes = source
+    .slice(0, openingEnd + 1)
     .replace(/^<svg\s*/u, "")
     .replace(/\s(?:width|height|x|y|color|style|overflow)="[^"]*"/gu, "")
     .replace(/>$/u, "")
@@ -157,7 +179,7 @@ function paddedSvg(
     `overflow="visible" ${attributes}>`,
     body,
     "</svg>",
-    "</svg>"
+    "</svg>",
   ].join("");
 }
 
@@ -165,11 +187,12 @@ function rasterLayout(
   svg: string,
   color: string,
   availableWidth: number,
-  cell: CellDimensions
+  cell: CellDimensions,
 ): { layout: RasterLayout; padded: string } {
-  const maxWidthCells = Math.max(1, Math.min(
-    Math.floor(availableWidth), FORMULA_SAFETY_LIMITS.imageColumns
-  ));
+  const maxWidthCells = Math.max(
+    1,
+    Math.min(Math.floor(availableWidth), FORMULA_SAFETY_LIMITS.imageColumns),
+  );
   const widthEx = exDimension(svg, "width");
   const heightEx = exDimension(svg, "height");
   const innerWidth = maxWidthCells * cell.widthPx - CONTENT_BLEED_PX * 2;
@@ -177,12 +200,13 @@ function rasterLayout(
   const pixelsPerEx = Math.min(basePixelsPerEx, innerWidth / widthEx);
   const widthPx = Math.max(1, widthEx * pixelsPerEx);
   const heightPx = Math.max(1, heightEx * pixelsPerEx);
-  const columns = Math.max(1, Math.ceil(
-    (widthPx + CONTENT_BLEED_PX * 2) / cell.widthPx - 1e-9
-  ));
+  const columns = Math.max(
+    1,
+    Math.ceil((widthPx + CONTENT_BLEED_PX * 2) / cell.widthPx - 1e-9),
+  );
   const rows = Math.max(
     1,
-    Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9)
+    Math.ceil((heightPx + CONTENT_BLEED_PX * 2) / cell.heightPx - 1e-9),
   );
   if (columns > FORMULA_SAFETY_LIMITS.imageColumns) {
     throw new Error("Formula image exceeds the fixed column limit");
@@ -197,7 +221,7 @@ function rasterLayout(
     heightPx: Math.round(heightPx),
     columns,
     rows,
-    scale: pixelsPerEx / basePixelsPerEx
+    scale: pixelsPerEx / basePixelsPerEx,
   };
   return {
     layout,
@@ -207,14 +231,18 @@ function rasterLayout(
       widthPx * DEVICE_SCALE,
       heightPx * DEVICE_SCALE,
       canvasWidth,
-      canvasHeight
-    )
+      canvasHeight,
+    ),
   };
 }
 
 function validCellDimensions(cell: CellDimensions): boolean {
-  return Number.isFinite(cell.widthPx) && cell.widthPx > 0 &&
-    Number.isFinite(cell.heightPx) && cell.heightPx > 0;
+  return (
+    Number.isFinite(cell.widthPx) &&
+    cell.widthPx > 0 &&
+    Number.isFinite(cell.heightPx) &&
+    cell.heightPx > 0
+  );
 }
 
 export function typesetMath(
@@ -222,7 +250,7 @@ export function typesetMath(
   color: string,
   availableWidth: number,
   cell: CellDimensions,
-  macros: FormulaMacros = {}
+  macros: FormulaMacros = {},
 ): TypesetImage {
   if (latex.length > FORMULA_SAFETY_LIMITS.latexCharacters) {
     throw new Error("Formula input exceeds the fixed character limit");
@@ -230,12 +258,22 @@ export function typesetMath(
   if (!/^#[\da-f]{6}$/iu.test(color)) {
     throw new Error("Formula color is not an exact RGB value");
   }
-  if (!Number.isFinite(availableWidth) || availableWidth <= 0 || !validCellDimensions(cell)) {
+  if (
+    !Number.isFinite(availableWidth) ||
+    availableWidth <= 0 ||
+    !validCellDimensions(cell)
+  ) {
     throw new Error("Formula layout dimensions must be finite and positive");
   }
 
   const typesetter = prepareTypesetter();
-  const svg = svgFor(latex, color, availableWidth * cell.widthPx, macros, typesetter);
+  const svg = svgFor(
+    latex,
+    color,
+    availableWidth * cell.widthPx,
+    macros,
+    typesetter,
+  );
   const { layout, padded } = rasterLayout(svg, color, availableWidth, cell);
   const png = typesetter.rasterize(padded);
   return { ...layout, svg, png };

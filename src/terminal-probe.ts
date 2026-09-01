@@ -1,6 +1,9 @@
 export interface TerminalUi {
-  addInputListener(listener: (data: string) =>
-    { consume: true } | { data: string } | undefined): () => void;
+  addInputListener(
+    listener: (
+      data: string,
+    ) => { consume: true } | { data: string } | undefined,
+  ): () => void;
   terminal: { write(data: string): void };
 }
 
@@ -10,13 +13,24 @@ export interface TerminalProbe {
   response: string;
 }
 
-const PROBE_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Xn0YVwAAAABJRU5ErkJggg==";
+const PROBE_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Xn0YVwAAAABJRU5ErkJggg==";
 const PROBE_TIMEOUT_MS = 300;
 let nextProbeId = 1_900_000_000;
 
-export function multiplexerProbeResult(env: NodeJS.ProcessEnv): TerminalProbe | undefined {
-  if (env.TMUX || env.TERM?.startsWith("tmux") || env.TERM?.startsWith("screen")) {
-    return { path: "text", reason: "terminal multiplexer", response: "not queried" };
+export function multiplexerProbeResult(
+  env: NodeJS.ProcessEnv,
+): TerminalProbe | undefined {
+  if (
+    env.TMUX ||
+    env.TERM?.startsWith("tmux") ||
+    env.TERM?.startsWith("screen")
+  ) {
+    return {
+      path: "text",
+      reason: "terminal multiplexer",
+      response: "not queried",
+    };
   }
   return undefined;
 }
@@ -45,19 +59,30 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
       unsubscribe();
       resolve(result);
     };
-    const timeout = setTimeout(() => finish({
-      path: "text", reason: "PNG query timed out", response: "timeout"
-    }), PROBE_TIMEOUT_MS);
+    const timeout = setTimeout(
+      () =>
+        finish({
+          path: "text",
+          reason: "PNG query timed out",
+          response: "timeout",
+        }),
+      PROBE_TIMEOUT_MS,
+    );
     timeout.unref?.();
 
-    const completeResponse = (): { consume: true } | { data: string } | undefined => {
+    const completeResponse = ():
+      | { consume: true }
+      | { data: string }
+      | undefined => {
       const end = response.indexOf("\x1b\\");
       if (end < 0) return undefined;
       const value = response.slice(prefix.length, end);
       const trailingInput = response.slice(end + 2);
-      finish(value === "OK"
-        ? { path: "image", reason: "PNG query returned OK", response: value }
-        : { path: "text", reason: "PNG query was rejected", response: value });
+      finish(
+        value === "OK"
+          ? { path: "image", reason: "PNG query returned OK", response: value }
+          : { path: "text", reason: "PNG query was rejected", response: value },
+      );
       return trailingInput ? { data: trailingInput } : { consume: true };
     };
 
@@ -78,12 +103,15 @@ export function probePngSupport(tui: TerminalUi): Promise<TerminalProbe> {
           const returnedInput = leadingInput + completed.data;
           return returnedInput ? { data: returnedInput } : { consume: true };
         }
-        return leadingInput ? { data: leadingInput } : (completed ?? { consume: true });
+        return leadingInput
+          ? { data: leadingInput }
+          : (completed ?? { consume: true });
       }
 
       const suffixLength = possiblePrefixSuffix(candidate, prefix);
       pendingPrefix = suffixLength > 0 ? candidate.slice(-suffixLength) : "";
-      const input = suffixLength > 0 ? candidate.slice(0, -suffixLength) : candidate;
+      const input =
+        suffixLength > 0 ? candidate.slice(0, -suffixLength) : candidate;
       return input ? { data: input } : { consume: true };
     });
     tui.terminal.write(query);

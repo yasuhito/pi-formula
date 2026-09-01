@@ -20,7 +20,10 @@ const DIACRITICS = `
 2DFD 2DFE 2DFF A66F A67C A67D A6F0 A6F1 A8E0 A8E1 A8E2 A8E3 A8E4 A8E5 A8E6 A8E7 A8E8 A8E9 A8EA A8EB A8EC A8ED
 A8EE A8EF A8F0 A8F1 AAB0 AAB2 AAB3 AAB7 AAB8 AABE AABF AAC1 FE20 FE21 FE22 FE23 FE24 FE25 FE26 10A0F 10A38
 1D185 1D186 1D187 1D188 1D189 1D1AA 1D1AB 1D1AC 1D1AD 1D242 1D243 1D244
-`.trim().split(/\s+/u).map((hex) => String.fromCodePoint(Number.parseInt(hex, 16)));
+`
+  .trim()
+  .split(/\s+/u)
+  .map((hex) => String.fromCodePoint(Number.parseInt(hex, 16)));
 
 function command(control: string, payload = ""): string {
   return `${ESC}_G${control};${payload}${ESC}\\`;
@@ -28,28 +31,42 @@ function command(control: string, payload = ""): string {
 
 export function stableImageId(key: string): number {
   const digest = createHash("sha256").update(key).digest();
-  return ((digest[0]! << 16) | (digest[1]! << 8) | digest[2]!) || 1;
+  return digest.readUIntBE(0, 3) || 1;
 }
 
-export function encodeTransfer(png: Buffer, id: number, columns: number, rows: number): string {
+export function encodeTransfer(
+  png: Buffer,
+  id: number,
+  columns: number,
+  rows: number,
+): string {
   const payload = png.toString("base64");
   const chunks = Array.from(
     { length: Math.ceil(payload.length / CHUNK_SIZE) },
-    (_, index) => payload.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE)
+    (_, index) => payload.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE),
   );
   const placement = `a=T,f=100,q=2,U=1,i=${id},p=${id},c=${columns},r=${rows}`;
-  return chunks.map((chunk, index) => {
-    const more = index < chunks.length - 1;
-    const control = index === 0
-      ? `${placement}${more ? ",m=1" : ""}`
-      : `m=${more ? 1 : 0},q=2`;
-    return command(control, chunk);
-  }).join("");
+  return chunks
+    .map((chunk, index) => {
+      const more = index < chunks.length - 1;
+      const control =
+        index === 0
+          ? `${placement}${more ? ",m=1" : ""}`
+          : `m=${more ? 1 : 0},q=2`;
+      return command(control, chunk);
+    })
+    .join("");
 }
 
-export function encodePlaceholderRows(id: number, columns: number, rows: number): string[] {
+export function encodePlaceholderRows(
+  id: number,
+  columns: number,
+  rows: number,
+): string[] {
   if (columns > DIACRITICS.length || rows > DIACRITICS.length) {
-    throw new Error("Formula image exceeds the Kitty placeholder coordinate range");
+    throw new Error(
+      "Formula image exceeds the Kitty placeholder coordinate range",
+    );
   }
   const red = (id >> 16) & 0xff;
   const green = (id >> 8) & 0xff;
@@ -59,7 +76,7 @@ export function encodePlaceholderRows(id: number, columns: number, rows: number)
   return Array.from({ length: rows }, (_, row) => {
     const cells = Array.from(
       { length: columns },
-      (_, column) => PLACEHOLDER + DIACRITICS[row] + DIACRITICS[column]
+      (_, column) => PLACEHOLDER + DIACRITICS[row] + DIACRITICS[column],
     ).join("");
     return `${foreground}${underline}${cells}${ESC}[39;59m`;
   });

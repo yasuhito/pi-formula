@@ -1,4 +1,4 @@
-const { Markdown } = require('@earendil-works/pi-tui');
+const { Markdown } = require("@earendil-works/pi-tui");
 
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 const SGR = /\x1b\[[0-9;]*m/gu;
@@ -33,16 +33,22 @@ F_8 = \frac{1}{\sqrt{8}}
 1 & \omega^6 & \omega^4 & \omega^2 & 1 & \omega^6 & \omega^4 & \omega^2 \\
 1 & \omega^7 & \omega^6 & \omega^5 & \omega^4 & \omega^3 & \omega^2 & \omega
 \end{pmatrix}
-$$`
+$$`,
 ];
 
 function graphicsCommands(line) {
-  return [...line.matchAll(/\x1b_G([^;]*);([^\x1b]*)\x1b\\/gu)]
-    .map((match) => ({ controls: match[1], payload: match[2] }));
+  return [...line.matchAll(/\x1b_G([^;]*);([^\x1b]*)\x1b\\/gu)].map(
+    (match) => ({
+      controls: match[1],
+      payload: match[2],
+    }),
+  );
 }
 
 function controls(command) {
-  return new Map(command.controls.split(',').map((control) => control.split('=', 2)));
+  return new Map(
+    command.controls.split(",").map((control) => control.split("=", 2)),
+  );
 }
 
 function placeholderId(line) {
@@ -53,65 +59,97 @@ function placeholderId(line) {
 
 function chunksAreComplete(line, commands) {
   const remainder = line
-    .replace(/\x1b_G[^;]*;[^\x1b]*\x1b\\/gu, '')
-    .replace(SGR, '')
+    .replace(/\x1b_G[^;]*;[^\x1b]*\x1b\\/gu, "")
+    .replace(SGR, "")
     .trim();
-  if (line.includes('\n') || commands.length === 0 || remainder !== '') return false;
+  if (line.includes("\n") || commands.length === 0 || remainder !== "")
+    return false;
   const chunkControls = commands.map(controls);
-  if (chunkControls[0].get('a') !== 'T' || commands.some(({ payload }) => !payload)) return false;
-  if (commands.length === 1) return !chunkControls[0].has('m');
-  return chunkControls[0].get('m') === '1'
-    && chunkControls.slice(1, -1).every((values) => values.get('m') === '1')
-    && chunkControls.at(-1).get('m') === '0';
+  if (
+    chunkControls[0].get("a") !== "T" ||
+    commands.some(({ payload }) => !payload)
+  )
+    return false;
+  if (commands.length === 1) return !chunkControls[0].has("m");
+  return (
+    chunkControls[0].get("m") === "1" &&
+    chunkControls.slice(1, -1).every((values) => values.get("m") === "1") &&
+    chunkControls.at(-1).get("m") === "0"
+  );
 }
 
 function inspectFrame(frame) {
   const transferLines = frame.terminalLines
     .map((line, index) => ({ line, index, commands: graphicsCommands(line) }))
-    .filter(({ commands }) => commands.some((command) => controls(command).get('a') === 'T'));
+    .filter(({ commands }) =>
+      commands.some((command) => controls(command).get("a") === "T"),
+    );
   const placeholders = frame.terminalLines
     .map((line, index) => ({ id: placeholderId(line), index }))
     .filter(({ id }) => id !== undefined);
-  const transferIds = transferLines.map(({ commands }) => Number(controls(commands[0]).get('i')));
+  const transferIds = transferLines.map(({ commands }) =>
+    Number(controls(commands[0]).get("i")),
+  );
 
   return {
-    transformedTransferCount: (frame.transformed.match(/\x1b_Ga=T,f=100/gu) ?? []).length,
+    transformedTransferCount: (
+      frame.transformed.match(/\x1b_Ga=T,f=100/gu) ?? []
+    ).length,
     transferLineCount: transferLines.length,
-    oneTransferPerLine: transferLines.every(({ commands }) =>
-      commands.filter((command) => controls(command).get('a') === 'T').length === 1
+    oneTransferPerLine: transferLines.every(
+      ({ commands }) =>
+        commands.filter((command) => controls(command).get("a") === "T")
+          .length === 1,
     ),
-    completeChunks: transferLines.every(({ line, commands }) => chunksAreComplete(line, commands)),
+    completeChunks: transferLines.every(({ line, commands }) =>
+      chunksAreComplete(line, commands),
+    ),
     matchingPlacementIds: transferLines.every(({ commands }) => {
       const header = controls(commands[0]);
-      return header.get('i') !== undefined && header.get('i') === header.get('p');
-    }),
-    matchingPlaceholderRows: transferLines.every(({ commands }) => {
-      const header = controls(commands[0]);
-      const id = Number(header.get('i'));
-      return placeholders.filter((placeholder) => placeholder.id === id).length === Number(header.get('r'));
-    }) && placeholders.every(({ id }) => transferIds.includes(id)),
-    adjacentPlacements: transferLines.every(({ index, commands }) => {
-      const id = Number(controls(commands[0]).get('i'));
-      const placement = placeholders.find((placeholder) => placeholder.id === id && placeholder.index > index);
-      if (!placement) return false;
-      return frame.terminalLines.slice(index + 1, placement.index).every((line) =>
-        !line.includes('\x1b_G') && line.replace(SGR, '').trim() === ''
+      return (
+        header.get("i") !== undefined && header.get("i") === header.get("p")
       );
-    })
+    }),
+    matchingPlaceholderRows:
+      transferLines.every(({ commands }) => {
+        const header = controls(commands[0]);
+        const id = Number(header.get("i"));
+        return (
+          placeholders.filter((placeholder) => placeholder.id === id).length ===
+          Number(header.get("r"))
+        );
+      }) && placeholders.every(({ id }) => transferIds.includes(id)),
+    adjacentPlacements: transferLines.every(({ index, commands }) => {
+      const id = Number(controls(commands[0]).get("i"));
+      const placement = placeholders.find(
+        (placeholder) => placeholder.id === id && placeholder.index > index,
+      );
+      if (!placement) return false;
+      return frame.terminalLines
+        .slice(index + 1, placement.index)
+        .every(
+          (line) =>
+            !line.includes("\x1b_G") && line.replace(SGR, "").trim() === "",
+        );
+    }),
   };
 }
 
 function renderStreamingRegression(pi) {
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });
   return REPRODUCTION_PARTS.map((_part, index) => {
-    const source = REPRODUCTION_PARTS.slice(0, index + 1).join('\n\n');
+    const source = REPRODUCTION_PARTS.slice(0, index + 1).join("\n\n");
     const transformed = pi.transformer()(source, {
-      messageType: 'assistant', isStreaming: true, availableWidth: 80
+      messageType: "assistant",
+      isStreaming: true,
+      availableWidth: 80,
     });
     return {
       source,
       transformed,
-      terminalLines: new Markdown(transformed, 0, 0, passthroughTheme).render(80)
+      terminalLines: new Markdown(transformed, 0, 0, passthroughTheme).render(
+        80,
+      ),
     };
   });
 }

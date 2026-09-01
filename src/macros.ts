@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { formulaConfigPath } from "./path-settings";
 
-export type MacroDefinition = string | readonly [replacement: string, argumentsCount: number];
+export type MacroDefinition =
+  | string
+  | readonly [replacement: string, argumentsCount: number];
 export type FormulaMacros = Readonly<Record<string, MacroDefinition>>;
 
 interface NormalizedMacros {
@@ -17,19 +19,27 @@ export interface LoadedUserMacros {
 
 function invalidParameterReference(
   replacement: string,
-  argumentsCount: number
+  argumentsCount: number,
 ): string | undefined {
   for (let index = 0; index < replacement.length; index += 1) {
     if (replacement[index] !== "#") continue;
     let backslashes = 0;
-    for (let cursor = index - 1; cursor >= 0 && replacement[cursor] === "\\"; cursor -= 1) {
+    for (
+      let cursor = index - 1;
+      cursor >= 0 && replacement[cursor] === "\\";
+      cursor -= 1
+    ) {
       backslashes += 1;
     }
     if (backslashes % 2 === 1) continue;
 
     const reference = replacement[index + 1];
     const number = reference ? Number.parseInt(reference, 10) : Number.NaN;
-    if (number >= 1 && number <= argumentsCount && reference === String(number)) {
+    if (
+      number >= 1 &&
+      number <= argumentsCount &&
+      reference === String(number)
+    ) {
       index += 1;
       continue;
     }
@@ -48,15 +58,21 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
     return {
       macros: {},
       rejected: new Set(),
-      errors: [`${source}: macro definitions must be a JSON object`]
+      errors: [`${source}: macro definitions must be a JSON object`],
     };
   }
 
-  const result: NormalizedMacros = { macros: {}, rejected: new Set(), errors: [] };
+  const result: NormalizedMacros = {
+    macros: {},
+    rejected: new Set(),
+    errors: [],
+  };
   for (const [rawName, definition] of Object.entries(value)) {
     const name = normalizedName(rawName);
     if (!name) {
-      result.errors.push(`${source}: macro name ${rawName} must contain only letters`);
+      result.errors.push(
+        `${source}: macro name ${rawName} must contain only letters`,
+      );
       continue;
     }
 
@@ -64,31 +80,33 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
     if (typeof definition === "string") {
       normalized = definition;
     } else if (
-      Array.isArray(definition)
-      && definition.length === 2
-      && typeof definition[0] === "string"
-      && Number.isInteger(definition[1])
-      && definition[1] >= 0
-      && definition[1] <= 9
+      Array.isArray(definition) &&
+      definition.length === 2 &&
+      typeof definition[0] === "string" &&
+      Number.isInteger(definition[1]) &&
+      definition[1] >= 0 &&
+      definition[1] <= 9
     ) {
       normalized = [definition[0], definition[1]];
     }
     if (normalized === undefined) {
       result.rejected.add(name);
       result.errors.push(
-        `${source}: \\${name} must be a string or [replacement, argument count]`
+        `${source}: \\${name} must be a string or [replacement, argument count]`,
       );
       continue;
     }
 
-    const [replacement, argumentsCount] = typeof normalized === "string"
-      ? [normalized, 0] as const
-      : normalized;
-    const invalidReference = invalidParameterReference(replacement, argumentsCount);
+    const [replacement, argumentsCount] =
+      typeof normalized === "string" ? ([normalized, 0] as const) : normalized;
+    const invalidReference = invalidParameterReference(
+      replacement,
+      argumentsCount,
+    );
     if (invalidReference) {
       result.rejected.add(name);
       result.errors.push(
-        `${source}: ${invalidReference} in \\${name} exceeds its argument count`
+        `${source}: ${invalidReference} in \\${name} exceeds its argument count`,
       );
       continue;
     }
@@ -102,7 +120,11 @@ function parseSource(raw: string, source: string): NormalizedMacros {
   try {
     value = JSON.parse(raw);
   } catch {
-    return { macros: {}, rejected: new Set(), errors: [`${source}: invalid JSON`] };
+    return {
+      macros: {},
+      rejected: new Set(),
+      errors: [`${source}: invalid JSON`],
+    };
   }
   return normalizeMacros(value, source);
 }
@@ -117,18 +139,26 @@ function configMacros(env: NodeJS.ProcessEnv): NormalizedMacros {
     return {
       macros: {},
       rejected: new Set(),
-      errors: [`XDG config: ${error instanceof Error ? error.message : String(error)}`]
+      errors: [
+        `XDG config: ${error instanceof Error ? error.message : String(error)}`,
+      ],
     };
   }
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
-    return { macros: {}, rejected: new Set(), errors: ["XDG config: invalid JSON"] };
+    return {
+      macros: {},
+      rejected: new Set(),
+      errors: ["XDG config: invalid JSON"],
+    };
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
-      macros: {}, rejected: new Set(), errors: ["XDG config: config must be a JSON object"]
+      macros: {},
+      rejected: new Set(),
+      errors: ["XDG config: config must be a JSON object"],
     };
   }
   const macros = (value as { macros?: unknown }).macros;
@@ -139,16 +169,20 @@ function configMacros(env: NodeJS.ProcessEnv): NormalizedMacros {
 
 export function loadUserMacros(env: NodeJS.ProcessEnv): LoadedUserMacros {
   const configured = configMacros(env);
-  const environment = env.PI_FORMULA_MACROS === undefined
-    ? { macros: {}, rejected: new Set<string>(), errors: [] }
-    : parseSource(env.PI_FORMULA_MACROS, "PI_FORMULA_MACROS");
+  const environment =
+    env.PI_FORMULA_MACROS === undefined
+      ? { macros: {}, rejected: new Set<string>(), errors: [] }
+      : parseSource(env.PI_FORMULA_MACROS, "PI_FORMULA_MACROS");
   const macros: Record<string, MacroDefinition> = { ...configured.macros };
   Object.assign(macros, environment.macros);
   return { macros, errors: [...configured.errors, ...environment.errors] };
 }
 
-export function validateAdditionalMacros(macros: FormulaMacros): Record<string, MacroDefinition> {
+export function validateAdditionalMacros(
+  macros: FormulaMacros,
+): Record<string, MacroDefinition> {
   const normalized = normalizeMacros(macros, "additional macros");
-  if (normalized.errors.length > 0) throw new TypeError(normalized.errors.join("; "));
+  if (normalized.errors.length > 0)
+    throw new TypeError(normalized.errors.join("; "));
   return normalized.macros;
 }

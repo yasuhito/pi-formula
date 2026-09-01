@@ -26,10 +26,14 @@ export class RenderCache {
 
   constructor(
     private readonly maxEntries: number,
-    private readonly maxBytes = Number.MAX_SAFE_INTEGER
+    private readonly maxBytes = Number.MAX_SAFE_INTEGER,
   ) {
-    if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0 ||
-        !Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
+    if (
+      !Number.isSafeInteger(maxEntries) ||
+      maxEntries <= 0 ||
+      !Number.isSafeInteger(maxBytes) ||
+      maxBytes <= 0
+    ) {
       throw new Error("RenderCache limits must be positive safe integers");
     }
   }
@@ -37,7 +41,7 @@ export class RenderCache {
   getOrCreate(
     key: string,
     create: () => TypesetImage,
-    accept: (image: TypesetImage) => boolean = () => true
+    accept: (image: TypesetImage) => boolean = () => true,
   ): TypesetImage | undefined {
     const cached = this.entries.get(key);
     if (cached) {
@@ -51,7 +55,10 @@ export class RenderCache {
         this.recordFailure(key, "image would be too small");
         return undefined;
       }
-      const bytes = Buffer.byteLength(key) + Buffer.byteLength(image.svg) + image.png.byteLength;
+      const bytes =
+        Buffer.byteLength(key) +
+        Buffer.byteLength(image.svg) +
+        image.png.byteLength;
       if (bytes > this.maxBytes) {
         this.recordFailure(key, "image exceeds cache byte limit");
         return undefined;
@@ -87,7 +94,7 @@ export class RenderCache {
     return {
       entries: this.entries.size,
       bytes: this.bytes,
-      ...(this.lastFailure ? { lastFailure: this.lastFailure } : {})
+      ...(this.lastFailure ? { lastFailure: this.lastFailure } : {}),
     };
   }
 
