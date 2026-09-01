@@ -242,7 +242,7 @@ When("固定上限を確認する", function () {
 });
 
 Then(
-  "入力文字数、画像列数・行数、一時保存件数・バイト数が有限の正数である",
+  "入力文字数、画像列数・行数、既成PNGのバイト数・ピクセル数、一時保存件数・バイト数が有限の正数である",
   function () {
     assert.deepEqual(
       {
@@ -258,6 +258,8 @@ Then(
           "imageColumns",
           "imageRows",
           "latexCharacters",
+          "pngBytes",
+          "pngPixels",
         ],
         allFinitePositiveIntegers: true,
       },

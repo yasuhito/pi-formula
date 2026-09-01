@@ -94,25 +94,38 @@ export PI_FORMULA_MACROS='{"RR":"\\mathbb{R}"}'
 
 MathJax と Resvg は、最初の表示数式が画像経路へ入るまで読み込みません。SVG と PNG は上限のあるメモリ内一時保存だけに置き、ディスクへ書きません。ネットワーク、ブラウザ、子プロセスも使いません。
 
-固定上限は LaTeX 16,384 文字、画像 255 列、255 行、一時保存 64 件、合計 32 MiB です。失敗結果も一時保存するため、同じ不正入力を繰り返し組版しません。
+固定上限は LaTeX 16,384 文字、画像 255 列、255 行、一時保存 64 件、合計 32 MiB です。既成 PNG は 1 件 32 MiB、展開後 4,194,304 ピクセルまでです。失敗結果も一時保存するため、同じ不正入力を繰り返し組版しません。
 
 ## 拡張向け公開 API
 
-CommonJS パッケージは、同期的な `registerFormula` と `createFormulaPng` だけを公開します。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
+CommonJS パッケージは、同期的な `registerFormula`、`createFormulaPng`、`getFormulaPath`、`renderPng` を公開します。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
 
 ```js
-const { createFormulaPng, registerFormula } = require("pi-formula");
+const {
+  createFormulaPng,
+  getFormulaPath,
+  registerFormula,
+  renderPng
+} = require("pi-formula");
 
 registerFormula(pi, {
   ket: ["\\left|#1\\right\\rangle", 1]
 });
 
 const image = createFormulaPng("\\ket{0}", availableWidth);
+
+if (getFormulaPath() === "image") {
+  const result = renderPng("/tmp/circuit.png", availableWidth);
+  if (result.rendered) return result.output;
+}
+return asciiCircuit;
 ```
 
 追加マクロ名には ASCII の英字を使い、先頭のバックスラッシュは省略できます。不正な追加マクロでは `registerFormula` が `TypeError` を出します。追加マクロは利用者マクロより優先し、単体版と同梱版をどちらの順で登録しても保護されます。再読み込みやセッション切り替えでは拡張を結び直し、利用者マクロを読み直します。
 
 テキスト経路では `image` は `undefined` です。画像経路では PNG の `data`、ピクセル寸法、端末の列数と行数を返します。Pi の画面部品は返しません。呼び出しごとに独立した PNG バッファを返します。
+
+`getFormulaPath()` は現在の画像経路またはテキスト経路を返します。`renderPng()` は PNG の `Buffer` またはファイルパスと、使える最大列数を受け取ります。画像経路では、端末寸法から表示列数と行数を計算し、Kitty 画像転送と配置を `output` に返します。この文字列を拡張の表示結果として返してください。テキスト経路では `{ rendered: false, reason: "image-unavailable" }` を返すため、呼び出し側で代替表示を選べます。署名、チャンク、CRC、圧縮データを検証できない PNG は `invalid-png`、32 MiB、4,194,304 ピクセル、または列数・行数の固定上限を超える PNG は `safety-limit` となり、例外を出しません。ファイルパスでは通常ファイルだけを読み込みます。
 
 ## 監査と変更履歴
 

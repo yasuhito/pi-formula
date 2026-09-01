@@ -64,11 +64,11 @@ Pi の画面部品に依存せず PNG を配置したい
 - When その追加マクロを使う PNG を公開 API で作る
 - Then Object prototype と同名の追加マクロが使える
 
-## Scenario: 公開 API を登録と PNG 作成に絞る
+## Scenario: 既存の公開 API と画像描画 API を公開する
 
 - Given pi-formula の CommonJS 公開 API がある
 - When 公開された名前を調べる
-- Then 拡張登録と同期的な PNG 作成だけが公開される
+- Then 既存の公開 API と画像経路向け API が公開される
 
 ## Scenario: 公開 API の不正な LaTeX 入力を安全に拒否する
 
@@ -99,6 +99,54 @@ Pi の画面部品に依存せず PNG を配置したい
 - Given テキスト経路を使う試験用の連携拡張がある
 - When 連携拡張が公開 API で PNG を作る
 - Then 公開 API は画像を返さない
+
+## Scenario: 現在の画像経路を問い合わせる
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 現在の表示経路を公開 API で問い合わせる
+- Then 現在の表示経路は画像経路である
+
+## Scenario: 現在のテキスト経路を問い合わせる
+
+- Given テキスト経路を使う試験用の連携拡張がある
+- When 現在の表示経路を公開 API で問い合わせる
+- Then 現在の表示経路はテキスト経路である
+
+## Scenario: Buffer の既成 PNG を画像経路で描く
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 端末寸法に合わせた画像転送と配置が返る
+
+## Scenario: ファイルの既成 PNG を画像経路で描く
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When ファイルの既成 PNG を公開 API で描く
+- Then ファイルの画像転送と配置が返る
+
+## Scenario: テキスト経路では既成 PNG を描かない
+
+- Given テキスト経路を使う試験用の連携拡張がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 代替表示を選べる結果が返る
+
+## Scenario: 安全上限を超える既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 安全上限を超える既成 PNG を公開 API で描く
+- Then 安全上限による拒否結果が返る
+
+## Scenario: 途中で切れた既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 途中で切れた既成 PNG を公開 API で描く
+- Then 不正な PNG による拒否結果が返る
+
+## Scenario: 展開上限を超える既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 展開上限を超える既成 PNG を公開 API で描く
+- Then 安全上限による拒否結果が返る
 
 ## Scenario: 終了後の新しい拡張 runtime へ再登録する
 

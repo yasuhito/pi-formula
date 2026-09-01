@@ -94,25 +94,38 @@ Do not enable Formula for Pi with other math rendering extensions that transform
 
 MathJax and Resvg load only when the first display formula enters the image path. SVG and PNG data stay in a bounded in-memory cache and are never written to disk. Rendering does not use a network connection, browser, or child process.
 
-The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Failed formulas are cached, so repeated invalid input is not typeset again.
+The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Each existing PNG is limited to 32 MiB and 4,194,304 expanded pixels. Failed formulas are cached, so repeated invalid input is not typeset again.
 
 ## Extension API
 
-The CommonJS package exports only synchronous `registerFormula` and `createFormulaPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+The CommonJS package exports synchronous `registerFormula`, `createFormulaPng`, `getFormulaPath`, and `renderPng` operations. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
 
 ```js
-const { createFormulaPng, registerFormula } = require("pi-formula");
+const {
+  createFormulaPng,
+  getFormulaPath,
+  registerFormula,
+  renderPng
+} = require("pi-formula");
 
 registerFormula(pi, {
   ket: ["\\left|#1\\right\\rangle", 1]
 });
 
 const image = createFormulaPng("\\ket{0}", availableWidth);
+
+if (getFormulaPath() === "image") {
+  const result = renderPng("/tmp/circuit.png", availableWidth);
+  if (result.rendered) return result.output;
+}
+return asciiCircuit;
 ```
 
 Additional macro names contain ASCII letters, with an optional leading backslash. Invalid additional macros make `registerFormula` throw `TypeError`. Additional macros override user macros and stay protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
 
 `image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts. It does not contain a Pi UI component. Each call returns an independent PNG buffer.
+
+`getFormulaPath()` returns the current image or text path. `renderPng()` accepts a PNG `Buffer` or file path plus the maximum available columns. On the image path it calculates terminal columns and rows from the terminal dimensions, then returns the Kitty image transfer and placement in `output`. Return this string as the extension's displayed result. On the text path it returns `{ rendered: false, reason: "image-unavailable" }`, so the caller can select a fallback. A PNG whose signature, chunks, CRCs, or compressed data cannot be validated returns `invalid-png`. A PNG exceeding 32 MiB, 4,194,304 expanded pixels, or the fixed column or row limit returns `safety-limit`. File paths accept regular files only. These outcomes do not throw exceptions.
 
 ## Audit and releases
 

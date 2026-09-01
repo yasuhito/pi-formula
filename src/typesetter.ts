@@ -9,6 +9,8 @@ export const FORMULA_SAFETY_LIMITS = Object.freeze({
   latexCharacters: 16_384,
   imageColumns: 255,
   imageRows: 255,
+  pngBytes: 32 * 1024 * 1024,
+  pngPixels: 2048 * 2048,
   cacheEntries: 64,
   cacheBytes: 32 * 1024 * 1024,
 });
