@@ -121,12 +121,85 @@ test("headless 出力から検証ウィンドウの矩形だけを切り出す",
   );
 });
 
-test("表示数式の画像行をピクセル判定前に確認する", () => {
+test("描画完了をピクセル判定前に確認する", () => {
   assert.ok(
     markersAppearInOrder(
       harness,
-      "verify-display-capture.js",
+      "check-display-rendered.js",
       "detect-display-bands.js",
+    ),
+  );
+});
+
+test("描画完了を確認するまでキャプチャを再試行する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "SECONDS < capture_deadline",
+      "run grim -o",
+      "check-display-rendered.js",
+    ),
+  );
+});
+
+test("再試行の期限を実時間で測る", () => {
+  assert.match(
+    harness,
+    /capture_deadline=\$\(\(SECONDS \+ CAPTURE_READY_TIMEOUT\)\)/u,
+  );
+});
+
+test("描画未完了だけ再試行し検査の実行失敗は停止する", () => {
+  assert.match(
+    harness,
+    /run-display-command" poll check-display-rendered[\s\S]*check-display-rendered\.js/u,
+  );
+});
+
+test("前回のキャプチャと比べて描画の安定を判定する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "check-display-rendered.js",
+      '"$PREVIOUS_CAPTURE_FILE"',
+      "--previous=$PREVIOUS_CAPTURE_FILE",
+    ),
+  );
+});
+
+test("引用ブロック背景も端末背景として渡す", () => {
+  assert.match(harness, /--background=250,248,240 --background=238,235,224/u);
+});
+
+test("キャプチャ待機中も画面ロックを検査してから再試行する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "SECONDS < capture_deadline",
+      "check-display-rendered.js",
+      "check-display-lock",
+      "run sleep",
+    ),
+  );
+});
+
+test("キャプチャ待機中のロック検出を理由に含めて報告する", () => {
+  assert.match(harness, /キャプチャ待機中に画面ロックを検出したか/u);
+});
+
+test("描画完了を確認できない場合は検証不能で停止する", () => {
+  assert.match(
+    harness,
+    /Ghostty の描画完了をキャプチャで確認できませんでした/u,
+  );
+});
+
+test("確認できたキャプチャだけを保存する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "Ghostty の描画完了をキャプチャで確認できませんでした",
+      "PI_FORMULA_VERIFY_CAPTURE",
     ),
   );
 });
@@ -183,7 +256,7 @@ test("grim を時間上限付きの通常コマンドとして実行する", () 
   assert.deepEqual(
     {
       runUsesTimeout: /run\(\).*timeout/su.test(harness),
-      grimUsesRun: /^run grim -o/mu.test(harness),
+      grimUsesRun: /^\s*run grim -o/mu.test(harness),
     },
     { runUsesTimeout: true, grimUsesRun: true },
   );

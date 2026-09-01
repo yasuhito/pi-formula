@@ -5,6 +5,8 @@ COMMAND_TIMEOUT=8
 BUILD_TIMEOUT=120
 DETECTOR_TIMEOUT=30
 SESSION_TIMEOUT=150
+CAPTURE_READY_TIMEOUT=30
+CAPTURE_READY_INTERVAL=2
 WINDOW_LIFETIME=240
 OUTPUT_NAME="pf-verify-$$"
 WORKSPACE_ID=
@@ -71,6 +73,7 @@ TEMP_DIR=$(run mktemp -d -t pi-formula-verify.XXXXXXXX)
 SESSION_FILE="$TEMP_DIR/session.jsonl"
 OUTPUT_CAPTURE_FILE="$TEMP_DIR/headless-output.png"
 CAPTURE_FILE="$TEMP_DIR/full-history.png"
+PREVIOUS_CAPTURE_FILE="$TEMP_DIR/previous-capture.png"
 RUNNER="$TEMP_DIR/run-pi"
 LAUNCHER="$TEMP_DIR/launch-ghostty"
 PID_FILE="$TEMP_DIR/window.pid"
@@ -229,7 +232,6 @@ done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
 run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
   || fail "Pi の応答がコーパスと一字一句一致しません"
-run sleep 2
 run "$ROOT/scripts/check-display-lock" \
   || fail "キャプチャ前に画面ロック状態を確認できませんでした"
 
@@ -256,22 +258,41 @@ CAPTURE_HEIGHT=${CAPTURE_SIZE#*x}
   || fail "Ghostty のキャプチャ矩形が不正です"
 CAPTURE_X=$((CAPTURE_GLOBAL_X - MONITOR_X))
 CAPTURE_Y=$((CAPTURE_GLOBAL_Y - MONITOR_Y))
-run grim -o "$OUTPUT_NAME" "$OUTPUT_CAPTURE_FILE"
-run node "$ROOT/scripts/verify-display-dimensions.js" png "$OUTPUT_CAPTURE_FILE" 1920 "$HEIGHT" \
-  || fail "headless 出力のキャプチャ寸法が不正です"
-run node "$ROOT/scripts/crop-display-capture.js" "$OUTPUT_CAPTURE_FILE" "$CAPTURE_FILE" \
-  "$CAPTURE_X" "$CAPTURE_Y" "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
-  || fail "検証ウィンドウ矩形をキャプチャから切り出せません"
-run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" \
-  "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
-  || fail "キャプチャに検証ウィンドウ全体の寸法がありません"
+display_rendered=false
+rendered_options=(--background=250,248,240 --background=238,235,224)
+capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
+while ((SECONDS < capture_deadline)); do
+  run grim -o "$OUTPUT_NAME" "$OUTPUT_CAPTURE_FILE"
+  run node "$ROOT/scripts/verify-display-dimensions.js" png "$OUTPUT_CAPTURE_FILE" 1920 "$HEIGHT" \
+    || fail "headless 出力のキャプチャ寸法が不正です"
+  run node "$ROOT/scripts/crop-display-capture.js" "$OUTPUT_CAPTURE_FILE" "$CAPTURE_FILE" \
+    "$CAPTURE_X" "$CAPTURE_Y" "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
+    || fail "検証ウィンドウ矩形をキャプチャから切り出せません"
+  run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" \
+    "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
+    || fail "キャプチャに検証ウィンドウ全体の寸法がありません"
+  if "$ROOT/scripts/run-display-command" poll check-display-rendered \
+    timeout --signal=TERM "$COMMAND_TIMEOUT" node "$ROOT/scripts/check-display-rendered.js" \
+    "${rendered_options[@]}" "$CAPTURE_FILE"; then
+    display_rendered=true
+    break
+  else
+    poll_status=$?
+    [[ "$poll_status" -eq 1 ]] || fail "キャプチャの描画完了を検査できませんでした"
+  fi
+  run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
+  rendered_options=(--background=250,248,240 --background=238,235,224 \
+    "--previous=$PREVIOUS_CAPTURE_FILE")
+  run "$ROOT/scripts/check-display-lock" \
+    || fail "キャプチャ待機中に画面ロックを検出したか、状態を確認できませんでした"
+  run sleep "$CAPTURE_READY_INTERVAL"
+done
+[[ "$display_rendered" == true ]] \
+  || fail "Ghostty の描画完了をキャプチャで確認できませんでした"
 if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
   run install -m 0644 "$CAPTURE_FILE" "$PI_FORMULA_VERIFY_CAPTURE"
   printf 'キャプチャ: %s\n' "$PI_FORMULA_VERIFY_CAPTURE"
 fi
-run node "$ROOT/scripts/verify-display-capture.js" \
-  --background=250,248,240 --image-rows="$IMAGE_ROWS" "$CAPTURE_FILE" \
-  || fail "キャプチャに表示数式の画像行がありません"
 run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
   "$window_address" "1920" "$HEIGHT" >/dev/null \
   || fail "キャプチャ中に Ghostty が終了または変形しました"

@@ -68,6 +68,15 @@ When("ハーネスの安全条件を調べる", function () {
       /run-display-command[\s\S]*exit 2/u.test(
         fs.readFileSync(path.join(root, "scripts/run-display-command"), "utf8"),
       ),
+    captureReadyRetry:
+      /capture_deadline=\$\(\(SECONDS \+ CAPTURE_READY_TIMEOUT\)\)/u.test(
+        this.harness,
+      ) &&
+      /run-display-command" poll check-display-rendered/u.test(this.harness) &&
+      /--previous=\$PREVIOUS_CAPTURE_FILE/u.test(this.harness) &&
+      /Ghostty の描画完了をキャプチャで確認できませんでした/u.test(
+        this.harness,
+      ),
     additionalMacros:
       /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u.test(
         this.harness,
@@ -77,7 +86,7 @@ When("ハーネスの安全条件を調べる", function () {
         this.macrosExtension,
       ),
     imagePath: /verify-image-path\.js/u.test(this.harness),
-    capturedImage: /verify-display-capture\.js/u.test(this.harness),
+    capturedImage: /check-display-rendered\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
@@ -126,6 +135,10 @@ Then("キャプチャへ時間上限と検証不能の終了コードを使う",
   assert.equal(this.safety.captureTimeout, true);
 });
 
+Then("前回のキャプチャと一致するまで実時間の期限内で撮り直す", function () {
+  assert.equal(this.safety.captureReadyRetry, true);
+});
+
 Then("公開 API で追加マクロを登録する拡張を読み込む", function () {
   assert.equal(this.safety.additionalMacros, true);
 });
@@ -134,7 +147,7 @@ Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
 });
 
-Then("ピクセル判定前に表示数式の画像行を確認する", function () {
+Then("ピクセル判定前に描画完了を確認する", function () {
   assert.equal(this.safety.capturedImage, true);
 });
 
