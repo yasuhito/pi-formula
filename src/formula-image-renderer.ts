@@ -161,14 +161,15 @@ export class FormulaImageRenderer {
           .encodePlaceholderRows(id, cached.image.columns, cached.image.rows)
           .join("\n");
         if (transferredIds.has(id)) return placeholder;
-        transferredIds.add(id);
-        return this.placePng(
+        const placed = this.placePng(
           cached.image.png,
           id,
           cached.image.columns,
           cached.image.rows,
           placeholder,
         );
+        transferredIds.add(id);
+        return placed;
       } catch {
         this.cache.recordFailure(cached.key, "placement failed");
         return original;

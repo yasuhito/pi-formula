@@ -70,6 +70,25 @@ test("a placement failure is visible in image renderer statistics", () => {
   assert.equal(result.stats.lastFailure, "placement failed");
 });
 
+test("a transfer failure does not mark the image ID as transferred", () => {
+  let transferAttempts = 0;
+  const renderer = new FormulaImageRenderer({
+    getCellDimensions: () => ({ widthPx: 8, heightPx: 16 }),
+    typesetMath: typesetImage,
+    stableImageId: () => 1,
+    encodeTransfer: () => {
+      transferAttempts += 1;
+      if (transferAttempts === 1) throw new Error("injected transfer failure");
+      return "transfer";
+    },
+    encodePlaceholderRows: () => ["placeholder"],
+  });
+  const render = renderer.createMarkdownRenderer(options);
+  render("broken", "$$broken$$");
+
+  assert.equal(render("valid", "$$valid$$"), "transfer\x1b[0m\n\nplaceholder");
+});
+
 test("a placement failure does not prevent the following formula", () => {
   let placementAttempts = 0;
   const renderer = new FormulaImageRenderer({
