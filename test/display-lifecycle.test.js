@@ -77,6 +77,30 @@ printf '[]\\n'
   },
 );
 
+test("ウィンドウ照会失敗を消滅確認の成功として扱わない", compositorTest, () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-stop-query-"),
+  );
+  writeFakeTimeout(directory);
+  const fakeHyprctl = path.join(directory, "hyprctl");
+  fs.writeFileSync(
+    fakeHyprctl,
+    `#!/usr/bin/env bash
+if [[ "$1" == clients ]]; then exit 1; fi
+exit 0
+`,
+  );
+  fs.chmodSync(fakeHyprctl, 0o755);
+
+  const result = spawnSync(stopper, ["999999", "verify-window"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+  });
+
+  assert.equal(result.status, 2);
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+
 test(
   "dispatch が起動前に失敗しても headless 出力を削除する",
   compositorTest,
@@ -170,6 +194,43 @@ printf '%s\\n' "$*" >>${JSON.stringify(log)}
         cleanupStatus: 0,
         commands: "output create headless pf-test\noutput remove pf-test\n",
       },
+    );
+    fs.rmSync(directory, { recursive: true, force: true });
+  },
+);
+
+test(
+  "ウィンドウ照会に失敗しても出力削除へ進み終了コード2を返す",
+  compositorTest,
+  () => {
+    const directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "pi-formula-query-cleanup-"),
+    );
+    writeFakeTimeout(directory);
+    const log = path.join(directory, "hyprctl.log");
+    const fakeHyprctl = path.join(directory, "hyprctl");
+    fs.writeFileSync(
+      fakeHyprctl,
+      `#!/usr/bin/env bash
+if [[ "$1" == clients ]]; then exit 1; fi
+printf '%s\\n' "$*" >>${JSON.stringify(log)}
+`,
+    );
+    fs.chmodSync(fakeHyprctl, 0o755);
+
+    const result = spawnSync(cleanup, ["pf-test", "verify-window"], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+    });
+
+    assert.deepEqual(
+      {
+        status: result.status,
+        removedOutput: fs
+          .readFileSync(log, "utf8")
+          .includes("output remove pf-test"),
+      },
+      { status: 2, removedOutput: true },
     );
     fs.rmSync(directory, { recursive: true, force: true });
   },

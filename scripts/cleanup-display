@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-COMMAND_TIMEOUT=3
+COMMAND_TIMEOUT=1
 OUTPUT_NAME=${1:-}
 WINDOW_TITLE=${2:-}
 WINDOW_PID=${3:-}
@@ -20,20 +20,32 @@ run() {
 }
 
 window_pid() {
-  run hyprctl clients -j | run jq -r --arg title "$WINDOW_TITLE" \
-    '[.[] | select(.title == $title) | .pid][0] // empty'
+  local clients
+  clients=$(run hyprctl clients -j) || return 2
+  printf '%s' "$clients" | run jq -r --arg title "$WINDOW_TITLE" \
+    '[.[] | select(.title == $title) | .pid][0] // empty' || return 2
 }
 
 window_exists() {
-  run hyprctl clients -j | run jq -e --arg title "$WINDOW_TITLE" \
-    '.[] | select(.title == $title)' >/dev/null
+  local clients
+  local count
+  clients=$(run hyprctl clients -j) || return 2
+  count=$(printf '%s' "$clients" | run jq -r --arg title "$WINDOW_TITLE" \
+    '[.[] | select(.title == $title)] | length') || return 2
+  [[ "$count" -gt 0 ]]
 }
 
 group_running() {
   local state
   local states
   [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]] || return 1
-  states=$(run ps -o stat= -g "$WINDOW_PID" 2>/dev/null) || return 1
+  if states=$(run ps -o stat= -g "$WINDOW_PID" 2>/dev/null); then
+    :
+  else
+    ps_status=$?
+    [[ "$ps_status" -eq 1 ]] && return 1
+    return 2
+  fi
   while IFS= read -r state; do
     state=${state#"${state%%[![:space:]]*}"}
     [[ -n "$state" && "$state" != Z* ]] && return 0
@@ -41,41 +53,93 @@ group_running() {
   return 1
 }
 
+verification_failed=false
 if [[ ! "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
   for _ in {1..8}; do
     if [[ -n "$PID_FILE" && -s "$PID_FILE" ]]; then
       read -r WINDOW_PID <"$PID_FILE" || WINDOW_PID=
     fi
     if [[ ! "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
-      client_pid=$(window_pid) || client_pid=
+      client_pid=
+      if ! client_pid=$(window_pid); then
+        verification_failed=true
+      fi
       if [[ "$client_pid" =~ ^[1-9][0-9]*$ ]]; then
-        WINDOW_PID=$(run ps -o pgid= -p "$client_pid" | tr -d '[:space:]') || WINDOW_PID=
+        pgid=$(run ps -o pgid= -p "$client_pid") || {
+          pgid=
+          verification_failed=true
+        }
+        WINDOW_PID=${pgid//[[:space:]]/}
       fi
     fi
     [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]] && break
-    run sleep 0.25 || true
+    run sleep 0.25 || verification_failed=true
   done
 fi
 
 if [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
   timeout --signal=TERM 8 "$ROOT/scripts/stop-display-process" \
-    "$WINDOW_PID" "$WINDOW_TITLE" >/dev/null 2>&1 || true
+    "$WINDOW_PID" "$WINDOW_TITLE" >/dev/null 2>&1 || verification_failed=true
+fi
+close_window=false
+if window_exists; then
+  close_window=true
+else
+  window_status=$?
+  if [[ "$window_status" -ne 1 ]]; then
+    close_window=true
+    verification_failed=true
+  fi
+fi
+if [[ "$close_window" == true ]]; then
+  run hyprctl dispatch "hl.dsp.window.close({ window = \"title:${WINDOW_TITLE}\" })" \
+    >/dev/null 2>&1 || verification_failed=true
 fi
 
-if window_exists; then
-  run hyprctl dispatch "hl.dsp.window.close({ window = \"title:${WINDOW_TITLE}\" })" \
-    >/dev/null 2>&1 || true
-fi
 if group_running; then
-  kill -KILL -- "-$WINDOW_PID" >/dev/null 2>&1 || true
+  kill -KILL -- "-$WINDOW_PID" >/dev/null 2>&1 || verification_failed=true
+else
+  group_status=$?
+  [[ "$group_status" -eq 1 ]] || verification_failed=true
 fi
-for _ in {1..8}; do
-  ! window_exists && ! group_running && break
-  run sleep 0.25 || true
+
+window_gone=false
+group_gone=false
+for _ in {1..4}; do
+  if window_exists; then
+    window_gone=false
+  else
+    window_status=$?
+    if [[ "$window_status" -eq 1 ]]; then
+      window_gone=true
+    else
+      window_gone=false
+      verification_failed=true
+    fi
+  fi
+  if group_running; then
+    group_gone=false
+  else
+    group_status=$?
+    if [[ "$group_status" -eq 1 ]]; then
+      group_gone=true
+    else
+      group_gone=false
+      verification_failed=true
+    fi
+  fi
+  [[ "$window_gone" == true && "$group_gone" == true ]] && break
+  run sleep 0.25 || verification_failed=true
 done
-if window_exists || group_running; then
-  printf 'verify-display: 検証プロセスまたはウィンドウを停止できませんでした\n' >&2
+
+remove_failed=false
+run hyprctl output remove "$OUTPUT_NAME" >/dev/null || remove_failed=true
+if [[
+  "$window_gone" != true ||
+    "$group_gone" != true ||
+    "$verification_failed" == true ||
+    "$remove_failed" == true
+]]; then
+  printf 'verify-display: 後片付けを完全に確認できませんでした\n' >&2
   exit 2
 fi
-
-run hyprctl output remove "$OUTPUT_NAME" >/dev/null

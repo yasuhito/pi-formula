@@ -95,8 +95,11 @@ test("キャプチャの PNG 寸法をピクセル判定前に確認する", () 
   );
 });
 
-test("終了処理を headless 出力の後片付けへ委譲する", () => {
-  assert.ok(markersAppearInOrder(harness, "cleanup()", "cleanup-display"));
+test("終了処理を十分な時間上限の後片付けへ委譲する", () => {
+  assert.match(
+    harness,
+    /timeout --signal=TERM 48 "\$ROOT\/scripts\/cleanup-display"/u,
+  );
 });
 
 test("process group を止めてから headless 出力を削除する", () => {
@@ -122,7 +125,11 @@ test("Ghostty の process group ID を保存する", () => {
 });
 
 test("通常コマンドの失敗を実行基盤エラーへ正規化する", () => {
-  assert.match(runFunction, /run-display-command" infrastructure/u);
+  assert.match(runFunction, /run-display-command" infrastructure "\$1"/u);
+});
+
+test("後片付けで外部trコマンドを使わない", () => {
+  assert.doesNotMatch(cleanupHarness, /\btr\b/u);
 });
 
 test("grim を通常コマンドとして実行する", () => {
@@ -131,7 +138,7 @@ test("grim を通常コマンドとして実行する", () => {
 
 test("ビルド出力を捨てない", () => {
   const build = harness.match(
-    /run-display-command" infrastructure \\\n {2}timeout[^\n]*npm run build[^\n]*/u,
+    /run-display-command" infrastructure npm \\\n {2}timeout[^\n]*npm run build[^\n]*/u,
   )?.[0];
   assert.equal(build?.includes("/dev/null"), false);
 });
@@ -154,10 +161,17 @@ test("キャプチャの前後で検証ウィンドウの存在を確認する",
   );
 });
 
+test("セッション待機だけ未完了の終了コード1を保つ", () => {
+  assert.match(
+    harness,
+    /run-display-command" poll check-display-session[\s\S]*check-display-session\.js/u,
+  );
+});
+
 test("ピクセル判定だけ専用の終了コード規則を使う", () => {
   assert.match(
     harness,
-    /run-display-command" detector[\s\S]*detect-display-bands\.js/u,
+    /run-display-command" detector detect-display-bands[\s\S]*detect-display-bands\.js/u,
   );
 });
 

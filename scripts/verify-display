@@ -19,7 +19,7 @@ PID_FILE=
 OUTPUT_CREATED=false
 
 run() {
-  "$ROOT/scripts/run-display-command" infrastructure \
+  "$ROOT/scripts/run-display-command" infrastructure "$1" \
     timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
 }
 
@@ -30,7 +30,7 @@ cleanup() {
     read -r WINDOW_PID <"$PID_FILE" || WINDOW_PID=
   fi
   if [[ "$OUTPUT_CREATED" == true ]]; then
-    timeout --signal=TERM 16 "$ROOT/scripts/cleanup-display" \
+    timeout --signal=TERM 48 "$ROOT/scripts/cleanup-display" \
       "$OUTPUT_NAME" "$WINDOW_TITLE" "$WINDOW_PID" "$PID_FILE" >/dev/null 2>&1 || status=2
   fi
   if [[ -n "$TEMP_DIR" ]]; then
@@ -60,7 +60,7 @@ fail() {
 
 [[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
 [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
-for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir tr; do
+for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
@@ -75,7 +75,7 @@ GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
 CONFIG_HOME="$TEMP_DIR/config"
 IMAGE_MARKER="$TEMP_DIR/image-path"
 run mkdir -p "$CONFIG_HOME"
-"$ROOT/scripts/run-display-command" infrastructure \
+"$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
 PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
   || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
@@ -183,13 +183,14 @@ run node "$ROOT/scripts/verify-image-path.js" "$IMAGE_MARKER" \
 
 completed=false
 for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
-  if [[ -s "$SESSION_FILE" ]] && run node -e '
-const fs = require("node:fs");
-const records = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map(JSON.parse);
-process.exit(records.some((record) => record.type === "message" && record.message?.role === "assistant" && record.message?.stopReason === "stop") ? 0 : 1);
-' "$SESSION_FILE"; then
+  if "$ROOT/scripts/run-display-command" poll check-display-session \
+    timeout --signal=TERM "$COMMAND_TIMEOUT" node \
+    "$ROOT/scripts/check-display-session.js" "$SESSION_FILE"; then
     completed=true
     break
+  else
+    poll_status=$?
+    [[ "$poll_status" -eq 1 ]] || fail "Pi のセッション記録を検査できませんでした"
   fi
   run sleep 1
 done
@@ -214,7 +215,7 @@ if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
 fi
 
 trap - ERR
-"$ROOT/scripts/run-display-command" detector \
+"$ROOT/scripts/run-display-command" detector detect-display-bands \
   timeout --signal=TERM "$DETECTOR_TIMEOUT" node "$ROOT/scripts/detect-display-bands.js" \
   --background=250,248,240 --body=40,40,35 \
   --ignore=50,100,120 --ignore=80,100,120 --ignore=70,112,70 \

@@ -10,7 +10,7 @@ Hyprland 0.55 以降の Lua dispatcher、Ghostty、grim、jq、Node.js、Pi が�
 scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-異常がなければ0、水平帯を検出すると1、準備・描画・キャプチャに失敗すると2で終了する。終了コード1を返すのはピクセル判定が帯を検出した場合だけとする。それ以前のコマンド失敗と判定器のtimeout・実行失敗は、元の終了コードとコマンドをstderrへ示して2に正規化する。ビルドの標準出力と標準エラーは原因調査のため保持する。検出時は次のように座標とRGBを表示する。
+異常がなければ0、水平帯を検出すると1、準備・描画・キャプチャに失敗すると2で終了する。終了コード1を返すのはピクセル判定が帯を検出した場合だけとする。それ以前のコマンド失敗と判定器のtimeout・実行失敗は、元の終了コードと実コマンド名をstderrへ示して2に正規化する。セッション待機では未完了だけを無言の1として扱い、JSONL解析失敗や検査timeoutは直ちに2とする。ビルドの標準出力と標準エラーは原因調査のため保持する。検出時は次のように座標とRGBを表示する。
 
 ```text
 異常な水平帯を 1 件検出しました
@@ -39,7 +39,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 すべての外部処理には時間上限がある。通常の外部処理は8秒、ビルドは120秒、最大画像のピクセル判定は30秒とする。Ghostty の240秒の寿命には、起動、画像経路、応答、描画、キャプチャの各期限と余裕を含める。キャプチャの直前と直後に、同じ address の対象ウィンドウが headless monitor 上に存在することを確認する。
 
-Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、PID ファイルまたは対象ウィンドウの PID から process group を回収して停止する。dispatch 未成立などで process group と対象ウィンドウが存在しない場合も headless 出力を削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
+Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP`のtrapは、PIDファイルまたは対象ウィンドウのPIDからprocess groupを回収して停止する。後片付けには48秒を確保し、各照会は1秒に制限する。ウィンドウなしと照会失敗を区別し、照会失敗時も出力削除までbest-effortで進んでexit 2にする。dispatch未成立などでprocess groupと対象ウィンドウが存在しない場合もheadless出力を削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
 
 ## 履歴全体
 

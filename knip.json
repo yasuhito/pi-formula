@@ -3,6 +3,7 @@
   "entry": [
     "src/extension.ts",
     ".pi/extensions/**/*.ts",
+    "scripts/check-display-session.js",
     "scripts/detect-display-bands.js",
     "scripts/plan-display.js",
     "scripts/verify-display-dimensions.js",

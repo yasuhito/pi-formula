@@ -44,9 +44,16 @@ if group_running; then
 fi
 
 for _ in {1..8}; do
-  if ! run hyprctl clients -j | run jq -e --arg title "$TITLE" '.[] | select(.title == $title)' >/dev/null; then
-    exit 0
-  fi
+  clients=$(run hyprctl clients -j) || {
+    printf '検証ウィンドウを照会できませんでした: %s\n' "$TITLE" >&2
+    exit 2
+  }
+  count=$(printf '%s' "$clients" | run jq -r --arg title "$TITLE" \
+    '[.[] | select(.title == $title)] | length') || {
+    printf '検証ウィンドウを解析できませんでした: %s\n' "$TITLE" >&2
+    exit 2
+  }
+  [[ "$count" -eq 0 ]] && exit 0
   run sleep 0.25
 done
 printf '検証ウィンドウが消えませんでした: %s\n' "$TITLE" >&2
