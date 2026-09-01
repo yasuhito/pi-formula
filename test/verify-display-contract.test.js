@@ -7,10 +7,6 @@ const harness = fs.readFileSync(
   path.resolve(__dirname, "../scripts/verify-display"),
   "utf8",
 );
-const cleanupHarness = fs.readFileSync(
-  path.resolve(__dirname, "../scripts/cleanup-display"),
-  "utf8",
-);
 const runFunction = harness.slice(
   harness.indexOf("run()"),
   harness.indexOf("cleanup()"),
@@ -54,71 +50,64 @@ test("検証専用の追加マクロ拡張を読み込む", () => {
   assert.match(harness, /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u);
 });
 
+test("利用者の画面から独立した検証セッションで描画する", () => {
+  assert.match(
+    harness,
+    /env -u WAYLAND_DISPLAY -u DISPLAY \\\n {2}WLR_BACKENDS=headless/u,
+  );
+});
+
+test("検証セッションを専用 process group で起動する", () => {
+  assert.match(harness, /setsid cage -d -- "\$LAUNCHER"/u);
+});
+
+test("検証セッションの出力を計画高へ広げる", () => {
+  assert.match(harness, /--custom-mode "1920x\$\{PI_FORMULA_VERIFY_HEIGHT\}"/u);
+});
+
+test("出力を広げてから検証セッションの窓口を外へ伝える", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "--custom-mode",
+      'printf \'%s\\n\' "$WAYLAND_DISPLAY" >"$PI_FORMULA_VERIFY_DISPLAY_FILE"',
+    ),
+  );
+});
+
+test("キャプチャは検証セッションの窓口へ向ける", () => {
+  assert.match(
+    harness,
+    /WAYLAND_DISPLAY="\$VERIFY_WAYLAND_DISPLAY" \\\n {4}"\$ROOT\/scripts\/run-display-command"/u,
+  );
+});
+
+test("検証セッションが起動しない場合はログを添えて停止する", () => {
+  assert.match(harness, /検証セッションが起動しませんでした/u);
+});
+
+test("計画した出力寸法を確認してから応答を待つ", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      '"$capture_size" == "1920x$HEIGHT"',
+      "check-display-session.js",
+    ),
+  );
+});
+
+test("表示数式の画像行数で出力高を決めてから検証セッションを起動する", () => {
+  assert.ok(markersAppearInOrder(harness, "plan-display.js", "setsid cage"));
+});
+
 test("画像経路を確認してからキャプチャする", () => {
-  assert.ok(markersAppearInOrder(harness, "verify-image-path.js", "run grim"));
+  assert.ok(
+    markersAppearInOrder(harness, "verify-image-path.js", "run_inside grim"),
+  );
 });
 
 test("応答一致を確認してからキャプチャする", () => {
-  assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run grim"));
-});
-
-test("出力作成を始める前に後片付けを有効にする", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      "OUTPUT_CREATED=true",
-      "output create headless",
-    ),
-  );
-});
-
-test("表示数式の画像行数で出力高を決めてから headless 出力を作る", () => {
-  assert.ok(
-    markersAppearInOrder(harness, "plan-display.js", "output create headless"),
-  );
-});
-
-test("計画した monitor 寸法を確認してから起動する", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      'verify-display-dimensions.js" monitor',
-      "hl.dsp.exec_cmd",
-    ),
-  );
-});
-
-test("画面ロック状態を描画とheadless出力作成より前に確認する", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      "check-display-lock",
-      "npm run build",
-      "output create headless",
-    ),
-  );
-});
-
-test("キャプチャ直前にも画面ロック状態を再確認する", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      "verify-echo.js",
-      "check-display-lock",
-      'grim -o "$OUTPUT_NAME"',
-    ),
-  );
-});
-
-test("headless 出力から検証ウィンドウの矩形だけを切り出す", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      'grim -o "$OUTPUT_NAME"',
-      "crop-display-capture.js",
-      '"$CAPTURE_FILE"',
-    ),
-  );
+  assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run_inside grim"));
 });
 
 test("描画完了をピクセル判定前に確認する", () => {
@@ -136,7 +125,7 @@ test("描画完了を確認するまでキャプチャを再試行する", () =>
     markersAppearInOrder(
       harness,
       "SECONDS < capture_deadline",
-      "run grim -o",
+      "run_inside grim",
       "check-display-rendered.js",
     ),
   );
@@ -169,22 +158,6 @@ test("前回のキャプチャと比べて描画の安定を判定する", () =>
 
 test("引用ブロック背景も端末背景として渡す", () => {
   assert.match(harness, /--background=250,248,240 --background=238,235,224/u);
-});
-
-test("キャプチャ待機中も画面ロックを検査してから再試行する", () => {
-  assert.ok(
-    markersAppearInOrder(
-      harness,
-      "SECONDS < capture_deadline",
-      "check-display-rendered.js",
-      "check-display-lock",
-      "run sleep",
-    ),
-  );
-});
-
-test("キャプチャ待機中のロック検出を理由に含めて報告する", () => {
-  assert.match(harness, /キャプチャ待機中に画面ロックを検出したか/u);
 });
 
 test("描画完了を確認できない場合は検証不能で停止する", () => {
@@ -230,55 +203,30 @@ test("キャプチャの PNG 寸法をピクセル判定前に確認する", () 
   assert.ok(
     markersAppearInOrder(
       harness,
-      "run grim",
+      "run_inside grim",
       'verify-display-dimensions.js" png',
       "detect-display-bands.js",
     ),
   );
 });
 
-test("終了処理を十分な時間上限の後片付けへ委譲する", () => {
-  assert.match(
-    harness,
-    /timeout --signal=TERM 48 "\$ROOT\/scripts\/cleanup-display"/u,
-  );
-});
-
-test("process group を止めてから headless 出力を削除する", () => {
-  assert.ok(
-    markersAppearInOrder(
-      cleanupHarness,
-      "stop-display-process",
-      "output remove",
-    ),
-  );
+test("終了処理で検証セッションの process group を止める", () => {
+  assert.match(harness, /kill -- "-\$CAGE_PID"/u);
 });
 
 test("順序判定は欠けた marker を拒否する", () => {
   assert.equal(markersAppearInOrder("first third", "first", "second"), false);
 });
 
-test("Ghostty を専用 process group で起動する", () => {
-  assert.match(harness, /setsid timeout/u);
-});
-
-test("Ghostty の process group ID を保存する", () => {
-  assert.match(harness, /read -r WINDOW_PID/u);
-});
-
 test("通常コマンドの失敗を実行基盤エラーへ正規化する", () => {
   assert.match(runFunction, /run-display-command" infrastructure "\$1"/u);
-});
-
-test("後片付けで外部trコマンドを使わない", () => {
-  assert.doesNotMatch(cleanupHarness, /\btr\b/u);
 });
 
 test("grim を時間上限付きの通常コマンドとして実行する", () => {
   assert.deepEqual(
     {
       runUsesTimeout: /run\(\).*timeout/su.test(harness),
-      grimUsesRun: /^\s*run grim -o/mu.test(harness),
+      grimUsesRun: /^\s*run_inside grim/mu.test(harness),
     },
     { runUsesTimeout: true, grimUsesRun: true },
   );
@@ -300,13 +248,6 @@ test("ビルドへ独立した長い時間上限を使う", () => {
 
 test("Ghosttyの寿命に各段の期限とキャプチャの余裕を含める", () => {
   assert.match(harness, /WINDOW_LIFETIME=240/u);
-});
-
-test("キャプチャの前後で検証ウィンドウの存在を確認する", () => {
-  assert.match(
-    harness,
-    /verify-display-window[\s\S]*run grim[\s\S]*verify-display-window/u,
-  );
 });
 
 test("セッション待機だけ未完了の終了コード1を保つ", () => {

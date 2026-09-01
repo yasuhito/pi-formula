@@ -8,32 +8,33 @@ SESSION_TIMEOUT=150
 CAPTURE_READY_TIMEOUT=30
 CAPTURE_READY_INTERVAL=2
 WINDOW_LIFETIME=240
-OUTPUT_NAME="pf-verify-$$"
-WORKSPACE_ID=
+SESSION_READY_TIMEOUT=30
 WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
 ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
 CORPUS=${1:-}
 TEMP_DIR=
-WINDOW_PID=
-PID_FILE=
-OUTPUT_CREATED=false
+CAGE_PID=
 
 run() {
   "$ROOT/scripts/run-display-command" infrastructure "$1" \
     timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
 }
 
+# 検証セッションの中だけで動くコマンド。利用者の画面へは触れない。
+run_inside() {
+  WAYLAND_DISPLAY="$VERIFY_WAYLAND_DISPLAY" \
+    "$ROOT/scripts/run-display-command" infrastructure "$1" \
+    timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
+}
+
 cleanup() {
   local status=$?
   trap - EXIT INT TERM HUP ERR
-  if [[ -z "$WINDOW_PID" && -n "$PID_FILE" && -s "$PID_FILE" ]]; then
-    read -r WINDOW_PID <"$PID_FILE" || WINDOW_PID=
-  fi
-  if [[ "$OUTPUT_CREATED" == true ]]; then
-    timeout --signal=TERM 48 "$ROOT/scripts/cleanup-display" \
-      "$OUTPUT_NAME" "$WINDOW_TITLE" "$WINDOW_PID" "$PID_FILE" >/dev/null 2>&1 || status=2
+  if [[ -n "$CAGE_PID" ]]; then
+    kill -- "-$CAGE_PID" 2>/dev/null || kill "$CAGE_PID" 2>/dev/null || true
+    wait "$CAGE_PID" 2>/dev/null || true
   fi
   if [[ -n "$TEMP_DIR" ]]; then
     run rm -rf -- "$TEMP_DIR" >/dev/null 2>&1 || true
@@ -62,25 +63,22 @@ fail() {
 
 [[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
 [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
-for command in timeout loginctl hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir touch; do
+for command in timeout cage wlr-randr ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
-run "$ROOT/scripts/check-display-lock" \
-  || fail "画面ロック状態を確認できませんでした"
 CORPUS=$(run realpath -- "$CORPUS")
 TEMP_DIR=$(run mktemp -d -t pi-formula-verify.XXXXXXXX)
 SESSION_FILE="$TEMP_DIR/session.jsonl"
-OUTPUT_CAPTURE_FILE="$TEMP_DIR/headless-output.png"
 CAPTURE_FILE="$TEMP_DIR/full-history.png"
 PREVIOUS_CAPTURE_FILE="$TEMP_DIR/previous-capture.png"
 RUNNER="$TEMP_DIR/run-pi"
-LAUNCHER="$TEMP_DIR/launch-ghostty"
-PID_FILE="$TEMP_DIR/window.pid"
+LAUNCHER="$TEMP_DIR/launch-session"
 GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
 CONFIG_HOME="$TEMP_DIR/config"
 IMAGE_MARKER="$TEMP_DIR/image-path"
-DISPLAY_READY_MARKER="$TEMP_DIR/display-ready"
+DISPLAY_FILE="$TEMP_DIR/wayland-display"
+CAGE_LOG="$TEMP_DIR/cage.log"
 run mkdir -p "$CONFIG_HOME"
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
@@ -104,25 +102,16 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_DISPLAY_READY=%q\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
   "$ROOT/src/extension.ts" "$ROOT/scripts/verify-extensions/pi-formula-verify-macros.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
-  "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" \
-  "$DISPLAY_READY_MARKER" >"$RUNNER"
+  "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" >"$RUNNER"
 run cat >>"$RUNNER" <<'RUNNER'
 export XDG_CONFIG_HOME="$PI_FORMULA_VERIFY_CONFIG_HOME"
 export PI_FORMULA_MACROS='{}'
 export PI_FORMULA_VERIFY_IMAGE_MARKER
 unset TMUX STY
-for _ in {1..80}; do
-  [[ -f "$PI_FORMULA_VERIFY_DISPLAY_READY" ]] && break
-  sleep 0.1
-done
-[[ -f "$PI_FORMULA_VERIFY_DISPLAY_READY" ]] || {
-  printf 'verify-display: headless 出力の準備を待てませんでした\n' >&2
-  exit 2
-}
 args=(
   --name "$PI_FORMULA_VERIFY_TITLE"
   --session "$PI_FORMULA_VERIFY_SESSION"
@@ -149,65 +138,60 @@ exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
   '次の Markdown を一字一句そのまま出力してください。'
 RUNNER
 run chmod +x "$RUNNER"
-# $pid は生成する launcher で展開する。
-# shellcheck disable=SC2016
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nsetsid timeout --signal=TERM %q ghostty --config-default-files=false --gtk-single-instance=false --title=%q --config-file=%q -e %q &\npid=$!\nprintf "%%s\\n" "$pid" >%q\nwait "$pid"\n' \
-  "$WINDOW_LIFETIME" "$WINDOW_TITLE" "$GHOSTTY_CONFIG" "$RUNNER" "$PID_FILE" >"$LAUNCHER"
+
+# 検証セッションの中で走る。出力を計画高へ広げ、その WAYLAND_DISPLAY を外へ伝える。
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_HEIGHT=%q\nPI_FORMULA_VERIFY_DISPLAY_FILE=%q\nPI_FORMULA_VERIFY_GHOSTTY_CONFIG=%q\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_RUNNER=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\n' \
+  "$HEIGHT" "$DISPLAY_FILE" "$GHOSTTY_CONFIG" "$WINDOW_TITLE" "$RUNNER" \
+  "$WINDOW_LIFETIME" >"$LAUNCHER"
+run cat >>"$LAUNCHER" <<'LAUNCHER'
+output=$(wlr-randr | grep -oE '^[A-Za-z0-9-]+' | head -1)
+[[ -n "$output" ]] || {
+  printf 'verify-display: 検証セッションの出力名を解決できませんでした\n' >&2
+  exit 2
+}
+wlr-randr --output "$output" --custom-mode "1920x${PI_FORMULA_VERIFY_HEIGHT}" || {
+  printf 'verify-display: 検証セッションの出力を広げられませんでした\n' >&2
+  exit 2
+}
+printf '%s\n' "$WAYLAND_DISPLAY" >"$PI_FORMULA_VERIFY_DISPLAY_FILE"
+exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
+  ghostty --config-default-files=false --gtk-single-instance=false \
+  --title="$PI_FORMULA_VERIFY_TITLE" \
+  --config-file="$PI_FORMULA_VERIFY_GHOSTTY_CONFIG" \
+  -e "$PI_FORMULA_VERIFY_RUNNER"
+LAUNCHER
 run chmod +x "$LAUNCHER"
 
-BEFORE_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
-OUTPUT_CREATED=true
-run hyprctl output create headless "$OUTPUT_NAME" >/dev/null
-run hyprctl eval "hl.monitor({ output = \"$OUTPUT_NAME\", mode = \"1920x${HEIGHT}@60\", position = \"auto\", scale = \"1\" })" >/dev/null
+# 利用者の画面から独立した検証セッション。画面ロックにも現在の作業にも影響されない。
+env -u WAYLAND_DISPLAY -u DISPLAY \
+  WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
+  setsid cage -d -- "$LAUNCHER" >"$CAGE_LOG" 2>&1 &
+CAGE_PID=$!
 
-monitor_id=
-for _ in {1..8}; do
-  monitors=$(run hyprctl monitors all -j)
-  if monitor_id=$(printf '%s' "$monitors" | run node \
-    "$ROOT/scripts/verify-display-dimensions.js" monitor "$OUTPUT_NAME" 1920 "$HEIGHT" 2>/dev/null); then
+VERIFY_WAYLAND_DISPLAY=
+for _ in {1..40}; do
+  if [[ -s "$DISPLAY_FILE" ]]; then
+    read -r VERIFY_WAYLAND_DISPLAY <"$DISPLAY_FILE"
     break
   fi
-  run sleep 1
-done
-[[ -n "$monitor_id" ]] || fail "headless 出力を 1920x${HEIGHT} で有効にできませんでした"
-MONITOR_X=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
-  '.[] | select(.name == $name) | .x')
-MONITOR_Y=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
-  '.[] | select(.name == $name) | .y')
-WORKSPACE_ID=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
-  '.[] | select(.name == $name) | .activeWorkspace.id')
-[[ "$MONITOR_X" =~ ^-?[0-9]+$ && "$MONITOR_Y" =~ ^-?[0-9]+$ ]] \
-  || fail "headless 出力の位置を確認できませんでした"
-[[ "$WORKSPACE_ID" =~ ^[1-9][0-9]*$ ]] \
-  || fail "headless 出力の workspace を確認できませんでした"
-
-run hyprctl dispatch "hl.dsp.exec_cmd(\"$LAUNCHER\", { workspace = \"$WORKSPACE_ID silent\", monitor = \"$OUTPUT_NAME silent\", no_initial_focus = true, no_focus = true, render_unfocused = true, no_anim = true })" >/dev/null
-for _ in {1..8}; do
-  if [[ -s "$PID_FILE" ]]; then
-    read -r WINDOW_PID <"$PID_FILE"
-    break
-  fi
+  kill -0 "$CAGE_PID" 2>/dev/null \
+    || fail "検証セッションが起動しませんでした: $(tail -3 "$CAGE_LOG" | tr '\n' ' ')"
   run sleep 0.25
 done
-[[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]] || fail "Ghostty の process group ID を取得できませんでした"
+[[ -n "$VERIFY_WAYLAND_DISPLAY" ]] \
+  || fail "検証セッションの WAYLAND_DISPLAY を受け取れませんでした"
 
-window_address=
-for _ in {1..15}; do
-  window_address=$(run hyprctl clients -j | run jq -r --arg title "$WINDOW_TITLE" --argjson monitor "$monitor_id" \
-    '.[] | select(.title == $title and .monitor == $monitor) | .address')
-  [[ -n "$window_address" ]] && break
+capture_size=
+for ((elapsed = 0; elapsed < SESSION_READY_TIMEOUT; elapsed += 1)); do
+  if run_inside grim "$CAPTURE_FILE" >/dev/null 2>&1 && capture_size=$(run node \
+    "$ROOT/scripts/verify-display-dimensions.js" size "$CAPTURE_FILE" 2>/dev/null); then
+    [[ "$capture_size" == "1920x$HEIGHT" ]] && break
+  fi
+  capture_size=
   run sleep 1
 done
-[[ -n "$window_address" ]] || fail "Ghostty が headless 出力だけに作られたことを確認できませんでした"
-VISIBLE_WORKSPACE=$(run hyprctl monitors all -j | run jq -r --arg name "$OUTPUT_NAME" \
-  '.[] | select(.name == $name) | .activeWorkspace.id')
-[[ "$VISIBLE_WORKSPACE" == "$WORKSPACE_ID" ]] \
-  || fail "Ghostty の workspace を headless 出力へ表示できませんでした"
-run touch "$DISPLAY_READY_MARKER"
-AFTER_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
-[[ "$AFTER_FOCUS" == "$BEFORE_FOCUS" ]] || fail "Ghostty の起動時に可視ワークスペースのフォーカスが変わりました"
-ACTIVE_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
-[[ "$ACTIVE_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+[[ "$capture_size" == "1920x$HEIGHT" ]] \
+  || fail "検証セッションの出力を 1920x${HEIGHT} で用意できませんでした"
 
 for _ in {1..15}; do
   [[ -s "$IMAGE_MARKER" ]] && break
@@ -232,45 +216,14 @@ done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
 run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
   || fail "Pi の応答がコーパスと一字一句一致しません"
-run "$ROOT/scripts/check-display-lock" \
-  || fail "キャプチャ前に画面ロック状態を確認できませんでした"
 
-CURRENT_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
-[[ "$CURRENT_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
-CAPTURE_GEOMETRY=
-for _ in {1..8}; do
-  if CAPTURE_GEOMETRY=$(run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
-    "$window_address" "1920" "$HEIGHT" 2>/dev/null); then
-    break
-  fi
-  run sleep 1
-done
-[[ -n "$CAPTURE_GEOMETRY" ]] \
-  || fail "Ghostty が headless 出力の使用可能領域を占めていません"
-CAPTURE_POSITION=${CAPTURE_GEOMETRY%% *}
-CAPTURE_SIZE=${CAPTURE_GEOMETRY#* }
-CAPTURE_GLOBAL_X=${CAPTURE_POSITION%,*}
-CAPTURE_GLOBAL_Y=${CAPTURE_POSITION#*,}
-CAPTURE_WIDTH=${CAPTURE_SIZE%x*}
-CAPTURE_HEIGHT=${CAPTURE_SIZE#*x}
-[[ "$CAPTURE_GLOBAL_X" =~ ^-?[0-9]+$ && "$CAPTURE_GLOBAL_Y" =~ ^-?[0-9]+$ && \
-  "$CAPTURE_WIDTH" =~ ^[1-9][0-9]*$ && "$CAPTURE_HEIGHT" =~ ^[1-9][0-9]*$ ]] \
-  || fail "Ghostty のキャプチャ矩形が不正です"
-CAPTURE_X=$((CAPTURE_GLOBAL_X - MONITOR_X))
-CAPTURE_Y=$((CAPTURE_GLOBAL_Y - MONITOR_Y))
 display_rendered=false
 rendered_options=(--background=250,248,240 --background=238,235,224)
 capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
 while ((SECONDS < capture_deadline)); do
-  run grim -o "$OUTPUT_NAME" "$OUTPUT_CAPTURE_FILE"
-  run node "$ROOT/scripts/verify-display-dimensions.js" png "$OUTPUT_CAPTURE_FILE" 1920 "$HEIGHT" \
-    || fail "headless 出力のキャプチャ寸法が不正です"
-  run node "$ROOT/scripts/crop-display-capture.js" "$OUTPUT_CAPTURE_FILE" "$CAPTURE_FILE" \
-    "$CAPTURE_X" "$CAPTURE_Y" "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
-    || fail "検証ウィンドウ矩形をキャプチャから切り出せません"
-  run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" \
-    "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
-    || fail "キャプチャに検証ウィンドウ全体の寸法がありません"
+  run_inside grim "$CAPTURE_FILE"
+  run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" 1920 "$HEIGHT" \
+    || fail "検証セッションのキャプチャ寸法が不正です"
   if "$ROOT/scripts/run-display-command" poll check-display-rendered \
     timeout --signal=TERM "$COMMAND_TIMEOUT" node "$ROOT/scripts/check-display-rendered.js" \
     "${rendered_options[@]}" "$CAPTURE_FILE"; then
@@ -283,8 +236,6 @@ while ((SECONDS < capture_deadline)); do
   run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
   rendered_options=(--background=250,248,240 --background=238,235,224 \
     "--previous=$PREVIOUS_CAPTURE_FILE")
-  run "$ROOT/scripts/check-display-lock" \
-    || fail "キャプチャ待機中に画面ロックを検出したか、状態を確認できませんでした"
   run sleep "$CAPTURE_READY_INTERVAL"
 done
 [[ "$display_rendered" == true ]] \
@@ -294,9 +245,6 @@ CAPTURE_DESTINATION=${PI_FORMULA_VERIFY_CAPTURE:-${XDG_STATE_HOME:-$HOME/.local/
 run mkdir -p -- "${CAPTURE_DESTINATION%/*}"
 run install -m 0644 "$CAPTURE_FILE" "$CAPTURE_DESTINATION"
 printf 'キャプチャ: %s\n' "$CAPTURE_DESTINATION"
-run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
-  "$window_address" "1920" "$HEIGHT" >/dev/null \
-  || fail "キャプチャ中に Ghostty が終了または変形しました"
 
 trap - ERR
 detector_status=0
