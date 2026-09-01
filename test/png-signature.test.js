@@ -6,7 +6,10 @@ const test = require("node:test");
 const { hasPngSignature } = require("../scripts/png-signature");
 
 const extension = fs.readFileSync(
-  path.resolve(__dirname, "../.pi/extensions/pi-formula-verify-image-path.ts"),
+  path.resolve(
+    __dirname,
+    "../scripts/verify-extensions/pi-formula-verify-image-path.ts",
+  ),
   "utf8",
 );
 

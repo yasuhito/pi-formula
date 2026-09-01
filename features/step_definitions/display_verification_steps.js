@@ -27,7 +27,7 @@ Given("実表示検証ハーネスと Issue 21 の再現コーパスがある", 
     "utf8",
   );
   this.macrosExtension = fs.readFileSync(
-    path.join(root, ".pi/extensions/pi-formula-verify-macros.ts"),
+    path.join(root, "scripts/verify-extensions/pi-formula-verify-macros.ts"),
     "utf8",
   );
 });
