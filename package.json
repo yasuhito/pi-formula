@@ -56,6 +56,7 @@
     "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
     "test": "npm run coverage && npm run test:cucumber",
     "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
+    "verify:session-record": "node scripts/verify-session-tools.js",
     "release:prepare": "npm run check && node scripts/prepare-release.js"
   },
   "dependencies": {
