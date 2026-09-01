@@ -46,7 +46,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check:package": "publint",
+    "check:package": "npm run build && publint",
     "typecheck": "tsc --noEmit",
     "test:unit": "npm run build && node --test test/*.test.js",
     "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
