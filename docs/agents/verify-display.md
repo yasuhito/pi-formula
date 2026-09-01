@@ -26,7 +26,7 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
 
 既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` だけを読み込む。qni-cli など、導入済み package の状態は検証結果へ影響しない。
 
-pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。現在の checkout の公開 API で試験用 PNG を作れたことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
+pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。現在の checkout の公開 API で試験用 PNG を作り、8 byte の PNG 署名が完全に一致したことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
 
 ```sh
 PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
@@ -37,7 +37,9 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ハーネスは実行ごとに一意な headless 出力を作る。Ghostty は `hl.dsp.exec_cmd` の `workspace` と `monitor` の `silent` 規則で、その出力へ作成時から割り当てる。`no_initial_focus` も指定する。後追い移動はしない。起動後は、Ghostty の monitor ID と実行前後の active window が変わっていないことを検査する。条件を満たさなければキャプチャせず失敗する。
 
-すべての外部処理には時間上限がある。通常の外部処理は8秒、ビルドは120秒、最大画像のピクセル判定は30秒とする。Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、Hyprland の close が失敗しても process group を停止し、対象ウィンドウが消えたことを確認してから headless 出力と一時ファイルを削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
+すべての外部処理には時間上限がある。通常の外部処理は8秒、ビルドは120秒、最大画像のピクセル判定は30秒とする。Ghostty の240秒の寿命には、起動、画像経路、応答、描画、キャプチャの各期限と余裕を含める。キャプチャの直前と直後に、同じ address の対象ウィンドウが headless monitor 上に存在することを確認する。
+
+Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、PID ファイルまたは対象ウィンドウの PID から process group を回収して停止する。dispatch 未成立などで process group と対象ウィンドウが存在しない場合も headless 出力を削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
 
 ## 履歴全体
 
@@ -49,7 +51,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 `scripts/detect-display-bands.js` は 8-bit RGB/RGBA の非インターレース PNG を読む。scanline の展開長が画像寸法と厳密に一致しない PNG は破損として拒否する。画素数の上限は 1920×16000 とする。
 
-ハーネスは専用の Pi theme と Ghostty の背景色・本文色を使う。判定器へ背景色、本文色、theme の全 UI 色を明示し、それらを候補から除く。このため、本文色の長い分数線、コード、URL、金額、シェル変数、非数式 UI を水平帯と誤認しない。専用 palette にない ID 色や黒色が、画面幅の 20% 以上に連続して 3 行以上続く場合を水平帯とする。字形で途切れた同色領域は近接する座標へまとめる。画面上下 1% の compositor 部品は対象外にする。
+ハーネスは専用の Pi theme と Ghostty の背景色・本文色を使う。判定器へ背景色、本文色、theme の全 UI 色を明示し、それらを候補から除く。このため、本文色の長い分数線、コード、URL、金額、シェル変数、非数式 UI を水平帯と誤認しない。専用 palette と量子化誤差2以内で一致しない ID 色や黒色について、2px 以上の同色成分を走査する。同じ行で16px 以下の字形の隙間を挟む同色成分をまとめ、幅48px 以上かつ40%以上が同色の領域が3行以上続く場合を水平帯とする。画面幅ではなく帯自体の幅を使うため、幅384px未満の短い表示数式も判定できる。画面上下 1% の compositor 部品は対象外にする。
 
 画素色は 24-bit 整数で扱い、背景色は固定長 histogram の一走査で求める。判定時間は画素数に比例する。横方向に色が変わり続ける上限寸法 1920×16000 の合成 PNG を、実処理と同じ30秒の上限で判定する回帰試験を置く。
 

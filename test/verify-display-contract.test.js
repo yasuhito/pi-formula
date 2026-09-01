@@ -7,6 +7,20 @@ const harness = fs.readFileSync(
   path.resolve(__dirname, "../scripts/verify-display"),
   "utf8",
 );
+const cleanupHarness = fs.readFileSync(
+  path.resolve(__dirname, "../scripts/cleanup-display"),
+  "utf8",
+);
+
+function markersAppearInOrder(source, ...markers) {
+  let previous = -1;
+  for (const marker of markers) {
+    const position = source.indexOf(marker, previous + 1);
+    if (position < 0) return false;
+    previous = position;
+  }
+  return true;
+}
 
 test("利用者の Pi 拡張を読み込まない", () => {
   assert.match(harness, /--no-extensions/u);
@@ -33,27 +47,35 @@ test("利用者マクロを空に固定する", () => {
 });
 
 test("画像経路を確認してからキャプチャする", () => {
-  assert.ok(
-    harness.indexOf("verify-image-path.js") < harness.indexOf("run grim"),
-  );
+  assert.ok(markersAppearInOrder(harness, "verify-image-path.js", "run grim"));
 });
 
 test("応答一致を確認してからキャプチャする", () => {
-  assert.ok(harness.indexOf("verify-echo.js") < harness.indexOf("run grim"));
+  assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run grim"));
 });
 
 test("表示数式の画像行数で出力高を決めてから headless 出力を作る", () => {
   assert.ok(
-    harness.indexOf("plan-display.js") <
-      harness.indexOf("output create headless"),
+    markersAppearInOrder(harness, "plan-display.js", "output create headless"),
   );
 });
 
+test("終了処理を headless 出力の後片付けへ委譲する", () => {
+  assert.ok(markersAppearInOrder(harness, "cleanup()", "cleanup-display"));
+});
+
 test("process group を止めてから headless 出力を削除する", () => {
-  const cleanup = harness.slice(harness.indexOf("cleanup()"));
   assert.ok(
-    cleanup.indexOf("stop-display-process") < cleanup.indexOf("output remove"),
+    markersAppearInOrder(
+      cleanupHarness,
+      "stop-display-process",
+      "output remove",
+    ),
   );
+});
+
+test("順序判定は欠けた marker を拒否する", () => {
+  assert.equal(markersAppearInOrder("first third", "first", "second"), false);
 });
 
 test("Ghostty を専用 process group で起動する", () => {
@@ -68,6 +90,17 @@ test("ビルドへ独立した長い時間上限を使う", () => {
   assert.match(
     harness,
     /BUILD_TIMEOUT=120[\s\S]*timeout --signal=TERM "\$BUILD_TIMEOUT" npm run build/u,
+  );
+});
+
+test("Ghosttyの寿命に各段の期限とキャプチャの余裕を含める", () => {
+  assert.match(harness, /WINDOW_LIFETIME=240/u);
+});
+
+test("キャプチャの前後で検証ウィンドウの存在を確認する", () => {
+  assert.match(
+    harness,
+    /verify-display-window[\s\S]*run grim[\s\S]*verify-display-window/u,
   );
 });
 

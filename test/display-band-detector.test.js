@@ -12,6 +12,7 @@ const detectorArgs = [
   "--background=250,248,240",
   "--body=40,40,35",
   "--ignore=230,228,217",
+  "--ignore=140,100,30",
 ];
 
 function runPng(png, timeout = 5_000) {
@@ -32,10 +33,12 @@ function runPng(png, timeout = 5_000) {
 
 function normalDisplay(x, y) {
   if (y >= 8 && y <= 13 && x >= 8 && x <= 111) return [230, 228, 217]; // 非数式 UI
+  if (y >= 18 && y <= 22 && x >= 10 && x <= 100) return [140, 100, 31]; // UI 色の量子化誤差
   if (y === 28 && x >= 18 && x <= 101) return [40, 40, 35]; // 長い分数線
   if (y >= 35 && y <= 45 && x >= 25 && x < 95 && (x + y) % 11 < 2)
     return [40, 40, 35];
   if (y === 60 && x >= 8 && x <= 111 && x % 3 !== 0) return [40, 40, 35]; // コード・URL 相当
+  if (y >= 65 && y <= 70 && x >= 20 && x <= 85) return [40, 40, 36]; // 本文の量子化誤差
   return [250, 248, 240];
 }
 
@@ -82,6 +85,42 @@ test("本文色とは異なる黒帯を検出する", () => {
       reportsBlack: /rgb=0,0,0/u.test(result.stdout),
     },
     { status: 1, reportsBlack: true },
+  );
+});
+
+test("1920px 画面上の短い表示数式帯を検出する", () => {
+  const result = runPng(
+    createPng(1920, 80, (x, y) => {
+      if (y >= 36 && y <= 43 && x >= 100 && x <= 299) return [210, 0, 170];
+      return normalDisplay(x, y);
+    }),
+  );
+
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsCoordinates: /x=100\.\.299, y=36\.\.43/u.test(result.stdout),
+    },
+    { status: 1, reportsCoordinates: true },
+  );
+});
+
+test("本文色の字形で細かく分断された表示数式帯を検出する", () => {
+  const result = runPng(
+    createPng(1920, 80, (x, y) => {
+      const inBand = y >= 36 && y <= 43 && x >= 100 && x <= 299;
+      if (inBand && (x - 100) % 10 < 8) return [210, 0, 170];
+      if (inBand) return [40, 40, 35];
+      return normalDisplay(x, y);
+    }),
+  );
+
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsCoordinates: /x=100\.\.297, y=36\.\.43/u.test(result.stdout),
+    },
+    { status: 1, reportsCoordinates: true },
   );
 });
 

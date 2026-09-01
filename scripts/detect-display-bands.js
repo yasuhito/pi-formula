@@ -136,11 +136,39 @@ function colorDistance(left, right) {
   return Math.sqrt(red * red + green * green + blue * blue);
 }
 
+function isPaletteColor(color, palette) {
+  for (const paletteColor of palette) {
+    if (colorDistance(color, paletteColor) <= 2) return true;
+  }
+  return false;
+}
+
 function horizontalRuns(image, background, ignored) {
-  const minimumWidth = Math.max(12, Math.ceil(image.width * 0.2));
+  const minimumComponentWidth = 2;
+  const minimumBandWidth = 48;
+  const maximumGlyphGap = 16;
+  const minimumCoverage = 0.4;
   const runs = [];
   const { pixels, channels, width, height } = image;
   for (let y = 0; y < height; y += 1) {
+    const candidates = new Map();
+    const finish = (candidate) => {
+      if (!candidate) return;
+      const span = candidate.x2 - candidate.x1 + 1;
+      if (
+        span >= minimumBandWidth &&
+        candidate.covered >= Math.max(8, Math.ceil(span * minimumCoverage))
+      ) {
+        runs.push({
+          color: candidate.color,
+          x1: candidate.x1,
+          x2: candidate.x2,
+          y1: y,
+          y2: y,
+          rows: 1,
+        });
+      }
+    };
     const rowOffset = y * width * channels;
     let start = 0;
     let color = colorAt(pixels, rowOffset);
@@ -149,15 +177,28 @@ function horizontalRuns(image, background, ignored) {
       if (next === color) continue;
       const runWidth = x - start;
       if (
-        runWidth >= minimumWidth &&
-        !ignored.has(color) &&
+        runWidth >= minimumComponentWidth &&
+        !isPaletteColor(color, ignored) &&
         colorDistance(color, background) > 32
       ) {
-        runs.push({ color, x1: start, x2: x - 1, y1: y, y2: y, rows: 1 });
+        const previous = candidates.get(color);
+        if (previous && start - previous.x2 - 1 <= maximumGlyphGap) {
+          previous.x2 = x - 1;
+          previous.covered += runWidth;
+        } else {
+          finish(previous);
+          candidates.set(color, {
+            color,
+            x1: start,
+            x2: x - 1,
+            covered: runWidth,
+          });
+        }
       }
       start = x;
       color = next;
     }
+    for (const candidate of candidates.values()) finish(candidate);
   }
   return runs;
 }

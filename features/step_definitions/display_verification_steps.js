@@ -52,28 +52,49 @@ When("ハーネスの安全条件を調べる", function () {
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
       /setsid timeout/u.test(this.harness) &&
-      /stop-display-process/u.test(this.harness) &&
-      /output remove/u.test(this.harness),
+      /cleanup-display/u.test(this.harness),
   };
 });
 
-Then(
-  "隔離した設定で現在の画像経路だけを確認する headless 起動、画像行数を含む全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている",
-  function () {
-    assert.deepEqual(this.safety, {
-      headless: true,
-      tallOutput: true,
-      launchRule: true,
-      timeouts: true,
-      focusGuard: true,
-      isolatedExtension: true,
-      isolatedSettings: true,
-      imagePath: true,
-      exactEcho: true,
-      cleanup: true,
-    });
-  },
-);
+Then("検証専用の headless 出力を作成する", function () {
+  assert.equal(this.safety.headless, true);
+});
+
+Then("計画した全履歴を1枚で取得する", function () {
+  assert.equal(this.safety.tallOutput, true);
+});
+
+Then("検証ウィンドウを headless 出力へフォーカスなしで起動する", function () {
+  assert.equal(this.safety.launchRule, true);
+});
+
+Then("外部処理と検証ウィンドウへ時間上限を設ける", function () {
+  assert.equal(this.safety.timeouts, true);
+});
+
+Then("起動後も可視画面のフォーカスが変わらないことを確認する", function () {
+  assert.equal(this.safety.focusGuard, true);
+});
+
+Then("利用者の拡張を除外して現在の pi-formula を読み込む", function () {
+  assert.equal(this.safety.isolatedExtension, true);
+});
+
+Then("一時設定と空の利用者マクロを使う", function () {
+  assert.equal(this.safety.isolatedSettings, true);
+});
+
+Then("キャプチャ前に画像経路を確認する", function () {
+  assert.equal(this.safety.imagePath, true);
+});
+
+Then("キャプチャ前に応答一致を確認する", function () {
+  assert.equal(this.safety.exactEcho, true);
+});
+
+Then("失敗時も process group と headless 出力を後片付けする", function () {
+  assert.equal(this.safety.cleanup, true);
+});
 
 Then("Issue 21 の最後の表示数式がコーパスに含まれる", function () {
   assert.ok(this.corpus.includes("F_8"));

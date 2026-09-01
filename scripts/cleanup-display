@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMMAND_TIMEOUT=3
+OUTPUT_NAME=${1:-}
+WINDOW_TITLE=${2:-}
+WINDOW_PID=${3:-}
+PID_FILE=${4:-}
+SCRIPT_DIR=${BASH_SOURCE[0]%/*}
+[[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
+ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+
+[[ -n "$OUTPUT_NAME" && -n "$WINDOW_TITLE" ]] || {
+  printf 'Usage: cleanup-display <output-name> <window-title> [process-group-id] [pid-file]\n' >&2
+  exit 2
+}
+
+run() {
+  timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
+}
+
+window_pid() {
+  run hyprctl clients -j | run jq -r --arg title "$WINDOW_TITLE" \
+    '[.[] | select(.title == $title) | .pid][0] // empty'
+}
+
+window_exists() {
+  run hyprctl clients -j | run jq -e --arg title "$WINDOW_TITLE" \
+    '.[] | select(.title == $title)' >/dev/null
+}
+
+group_running() {
+  local state
+  local states
+  [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]] || return 1
+  states=$(run ps -o stat= -g "$WINDOW_PID" 2>/dev/null) || return 1
+  while IFS= read -r state; do
+    state=${state#"${state%%[![:space:]]*}"}
+    [[ -n "$state" && "$state" != Z* ]] && return 0
+  done <<<"$states"
+  return 1
+}
+
+if [[ ! "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
+  for _ in {1..8}; do
+    if [[ -n "$PID_FILE" && -s "$PID_FILE" ]]; then
+      read -r WINDOW_PID <"$PID_FILE" || WINDOW_PID=
+    fi
+    if [[ ! "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
+      client_pid=$(window_pid) || client_pid=
+      if [[ "$client_pid" =~ ^[1-9][0-9]*$ ]]; then
+        WINDOW_PID=$(run ps -o pgid= -p "$client_pid" | tr -d '[:space:]') || WINDOW_PID=
+      fi
+    fi
+    [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]] && break
+    run sleep 0.25 || true
+  done
+fi
+
+if [[ "$WINDOW_PID" =~ ^[1-9][0-9]*$ ]]; then
+  timeout --signal=TERM 8 "$ROOT/scripts/stop-display-process" \
+    "$WINDOW_PID" "$WINDOW_TITLE" >/dev/null 2>&1 || true
+fi
+
+if window_exists; then
+  run hyprctl dispatch "hl.dsp.window.close({ window = \"title:${WINDOW_TITLE}\" })" \
+    >/dev/null 2>&1 || true
+fi
+if group_running; then
+  kill -KILL -- "-$WINDOW_PID" >/dev/null 2>&1 || true
+fi
+for _ in {1..8}; do
+  ! window_exists && ! group_running && break
+  run sleep 0.25 || true
+done
+if window_exists || group_running; then
+  printf 'verify-display: 検証プロセスまたはウィンドウを停止できませんでした\n' >&2
+  exit 2
+fi
+
+run hyprctl output remove "$OUTPUT_NAME" >/dev/null

@@ -5,7 +5,7 @@ COMMAND_TIMEOUT=8
 BUILD_TIMEOUT=120
 DETECTOR_TIMEOUT=30
 SESSION_TIMEOUT=150
-WINDOW_LIFETIME=180
+WINDOW_LIFETIME=240
 OUTPUT_NAME="pf-verify-$$"
 WORKSPACE_ID=$((900000 + ($$ % 90000)))
 WINDOW_TITLE="pi-formula-verify-$$"
@@ -16,7 +16,6 @@ CORPUS=${1:-}
 TEMP_DIR=
 WINDOW_PID=
 PID_FILE=
-LAUNCH_REQUESTED=false
 OUTPUT_CREATED=false
 
 run() {
@@ -25,28 +24,13 @@ run() {
 
 cleanup() {
   local status=$?
-  local stopped=true
   trap - EXIT INT TERM HUP
-  if [[ "$LAUNCH_REQUESTED" == true && -z "$WINDOW_PID" && -n "$PID_FILE" ]]; then
-    for _ in {1..8}; do
-      if [[ -s "$PID_FILE" ]]; then
-        read -r WINDOW_PID <"$PID_FILE"
-        break
-      fi
-      run sleep 0.25 || true
-    done
+  if [[ -z "$WINDOW_PID" && -n "$PID_FILE" && -s "$PID_FILE" ]]; then
+    read -r WINDOW_PID <"$PID_FILE" || WINDOW_PID=
   fi
-  if [[ -n "$WINDOW_PID" ]]; then
-    timeout --signal=TERM 8 "$ROOT/scripts/stop-display-process" \
-      "$WINDOW_PID" "$WINDOW_TITLE" >/dev/null 2>&1 || stopped=false
-  elif [[ "$LAUNCH_REQUESTED" == true ]]; then
-    stopped=false
-  fi
-  if [[ "$OUTPUT_CREATED" == true && "$stopped" == true ]]; then
-    run hyprctl output remove "$OUTPUT_NAME" >/dev/null 2>&1 || status=2
-  elif [[ "$stopped" != true ]]; then
-    printf 'verify-display: 検証プロセスを停止できないため headless 出力を保持します\n' >&2
-    status=2
+  if [[ "$OUTPUT_CREATED" == true ]]; then
+    timeout --signal=TERM 16 "$ROOT/scripts/cleanup-display" \
+      "$OUTPUT_NAME" "$WINDOW_TITLE" "$WINDOW_PID" "$PID_FILE" >/dev/null 2>&1 || status=2
   fi
   if [[ -n "$TEMP_DIR" ]]; then
     run rm -rf -- "$TEMP_DIR" >/dev/null 2>&1 || true
@@ -62,7 +46,7 @@ fail() {
 
 [[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
 [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
-for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
+for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir tr; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
@@ -148,7 +132,6 @@ for _ in {1..8}; do
 done
 [[ -n "$monitor_id" ]] || fail "headless 出力を有効にできませんでした"
 
-LAUNCH_REQUESTED=true
 run hyprctl dispatch "hl.dsp.exec_cmd(\"$LAUNCHER\", { workspace = \"$WORKSPACE_ID silent\", monitor = \"$OUTPUT_NAME silent\", no_initial_focus = true, no_focus = true, render_unfocused = true, no_anim = true })" >/dev/null
 for _ in {1..8}; do
   if [[ -s "$PID_FILE" ]]; then
@@ -199,7 +182,11 @@ run sleep 2
 
 CURRENT_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
 [[ "$CURRENT_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
+  "$window_address" >/dev/null || fail "キャプチャ前に Ghostty が終了しました"
 run grim -o "$OUTPUT_NAME" "$CAPTURE_FILE"
+run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
+  "$window_address" >/dev/null || fail "キャプチャ中に Ghostty が終了しました"
 
 if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
   run install -m 0644 "$CAPTURE_FILE" "$PI_FORMULA_VERIFY_CAPTURE"

@@ -4,11 +4,65 @@ pi-formula の worker として
 利用者の可視画面を変えずに
 表示数式の実表示を履歴全体で回帰検証したい
 
-## Scenario: 全履歴を不可視の headless 出力で検証する
+## Scenario: headless 出力を作成する
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then 隔離した設定で現在の画像経路だけを確認する headless 起動、画像行数を含む全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている
+- Then 検証専用の headless 出力を作成する
+
+## Scenario: 全履歴を1枚で取得する
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 計画した全履歴を1枚で取得する
+
+## Scenario: 検証ウィンドウを不可視で起動する
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 検証ウィンドウを headless 出力へフォーカスなしで起動する
+
+## Scenario: 外部処理へ時間上限を設ける
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 外部処理と検証ウィンドウへ時間上限を設ける
+
+## Scenario: 可視画面のフォーカスを変えない
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 起動後も可視画面のフォーカスが変わらないことを確認する
+
+## Scenario: 現在の拡張だけを読み込む
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 利用者の拡張を除外して現在の pi-formula を読み込む
+
+## Scenario: 利用者設定とマクロを隔離する
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 一時設定と空の利用者マクロを使う
+
+## Scenario: 現在の画像経路を確認する
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then キャプチャ前に画像経路を確認する
+
+## Scenario: 応答を一字一句確認する
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then キャプチャ前に応答一致を確認する
+
+## Scenario: process group と headless 出力を後片付けする
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 失敗時も process group と headless 出力を後片付けする
 
 ## Scenario: Issue 21 の再現コーパスを使う
 
