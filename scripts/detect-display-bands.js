@@ -3,16 +3,22 @@
 const fs = require('node:fs');
 const { inflateSync } = require('node:zlib');
 
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
+const MAX_PIXELS = 1920 * 16000;
+
 function readChunks(png) {
-  if (!png.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
-    throw new Error('PNG signature がありません');
-  }
+  if (!png.subarray(0, 8).equals(PNG_SIGNATURE)) throw new Error('PNG signature がありません');
   const chunks = [];
   for (let offset = 8; offset < png.length;) {
+    if (offset + 12 > png.length) throw new Error('PNG chunk が途中で切れています');
     const length = png.readUInt32BE(offset);
-    const type = png.subarray(offset + 4, offset + 8).toString('ascii');
-    chunks.push({ type, data: png.subarray(offset + 8, offset + 8 + length) });
-    offset += length + 12;
+    const end = offset + length + 12;
+    if (end > png.length) throw new Error('PNG chunk が途中で切れています');
+    chunks.push({
+      type: png.subarray(offset + 4, offset + 8).toString('ascii'),
+      data: png.subarray(offset + 8, offset + 8 + length)
+    });
+    offset = end;
   }
   return chunks;
 }
@@ -29,7 +35,7 @@ function paeth(left, above, upperLeft) {
 function decodePng(png) {
   const chunks = readChunks(png);
   const header = chunks.find(({ type }) => type === 'IHDR')?.data;
-  if (!header) throw new Error('PNG に IHDR がありません');
+  if (!header || header.length !== 13) throw new Error('PNG に正しい IHDR がありません');
   const width = header.readUInt32BE(0);
   const height = header.readUInt32BE(4);
   const bitDepth = header[8];
@@ -38,64 +44,99 @@ function decodePng(png) {
   if (bitDepth !== 8 || channels === undefined || header[12] !== 0) {
     throw new Error('8-bit RGB/RGBA の非インターレース PNG だけを判定できます');
   }
+  if (width === 0 || height === 0 || width * height > MAX_PIXELS) {
+    throw new Error(`PNG の画素数が上限 ${MAX_PIXELS} を超えています`);
+  }
 
   const packed = inflateSync(Buffer.concat(
     chunks.filter(({ type }) => type === 'IDAT').map(({ data }) => data)
   ));
   const stride = width * channels;
-  const pixels = Buffer.alloc(stride * height);
+  const expectedLength = (stride + 1) * height;
+  if (packed.length !== expectedLength) {
+    throw new Error(`PNG の展開長が不正です: expected ${expectedLength}, got ${packed.length}`);
+  }
+
+  const pixels = Buffer.allocUnsafe(stride * height);
   let inputOffset = 0;
   for (let y = 0; y < height; y += 1) {
     const filter = packed[inputOffset];
     inputOffset += 1;
+    if (filter > 4) throw new Error(`未対応の PNG filter: ${filter}`);
+    const rowOffset = y * stride;
     for (let x = 0; x < stride; x += 1) {
       const raw = packed[inputOffset + x];
-      const left = x >= channels ? pixels[y * stride + x - channels] : 0;
-      const above = y > 0 ? pixels[(y - 1) * stride + x] : 0;
-      const upperLeft = y > 0 && x >= channels
-        ? pixels[(y - 1) * stride + x - channels]
-        : 0;
-      const predictor = [0, left, above, Math.floor((left + above) / 2), paeth(left, above, upperLeft)][filter];
-      if (predictor === undefined) throw new Error(`未対応の PNG filter: ${filter}`);
-      pixels[y * stride + x] = (raw + predictor) & 0xff;
+      const left = x >= channels ? pixels[rowOffset + x - channels] : 0;
+      const above = y > 0 ? pixels[rowOffset + x - stride] : 0;
+      const upperLeft = y > 0 && x >= channels ? pixels[rowOffset + x - stride - channels] : 0;
+      let predictor = 0;
+      if (filter === 1) predictor = left;
+      else if (filter === 2) predictor = above;
+      else if (filter === 3) predictor = (left + above) >>> 1;
+      else if (filter === 4) predictor = paeth(left, above, upperLeft);
+      pixels[rowOffset + x] = (raw + predictor) & 0xff;
     }
     inputOffset += stride;
   }
   return { width, height, channels, pixels };
 }
 
-function rgbAt(image, x, y) {
-  const offset = (y * image.width + x) * image.channels;
-  return `${image.pixels[offset]},${image.pixels[offset + 1]},${image.pixels[offset + 2]}`;
+function packedColor(red, green, blue) {
+  return (red << 16) | (green << 8) | blue;
+}
+
+function colorAt(pixels, offset) {
+  return packedColor(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+}
+
+function colorText(color) {
+  return `${(color >>> 16) & 0xff},${(color >>> 8) & 0xff},${color & 0xff}`;
+}
+
+function parseColor(value) {
+  const channels = value.split(',').map(Number);
+  if (channels.length !== 3 || channels.some((channel) =>
+    !Number.isInteger(channel) || channel < 0 || channel > 255
+  )) throw new Error(`RGB が不正です: ${value}`);
+  return packedColor(...channels);
 }
 
 function dominantColor(image) {
-  const counts = new Map();
-  for (let y = 0; y < image.height; y += 1) {
-    for (let x = 0; x < image.width; x += 1) {
-      const color = rgbAt(image, x, y);
-      counts.set(color, (counts.get(color) ?? 0) + 1);
+  const counts = new Uint32Array(1 << 24);
+  let dominant = 0;
+  let maximum = 0;
+  for (let offset = 0; offset < image.pixels.length; offset += image.channels) {
+    const color = colorAt(image.pixels, offset);
+    const count = ++counts[color];
+    if (count > maximum) {
+      maximum = count;
+      dominant = color;
     }
   }
-  return [...counts].sort((left, right) => right[1] - left[1])[0][0];
+  return dominant;
 }
 
 function colorDistance(left, right) {
-  const leftChannels = left.split(',').map(Number);
-  const rightChannels = right.split(',').map(Number);
-  return Math.hypot(...leftChannels.map((channel, index) => channel - rightChannels[index]));
+  const red = ((left >>> 16) & 0xff) - ((right >>> 16) & 0xff);
+  const green = ((left >>> 8) & 0xff) - ((right >>> 8) & 0xff);
+  const blue = (left & 0xff) - (right & 0xff);
+  return Math.sqrt(red * red + green * green + blue * blue);
 }
 
-function horizontalRuns(image, background) {
+function horizontalRuns(image, background, ignored) {
   const minimumWidth = Math.max(12, Math.ceil(image.width * 0.2));
   const runs = [];
-  for (let y = 0; y < image.height; y += 1) {
+  const { pixels, channels, width, height } = image;
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * width * channels;
     let start = 0;
-    let color = rgbAt(image, 0, y);
-    for (let x = 1; x <= image.width; x += 1) {
-      const next = x < image.width ? rgbAt(image, x, y) : undefined;
+    let color = colorAt(pixels, rowOffset);
+    for (let x = 1; x <= width; x += 1) {
+      const next = x < width ? colorAt(pixels, rowOffset + x * channels) : -1;
       if (next === color) continue;
-      if (colorDistance(color, background) > 32 && x - start >= minimumWidth) {
+      const runWidth = x - start;
+      if (runWidth >= minimumWidth && !ignored.has(color)
+        && colorDistance(color, background) > 32) {
         runs.push({ color, x1: start, x2: x - 1, y1: y, y2: y, rows: 1 });
       }
       start = x;
@@ -109,23 +150,19 @@ function mergeRuns(runs) {
   const bands = [];
   for (const run of runs) {
     const previous = [...bands].reverse().find((band) =>
-      band.color === run.color
-      && run.y1 - band.y2 <= 24
-      && run.x1 <= band.x2
-      && run.x2 >= band.x1
+      band.color === run.color && run.y1 - band.y2 <= 24
+      && run.x1 <= band.x2 && run.x2 >= band.x1
     );
     if (previous) {
       previous.x1 = Math.min(previous.x1, run.x1);
       previous.x2 = Math.max(previous.x2, run.x2);
       previous.y2 = run.y2;
       previous.rows += 1;
-    } else {
-      bands.push({ ...run });
-    }
+    } else bands.push({ ...run });
   }
   const substantial = bands
     .filter(({ rows }) => rows >= 3)
-    .sort((left, right) => left.color.localeCompare(right.color) || left.y1 - right.y1);
+    .sort((left, right) => left.color - right.color || left.y1 - right.y1);
   const coalesced = [];
   for (const band of substantial) {
     const previous = coalesced.at(-1);
@@ -135,37 +172,48 @@ function mergeRuns(runs) {
       previous.x2 = Math.max(previous.x2, band.x2);
       previous.y2 = Math.max(previous.y2, band.y2);
       previous.rows += band.rows;
-    } else {
-      coalesced.push({ ...band });
-    }
+    } else coalesced.push({ ...band });
   }
   return coalesced.sort((left, right) => left.y1 - right.y1);
 }
 
-function detectDisplayBands(png) {
+function detectDisplayBands(png, options = {}) {
   const image = decodePng(png);
+  const background = options.background ?? dominantColor(image);
+  const ignored = new Set(options.ignored ?? []);
+  ignored.add(background);
+  if (options.body !== undefined) ignored.add(options.body);
   const top = image.height * 0.01;
   const bottom = image.height * 0.99;
-  return mergeRuns(horizontalRuns(image, dominantColor(image)))
+  return mergeRuns(horizontalRuns(image, background, ignored))
     .filter(({ y1, y2 }) => y2 >= top && y1 <= bottom);
 }
 
-function main() {
-  const filename = process.argv[2];
-  if (!filename) {
-    console.error('Usage: detect-display-bands.js <capture.png>');
-    process.exitCode = 2;
-    return;
+function parseArguments(args) {
+  const options = { ignored: [] };
+  let filename;
+  for (const argument of args) {
+    if (argument.startsWith('--background=')) options.background = parseColor(argument.slice(13));
+    else if (argument.startsWith('--body=')) options.body = parseColor(argument.slice(7));
+    else if (argument.startsWith('--ignore=')) options.ignored.push(parseColor(argument.slice(9)));
+    else if (!filename) filename = argument;
+    else throw new Error(`不明な引数です: ${argument}`);
   }
+  if (!filename) throw new Error('Usage: detect-display-bands.js [--background=R,G,B] [--body=R,G,B] [--ignore=R,G,B] <capture.png>');
+  return { filename, options };
+}
+
+function main() {
   try {
-    const bands = detectDisplayBands(fs.readFileSync(filename));
+    const { filename, options } = parseArguments(process.argv.slice(2));
+    const bands = detectDisplayBands(fs.readFileSync(filename), options);
     if (bands.length === 0) {
       console.log('異常な水平帯はありません');
       return;
     }
     console.log(`異常な水平帯を ${bands.length} 件検出しました`);
     for (const band of bands) {
-      console.log(`- x=${band.x1}..${band.x2}, y=${band.y1}..${band.y2}, rgb=${band.color}`);
+      console.log(`- x=${band.x1}..${band.x2}, y=${band.y1}..${band.y2}, rgb=${colorText(band.color)}`);
     }
     process.exitCode = 1;
   } catch (error) {
@@ -175,4 +223,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { decodePng, detectDisplayBands };
+module.exports = { decodePng, detectDisplayBands, parseColor };

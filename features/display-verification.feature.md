@@ -8,7 +8,22 @@ pi-formula の worker として
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then headless 出力への起動、全履歴キャプチャ、全外部処理の時間上限、フォーカス不変確認、終了時の後片付けが揃っている
+- Then 現在の画像経路だけを使う headless 起動、全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている
+
+## Scenario Outline: 改変された回帰入力を拒否する
+
+- Given コーパスへ `<change>` を加えた assistant のセッション記録がある
+- When 応答とコーパスの一致を検証する
+- Then 改変された応答はキャプチャ前に拒否される
+
+### Examples:
+
+  | change         |
+  | -------------- |
+  | コードフェンス |
+  | Unicode 化     |
+  | 前置き         |
+  | 欠落           |
 
 ## Scenario: 正常な表示数式には帯がない
 

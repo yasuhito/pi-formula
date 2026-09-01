@@ -9,6 +9,8 @@ const { createPng } = require('../../test/support/png-fixture');
 const root = path.resolve(__dirname, '../..');
 
 function normalDisplay(x, y) {
+  if (y >= 8 && y <= 13 && x >= 8 && x <= 111) return [230, 228, 217];
+  if (y === 28 && x >= 18 && x <= 101) return [40, 40, 35];
   if (y >= 35 && y <= 45 && x >= 25 && x < 95 && (x + y) % 11 < 2) return [40, 40, 35];
   return [250, 248, 240];
 }
@@ -28,13 +30,18 @@ When('ハーネスの安全条件を調べる', function () {
     timeouts: /run\(\).*timeout/su.test(this.harness)
       && /PI_FORMULA_VERIFY_WINDOW_LIFETIME/u.test(this.harness),
     focusGuard: /AFTER_FOCUS.*BEFORE_FOCUS/su.test(this.harness),
+    isolatedExtension: /--no-extensions/u.test(this.harness)
+      && /--extension "\$PI_FORMULA_VERIFY_EXTENSION"/u.test(this.harness)
+      && /src\/extension\.ts/u.test(this.harness),
+    exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup: /trap cleanup EXIT INT TERM HUP/u.test(this.harness)
+      && /setsid timeout/u.test(this.harness)
+      && /stop-display-process/u.test(this.harness)
       && /output remove/u.test(this.harness)
-      && /window\.close/u.test(this.harness)
   };
 });
 
-Then('headless 出力への起動、全履歴キャプチャ、全外部処理の時間上限、フォーカス不変確認、終了時の後片付けが揃っている', function () {
+Then('現在の画像経路だけを使う headless 起動、全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている', function () {
   assert.ok(this.corpus.includes('F_8'));
   assert.deepEqual(this.safety, {
     headless: true,
@@ -42,8 +49,40 @@ Then('headless 出力への起動、全履歴キャプチャ、全外部処理�
     launchRule: true,
     timeouts: true,
     focusGuard: true,
+    isolatedExtension: true,
+    exactEcho: true,
     cleanup: true
   });
+});
+
+Given(/^コーパスへ `([^`]+)` を加えた assistant のセッション記録がある$/u, function (change) {
+  this.directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-formula-cucumber-echo-'));
+  this.echoCorpus = path.join(this.directory, 'corpus.md');
+  this.echoSession = path.join(this.directory, 'session.jsonl');
+  const corpus = '本文 $x$。\n\n$$\n\\frac{1}{2}\n$$';
+  const changed = {
+    'コードフェンス': `\`\`\`markdown\n${corpus}\n\`\`\``,
+    'Unicode 化': corpus.replace('\\frac{1}{2}', '½'),
+    '前置き': `原文です。\n${corpus}`,
+    '欠落': corpus.replace('本文 $x$。\n\n', '')
+  }[change];
+  fs.writeFileSync(this.echoCorpus, corpus);
+  fs.writeFileSync(this.echoSession, `${JSON.stringify({
+    type: 'message',
+    message: { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: changed }] }
+  })}\n`);
+});
+
+When('応答とコーパスの一致を検証する', function () {
+  this.echoResult = spawnSync(process.execPath, [
+    path.join(root, 'scripts/verify-echo.js'), this.echoCorpus, this.echoSession
+  ], { encoding: 'utf8', timeout: 5_000 });
+  fs.rmSync(this.directory, { recursive: true, force: true });
+});
+
+Then('改変された応答はキャプチャ前に拒否される', function () {
+  assert.equal(this.echoResult.status, 2);
+  assert.match(this.echoResult.stderr, /一字一句一致しません/u);
 });
 
 function givenPng(world, withBand) {
@@ -65,7 +104,8 @@ Given('ID 色の水平帯がある表示数式の合成 PNG がある', function
 
 When('ピクセル判定を実行する', function () {
   this.result = spawnSync(process.execPath, [
-    path.join(root, 'scripts/detect-display-bands.js'), this.capture
+    path.join(root, 'scripts/detect-display-bands.js'),
+    '--background=250,248,240', '--body=40,40,35', '--ignore=230,228,217', this.capture
   ], { encoding: 'utf8', timeout: 5_000 });
   fs.rmSync(this.directory, { recursive: true, force: true });
 });

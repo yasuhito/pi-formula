@@ -24,7 +24,7 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
   scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。
+既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` だけを読み込む。qni-cli など、導入済み package の状態は検証結果へ影響しない。
 
 ```sh
 PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
@@ -35,16 +35,20 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ハーネスは実行ごとに一意な headless 出力を作る。Ghostty は `hl.dsp.exec_cmd` の `workspace` と `monitor` の `silent` 規則で、その出力へ作成時から割り当てる。`no_initial_focus` も指定する。後追い移動はしない。起動後は、Ghostty の monitor ID と実行前後の active window が変わっていないことを検査する。条件を満たさなければキャプチャせず失敗する。
 
-すべての外部処理には時間上限がある。`EXIT`、`INT`、`TERM`、`HUP` の trap は、失敗時も Ghostty を閉じ、headless 出力と一時ファイルを削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
+すべての外部処理には時間上限がある。Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、Hyprland の close が失敗しても process group を停止し、対象ウィンドウが消えたことを確認してから headless 出力と一時ファイルを削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
 
 ## 履歴全体
 
-コーパスの行数と折り返し量から、8000〜16000 px の縦長 headless 出力を実行前に選ぶ。入力メッセージ、応答、Pi の画面部品を含む保守的な余白を加える。16000 px に収まらないコーパスは、ビューポートだけを撮らず実行前に拒否する。受理したコーパスはスクロールや画像結合を使わず、`grim -o` の 1 枚で履歴全体を取得する。
+コーパスの行数と折り返し量から、8000〜16000 px の縦長 headless 出力を実行前に選ぶ。入力メッセージ、応答、Pi の画面部品を含む保守的な余白を加える。16000 px に収まらないコーパスは、ビューポートだけを撮らず実行前に拒否する。受理したコーパスはスクロールや画像結合を使わず、`grim -o` の 1 枚で履歴全体を取得する。キャプチャ前には session JSONL の最後の完了した assistant message から text content を取り出し、コーパスと一字一句比較する。コードフェンス、Unicode 化、前置き、欠落を含む不一致は exit 2 とし、キャプチャへ進まない。
 
 この方式は GPU の最大テクスチャ寸法以下に限られる。長大な会話履歴一般を撮る道具ではなく、指定コーパスを一度だけ回帰検証するためのものとする。
 
 ## 判定
 
-`scripts/detect-display-bands.js` は 8-bit RGB/RGBA の非インターレース PNG を読む。画面で最も多い色を背景色とし、背景色に近い色を除く。画面幅の 20% 以上に連続する同色領域が 3 行以上続く場合を水平帯とする。字形で途切れた同色領域は近接する座標へまとめる。画面上下 1% の compositor 部品は対象外にする。本文の字形や正常な透明背景の表示数式は、長い同色矩形を作らないため検出しない。
+`scripts/detect-display-bands.js` は 8-bit RGB/RGBA の非インターレース PNG を読む。scanline の展開長が画像寸法と厳密に一致しない PNG は破損として拒否する。画素数の上限は 1920×16000 とする。
+
+ハーネスは専用の Pi theme と Ghostty の背景色・本文色を使う。判定器へ背景色、本文色、theme の全 UI 色を明示し、それらを候補から除く。このため、本文色の長い分数線、コード、URL、金額、シェル変数、非数式 UI を水平帯と誤認しない。専用 palette にない ID 色や黒色が、画面幅の 20% 以上に連続して 3 行以上続く場合を水平帯とする。字形で途切れた同色領域は近接する座標へまとめる。画面上下 1% の compositor 部品は対象外にする。
+
+画素色は 24-bit 整数で扱い、背景色は固定長 histogram の一走査で求める。1920×8000 で横方向に色が変わり続ける合成 PNG を 8 秒以内に判定する回帰試験を置く。
 
 この判定は決定的な一次判定であり、数式の組版品質や内容の正しさまでは判定しない。

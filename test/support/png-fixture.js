@@ -1,13 +1,16 @@
 const { deflateSync } = require('node:zlib');
 
+const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
+  let value = byte;
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = (value >>> 1) ^ (0xedb88320 & -(value & 1));
+  }
+  return value >>> 0;
+});
+
 function crc32(buffer) {
   let value = 0xffffffff;
-  for (const byte of buffer) {
-    value ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      value = (value >>> 1) ^ (0xedb88320 & -(value & 1));
-    }
-  }
+  for (const byte of buffer) value = (value >>> 8) ^ crcTable[(value ^ byte) & 0xff];
   return (value ^ 0xffffffff) >>> 0;
 }
 
@@ -20,13 +23,21 @@ function chunk(type, data) {
   return Buffer.concat([length, name, data, crc]);
 }
 
-function createPng(width, height, pixel) {
+function createPngFromScanlines(width, height, scanlines, colorType = 6) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
   header[8] = 8;
-  header[9] = 6;
+  header[9] = colorType;
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(scanlines)),
+    chunk('IEND', Buffer.alloc(0))
+  ]);
+}
 
+function createPng(width, height, pixel) {
   const rows = [];
   for (let y = 0; y < height; y += 1) {
     const row = Buffer.alloc(1 + width * 4);
@@ -37,12 +48,7 @@ function createPng(width, height, pixel) {
     rows.push(row);
   }
 
-  return Buffer.concat([
-    Buffer.from('89504e470d0a1a0a', 'hex'),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.concat(rows))),
-    chunk('IEND', Buffer.alloc(0))
-  ]);
+  return createPngFromScanlines(width, height, Buffer.concat(rows));
 }
 
-module.exports = { createPng };
+module.exports = { createPng, createPngFromScanlines };
