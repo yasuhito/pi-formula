@@ -5,9 +5,11 @@ COMMAND_TIMEOUT=8
 BUILD_TIMEOUT=120
 DETECTOR_TIMEOUT=30
 SESSION_TIMEOUT=150
+CAPTURE_READY_TIMEOUT=30
+CAPTURE_READY_INTERVAL=2
 WINDOW_LIFETIME=240
 OUTPUT_NAME="pf-verify-$$"
-WORKSPACE_ID=$((900000 + ($$ % 90000)))
+WORKSPACE_ID=
 WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
@@ -60,28 +62,36 @@ fail() {
 
 [[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
 [[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
-for command in timeout hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do
+for command in timeout loginctl hyprctl ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir touch; do
   command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
 done
 
+run "$ROOT/scripts/check-display-lock" \
+  || fail "画面ロック状態を確認できませんでした"
 CORPUS=$(run realpath -- "$CORPUS")
 TEMP_DIR=$(run mktemp -d -t pi-formula-verify.XXXXXXXX)
 SESSION_FILE="$TEMP_DIR/session.jsonl"
+OUTPUT_CAPTURE_FILE="$TEMP_DIR/headless-output.png"
 CAPTURE_FILE="$TEMP_DIR/full-history.png"
+PREVIOUS_CAPTURE_FILE="$TEMP_DIR/previous-capture.png"
 RUNNER="$TEMP_DIR/run-pi"
 LAUNCHER="$TEMP_DIR/launch-ghostty"
 PID_FILE="$TEMP_DIR/window.pid"
 GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
 CONFIG_HOME="$TEMP_DIR/config"
 IMAGE_MARKER="$TEMP_DIR/image-path"
+DISPLAY_READY_MARKER="$TEMP_DIR/display-ready"
 run mkdir -p "$CONFIG_HOME"
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
 PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
   || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
 HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
+IMAGE_ROWS=$(printf '%s' "$PLAN" | run jq -r '.imageRows')
 [[ "$HEIGHT" =~ ^[0-9]+$ && "$HEIGHT" -le 16000 ]] \
   || fail "表示計画の出力高が不正です"
+[[ "$IMAGE_ROWS" =~ ^[1-9][0-9]*$ ]] \
+  || fail "コーパスに表示数式の画像行がありません"
 
 run cat >"$GHOSTTY_CONFIG" <<'CONFIG'
 font-size = 12
@@ -94,16 +104,25 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_DISPLAY_READY=%q\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
   "$ROOT/src/extension.ts" "$ROOT/scripts/verify-extensions/pi-formula-verify-macros.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
-  "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" >"$RUNNER"
+  "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" \
+  "$DISPLAY_READY_MARKER" >"$RUNNER"
 run cat >>"$RUNNER" <<'RUNNER'
 export XDG_CONFIG_HOME="$PI_FORMULA_VERIFY_CONFIG_HOME"
 export PI_FORMULA_MACROS='{}'
 export PI_FORMULA_VERIFY_IMAGE_MARKER
 unset TMUX STY
+for _ in {1..80}; do
+  [[ -f "$PI_FORMULA_VERIFY_DISPLAY_READY" ]] && break
+  sleep 0.1
+done
+[[ -f "$PI_FORMULA_VERIFY_DISPLAY_READY" ]] || {
+  printf 'verify-display: headless 出力の準備を待てませんでした\n' >&2
+  exit 2
+}
 args=(
   --name "$PI_FORMULA_VERIFY_TITLE"
   --session "$PI_FORMULA_VERIFY_SESSION"
@@ -132,7 +151,7 @@ RUNNER
 run chmod +x "$RUNNER"
 # $pid は生成する launcher で展開する。
 # shellcheck disable=SC2016
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nsetsid timeout --signal=TERM %q ghostty --gtk-single-instance=false --title=%q --config-file=%q -e %q &\npid=$!\nprintf "%%s\\n" "$pid" >%q\nwait "$pid"\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nsetsid timeout --signal=TERM %q ghostty --config-default-files=false --gtk-single-instance=false --title=%q --config-file=%q -e %q &\npid=$!\nprintf "%%s\\n" "$pid" >%q\nwait "$pid"\n' \
   "$WINDOW_LIFETIME" "$WINDOW_TITLE" "$GHOSTTY_CONFIG" "$RUNNER" "$PID_FILE" >"$LAUNCHER"
 run chmod +x "$LAUNCHER"
 
@@ -151,6 +170,16 @@ for _ in {1..8}; do
   run sleep 1
 done
 [[ -n "$monitor_id" ]] || fail "headless 出力を 1920x${HEIGHT} で有効にできませんでした"
+MONITOR_X=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
+  '.[] | select(.name == $name) | .x')
+MONITOR_Y=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
+  '.[] | select(.name == $name) | .y')
+WORKSPACE_ID=$(printf '%s' "$monitors" | run jq -r --arg name "$OUTPUT_NAME" \
+  '.[] | select(.name == $name) | .activeWorkspace.id')
+[[ "$MONITOR_X" =~ ^-?[0-9]+$ && "$MONITOR_Y" =~ ^-?[0-9]+$ ]] \
+  || fail "headless 出力の位置を確認できませんでした"
+[[ "$WORKSPACE_ID" =~ ^[1-9][0-9]*$ ]] \
+  || fail "headless 出力の workspace を確認できませんでした"
 
 run hyprctl dispatch "hl.dsp.exec_cmd(\"$LAUNCHER\", { workspace = \"$WORKSPACE_ID silent\", monitor = \"$OUTPUT_NAME silent\", no_initial_focus = true, no_focus = true, render_unfocused = true, no_anim = true })" >/dev/null
 for _ in {1..8}; do
@@ -170,9 +199,13 @@ for _ in {1..15}; do
   run sleep 1
 done
 [[ -n "$window_address" ]] || fail "Ghostty が headless 出力だけに作られたことを確認できませんでした"
+VISIBLE_WORKSPACE=$(run hyprctl monitors all -j | run jq -r --arg name "$OUTPUT_NAME" \
+  '.[] | select(.name == $name) | .activeWorkspace.id')
+[[ "$VISIBLE_WORKSPACE" == "$WORKSPACE_ID" ]] \
+  || fail "Ghostty の workspace を headless 出力へ表示できませんでした"
+run touch "$DISPLAY_READY_MARKER"
 AFTER_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
 [[ "$AFTER_FOCUS" == "$BEFORE_FOCUS" ]] || fail "Ghostty の起動時に可視ワークスペースのフォーカスが変わりました"
-run hyprctl eval "hl.get_monitor(\"$OUTPUT_NAME\"):set_workspace({ workspace = $WORKSPACE_ID })" >/dev/null
 ACTIVE_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
 [[ "$ACTIVE_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
 
@@ -199,24 +232,74 @@ done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
 run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
   || fail "Pi の応答がコーパスと一字一句一致しません"
-run sleep 2
+run "$ROOT/scripts/check-display-lock" \
+  || fail "キャプチャ前に画面ロック状態を確認できませんでした"
 
 CURRENT_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
 [[ "$CURRENT_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+CAPTURE_GEOMETRY=
+for _ in {1..8}; do
+  if CAPTURE_GEOMETRY=$(run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
+    "$window_address" "1920" "$HEIGHT" 2>/dev/null); then
+    break
+  fi
+  run sleep 1
+done
+[[ -n "$CAPTURE_GEOMETRY" ]] \
+  || fail "Ghostty が headless 出力の使用可能領域を占めていません"
+CAPTURE_POSITION=${CAPTURE_GEOMETRY%% *}
+CAPTURE_SIZE=${CAPTURE_GEOMETRY#* }
+CAPTURE_GLOBAL_X=${CAPTURE_POSITION%,*}
+CAPTURE_GLOBAL_Y=${CAPTURE_POSITION#*,}
+CAPTURE_WIDTH=${CAPTURE_SIZE%x*}
+CAPTURE_HEIGHT=${CAPTURE_SIZE#*x}
+[[ "$CAPTURE_GLOBAL_X" =~ ^-?[0-9]+$ && "$CAPTURE_GLOBAL_Y" =~ ^-?[0-9]+$ && \
+  "$CAPTURE_WIDTH" =~ ^[1-9][0-9]*$ && "$CAPTURE_HEIGHT" =~ ^[1-9][0-9]*$ ]] \
+  || fail "Ghostty のキャプチャ矩形が不正です"
+CAPTURE_X=$((CAPTURE_GLOBAL_X - MONITOR_X))
+CAPTURE_Y=$((CAPTURE_GLOBAL_Y - MONITOR_Y))
+display_rendered=false
+rendered_options=(--background=250,248,240 --background=238,235,224)
+capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
+while ((SECONDS < capture_deadline)); do
+  run grim -o "$OUTPUT_NAME" "$OUTPUT_CAPTURE_FILE"
+  run node "$ROOT/scripts/verify-display-dimensions.js" png "$OUTPUT_CAPTURE_FILE" 1920 "$HEIGHT" \
+    || fail "headless 出力のキャプチャ寸法が不正です"
+  run node "$ROOT/scripts/crop-display-capture.js" "$OUTPUT_CAPTURE_FILE" "$CAPTURE_FILE" \
+    "$CAPTURE_X" "$CAPTURE_Y" "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
+    || fail "検証ウィンドウ矩形をキャプチャから切り出せません"
+  run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" \
+    "$CAPTURE_WIDTH" "$CAPTURE_HEIGHT" \
+    || fail "キャプチャに検証ウィンドウ全体の寸法がありません"
+  if "$ROOT/scripts/run-display-command" poll check-display-rendered \
+    timeout --signal=TERM "$COMMAND_TIMEOUT" node "$ROOT/scripts/check-display-rendered.js" \
+    "${rendered_options[@]}" "$CAPTURE_FILE"; then
+    display_rendered=true
+    break
+  else
+    poll_status=$?
+    [[ "$poll_status" -eq 1 ]] || fail "キャプチャの描画完了を検査できませんでした"
+  fi
+  run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
+  rendered_options=(--background=250,248,240 --background=238,235,224 \
+    "--previous=$PREVIOUS_CAPTURE_FILE")
+  run "$ROOT/scripts/check-display-lock" \
+    || fail "キャプチャ待機中に画面ロックを検出したか、状態を確認できませんでした"
+  run sleep "$CAPTURE_READY_INTERVAL"
+done
+[[ "$display_rendered" == true ]] \
+  || fail "Ghostty の描画完了をキャプチャで確認できませんでした"
+# 表示の正しさは人と Agent が目で確かめる。撮れた画面を必ず残して場所を伝える。
+CAPTURE_DESTINATION=${PI_FORMULA_VERIFY_CAPTURE:-${XDG_STATE_HOME:-$HOME/.local/state}/pi-formula/verify-display-capture.png}
+run mkdir -p -- "${CAPTURE_DESTINATION%/*}"
+run install -m 0644 "$CAPTURE_FILE" "$CAPTURE_DESTINATION"
+printf 'キャプチャ: %s\n' "$CAPTURE_DESTINATION"
 run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
-  "$window_address" >/dev/null || fail "キャプチャ前に Ghostty が終了しました"
-run grim -o "$OUTPUT_NAME" "$CAPTURE_FILE"
-run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" 1920 "$HEIGHT" \
-  || fail "キャプチャに全履歴の寸法がありません"
-run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
-  "$window_address" >/dev/null || fail "キャプチャ中に Ghostty が終了しました"
-
-if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
-  run install -m 0644 "$CAPTURE_FILE" "$PI_FORMULA_VERIFY_CAPTURE"
-  printf 'キャプチャ: %s\n' "$PI_FORMULA_VERIFY_CAPTURE"
-fi
+  "$window_address" "1920" "$HEIGHT" >/dev/null \
+  || fail "キャプチャ中に Ghostty が終了または変形しました"
 
 trap - ERR
+detector_status=0
 "$ROOT/scripts/run-display-command" detector detect-display-bands \
   timeout --signal=TERM "$DETECTOR_TIMEOUT" node "$ROOT/scripts/detect-display-bands.js" \
   --background=250,248,240 --body=40,40,35 \
@@ -224,4 +307,8 @@ trap - ERR
   --ignore=150,60,60 --ignore=140,100,30 --ignore=100,100,96 \
   --ignore=130,130,124 --ignore=180,178,168 --ignore=220,216,202 \
   --ignore=238,235,224 --ignore=232,230,220 --ignore=228,236,224 \
-  --ignore=240,226,222 --ignore=232,226,236 "$CAPTURE_FILE"
+  --ignore=240,226,222 --ignore=232,226,236 "$CAPTURE_FILE" || detector_status=$?
+# 帯の座標だけでは表示が壊れているかを決められない。撮れた画面を見て判断する。
+[[ "$detector_status" -eq 0 ]] \
+  || printf 'キャプチャを開いて表示を確認してください: %s\n' "$CAPTURE_DESTINATION" >&2
+exit "$detector_status"

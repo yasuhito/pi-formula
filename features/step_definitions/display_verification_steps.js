@@ -52,6 +52,31 @@ When("ハーネスの安全条件を調べる", function () {
     isolatedSettings:
       /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u.test(this.harness) &&
       /PI_FORMULA_MACROS='\{\}'/u.test(this.harness),
+    windowCapture:
+      /verify-display-window[^\n]*[\s\S]*"\$window_address" "1920" "\$HEIGHT"/u.test(
+        this.harness,
+      ) &&
+      /grim -o "\$OUTPUT_NAME" "\$OUTPUT_CAPTURE_FILE"/u.test(this.harness) &&
+      /crop-display-capture\.js/u.test(this.harness),
+    lockGuard:
+      /check-display-lock/u.test(this.harness) &&
+      this.harness.indexOf("check-display-lock") <
+        this.harness.indexOf("output create headless"),
+    captureTimeout:
+      /run\(\).*timeout/su.test(this.harness) &&
+      /run grim -o/u.test(this.harness) &&
+      /run-display-command[\s\S]*exit 2/u.test(
+        fs.readFileSync(path.join(root, "scripts/run-display-command"), "utf8"),
+      ),
+    captureReadyRetry:
+      /capture_deadline=\$\(\(SECONDS \+ CAPTURE_READY_TIMEOUT\)\)/u.test(
+        this.harness,
+      ) &&
+      /run-display-command" poll check-display-rendered/u.test(this.harness) &&
+      /--previous=\$PREVIOUS_CAPTURE_FILE/u.test(this.harness) &&
+      /Ghostty の描画完了をキャプチャで確認できませんでした/u.test(
+        this.harness,
+      ),
     additionalMacros:
       /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u.test(
         this.harness,
@@ -60,7 +85,16 @@ When("ハーネスの安全条件を調べる", function () {
       /registerFormula\(pi, VERIFY_DISPLAY_MACROS\)/u.test(
         this.macrosExtension,
       ),
+    keptCapture:
+      /CAPTURE_DESTINATION=\$\{PI_FORMULA_VERIFY_CAPTURE:-/u.test(
+        this.harness,
+      ) &&
+      /printf 'キャプチャ: %s\\n' "\$CAPTURE_DESTINATION"/u.test(
+        this.harness,
+      ) &&
+      /キャプチャを開いて表示を確認してください/u.test(this.harness),
     imagePath: /verify-image-path\.js/u.test(this.harness),
+    capturedImage: /check-display-rendered\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
@@ -97,12 +131,36 @@ Then("一時設定と空の利用者マクロを使う", function () {
   assert.equal(this.safety.isolatedSettings, true);
 });
 
+Then("headless 出力の検証ウィンドウ矩形だけをキャプチャする", function () {
+  assert.equal(this.safety.windowCapture, true);
+});
+
+Then("描画前に画面ロック状態を確認する", function () {
+  assert.equal(this.safety.lockGuard, true);
+});
+
+Then("キャプチャへ時間上限と検証不能の終了コードを使う", function () {
+  assert.equal(this.safety.captureTimeout, true);
+});
+
+Then("前回のキャプチャと一致するまで実時間の期限内で撮り直す", function () {
+  assert.equal(this.safety.captureReadyRetry, true);
+});
+
 Then("公開 API で追加マクロを登録する拡張を読み込む", function () {
   assert.equal(this.safety.additionalMacros, true);
 });
 
 Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
+});
+
+Then("保存先の指定がなくてもキャプチャを残して報告する", function () {
+  assert.equal(this.safety.keptCapture, true);
+});
+
+Then("ピクセル判定前に描画完了を確認する", function () {
+  assert.equal(this.safety.capturedImage, true);
 });
 
 Then("キャプチャ前に応答一致を確認する", function () {

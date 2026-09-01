@@ -236,6 +236,63 @@ printf '%s\\n' "$*" >>${JSON.stringify(log)}
   },
 );
 
+test("検証ウィンドウ矩形をキャプチャ領域として返す", compositorTest, () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-window-geometry-"),
+  );
+  writeFakeTimeout(directory);
+  const fakeHyprctl = path.join(directory, "hyprctl");
+  fs.writeFileSync(
+    fakeHyprctl,
+    `#!/usr/bin/env bash
+printf '[{"title":"verify-window","monitor":42,"address":"0xexpected","at":[3014,40],"size":[1892,7946]}]\\n'
+`,
+  );
+  fs.chmodSync(fakeHyprctl, 0o755);
+
+  const result = spawnSync(
+    windowVerifier,
+    ["verify-window", "42", "0xexpected", "1920", "8000"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+    },
+  );
+
+  assert.deepEqual(
+    { status: result.status, geometry: result.stdout.trim() },
+    { status: 0, geometry: "3014,40 1892x7946" },
+  );
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test("headless 出力より小さい検証ウィンドウを拒否する", compositorTest, () => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-window-small-"),
+  );
+  writeFakeTimeout(directory);
+  const fakeHyprctl = path.join(directory, "hyprctl");
+  fs.writeFileSync(
+    fakeHyprctl,
+    `#!/usr/bin/env bash
+printf '[{"title":"verify-window","monitor":42,"address":"0xexpected","at":[3000,20],"size":[800,600]}]\\n'
+`,
+  );
+  fs.chmodSync(fakeHyprctl, 0o755);
+
+  const result = spawnSync(
+    windowVerifier,
+    ["verify-window", "42", "0xexpected", "1920", "8000"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+    },
+  );
+
+  assert.equal(result.status, 2);
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+
 test(
   "キャプチャ前に検証ウィンドウが消えていたら拒否する",
   compositorTest,
