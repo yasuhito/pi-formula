@@ -267,7 +267,11 @@ export function registerFormula(
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
-    if (context.messageType === "assistant-thinking" || state.path === "text")
+    if (
+      context.isStreaming ||
+      context.messageType === "assistant-thinking" ||
+      state.path === "text"
+    )
       return markdown;
     const renderFormula = state.imageRenderer.createMarkdownRenderer({
       availableWidth: context.availableWidth,

@@ -46,6 +46,12 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then 一時設定と空の利用者マクロを使う
 
+## Scenario: 検証専用の追加マクロを読み込む
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 公開 API で追加マクロを登録する拡張を読み込む
+
 ## Scenario: 現在の画像経路を確認する
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
@@ -68,6 +74,11 @@ pi-formula の worker として
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - Then Issue 21 の最後の表示数式がコーパスに含まれる
+
+## Scenario: Issue 26 の再現原文を使う
+
+- Given Issue 26 の再現コーパスがある
+- Then 追加マクロを含む3つの表示数式を組版できる
 
 ## Scenario: 短いが高い表示数式を事前に拒否する
 

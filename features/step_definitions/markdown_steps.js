@@ -9,7 +9,9 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
+  inspectPlacementBlocks,
   inspectStreamingRegression,
+  issue26Updates,
   renderStreamingRegression,
 } = require("../support/streaming-regression");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
@@ -214,8 +216,8 @@ Then("画像は引用の階層に残る", function () {
   assert.equal(placeholderLines(this.rendered)[0]?.startsWith("> "), true);
 });
 
-Then("閉じた表示数式は画像になる", function () {
-  assert.equal(placeholderLines(this.rendered).length, 1);
+Then("閉じた表示数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 Then("未完成な数式は原文のまま残る", function () {
@@ -459,6 +461,71 @@ Then(
     );
   },
 );
+
+When(
+  "先行するツール描画後にIssue 26の異なる3式を逐次更新して確定する",
+  function () {
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+    });
+    this.issue26Updates = issue26Updates(this.pi);
+  },
+);
+
+Then("逐次更新中は文字を保ち確定後に3式の転送と配置が対応する", function () {
+  const blocks = inspectPlacementBlocks(this.issue26Updates.finalized);
+  assert.deepEqual(
+    {
+      precedingToolDrawn:
+        this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
+      streamingImages: this.issue26Updates.streaming.map(imageCount),
+      streamingTuiImages:
+        this.issue26Updates.tuiWrites.streaming.map(imageCount),
+      finalizedTuiImages: imageCount(this.issue26Updates.tuiWrites.finalized),
+      placements: blocks.length,
+      multipleRows: blocks.some((block) => block.rows > 1),
+      matching: blocks.every(
+        (block) =>
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
+    },
+    {
+      precedingToolDrawn: true,
+      streamingImages: [0, 0, 0],
+      streamingTuiImages: [0, 0, 0],
+      finalizedTuiImages: 3,
+      placements: 3,
+      multipleRows: true,
+      matching: true,
+    },
+  );
+});
+
+When("同じ複数行表示数式を一回の確定応答内に二回配置する", function () {
+  const formula = String.raw`$$\begin{pmatrix}1&0\\0&1\end{pmatrix}$$`;
+  transform(this, [formula, "端末上の画像を破棄", formula].join("\n\n"));
+  this.cachedPlacementBlocks = inspectPlacementBlocks(this.rendered);
+});
+
+Then("各配置で同じ画像IDの複数行転送とプレースホルダーが対応する", function () {
+  const [first, second] = this.cachedPlacementBlocks;
+  assert.equal(
+    this.cachedPlacementBlocks.length === 2 &&
+      first.id === second.id &&
+      this.cachedPlacementBlocks.every(
+        (block) =>
+          block.rows > 1 &&
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
+    true,
+  );
+});
 
 When("外部作用を監視しながら表示数式を変換する", function () {
   const calls = [];

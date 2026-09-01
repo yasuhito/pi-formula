@@ -151,7 +151,6 @@ export class FormulaImageRenderer {
   createMarkdownRenderer(
     options: FormulaImageOptions,
   ): (latex: string, original: string) => string {
-    const transferredIds = new Set<number>();
     return (latex, original) => {
       const cached = this.cachedImage(latex, options);
       if (!cached) return original;
@@ -160,7 +159,6 @@ export class FormulaImageRenderer {
         const placeholder = this.dependencies
           .encodePlaceholderRows(id, cached.image.columns, cached.image.rows)
           .join("\n");
-        if (transferredIds.has(id)) return placeholder;
         const placed = this.placePng(
           cached.image.png,
           id,
@@ -168,7 +166,6 @@ export class FormulaImageRenderer {
           cached.image.rows,
           placeholder,
         );
-        transferredIds.add(id);
         return placed;
       } catch {
         this.cache.recordFailure(cached.key, "placement failed");
