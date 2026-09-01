@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMMAND_TIMEOUT=3
+TITLE=${1:-}
+MONITOR=${2:-}
+EXPECTED_ADDRESS=${3:-}
+
+[[ -n "$TITLE" && "$MONITOR" =~ ^-?[0-9]+$ ]] || {
+  printf 'Usage: verify-display-window <title> <monitor-id> [expected-address]\n' >&2
+  exit 2
+}
+
+run() {
+  timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
+}
+
+address=$(run hyprctl clients -j | run jq -r --arg title "$TITLE" --argjson monitor "$MONITOR" \
+  '[.[] | select(.title == $title and .monitor == $monitor) | .address] | if length == 1 then .[0] else empty end')
+if [[ -z "$address" || (-n "$EXPECTED_ADDRESS" && "$address" != "$EXPECTED_ADDRESS") ]]; then
+  printf '検証ウィンドウが headless 出力に存在しません\n' >&2
+  exit 2
+fi
+printf '%s\n' "$address"

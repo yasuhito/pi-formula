@@ -5,6 +5,7 @@ const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { After, Before, Given, Then, When } = require("@cucumber/cucumber");
 
+const { createPngFromScanlines } = require("../../test/support/png-fixture.js");
 const {
   fakePi,
   resetFormulaState,
@@ -33,11 +34,12 @@ function writeConfig(world, macros) {
 }
 
 function pngWithDimensions(width, height) {
-  const png = Buffer.alloc(33);
-  Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(png);
-  png.writeUInt32BE(width, 16);
-  png.writeUInt32BE(height, 20);
-  return png;
+  return createPngFromScanlines(
+    width,
+    height,
+    Buffer.alloc(height * (width + 1)),
+    0,
+  );
 }
 
 async function registeredImageApi(world, additional = {}) {
@@ -381,6 +383,22 @@ Then("安全上限による拒否結果が返る", function () {
     rendered: false,
     reason: "safety-limit",
   });
+});
+
+When("途中で切れた既成 PNG を公開 API で描く", function () {
+  const png = pngWithDimensions(10, 10);
+  this.renderedPng = freshApi().renderPng(png.subarray(0, png.length - 5), 80);
+});
+
+Then("不正な PNG による拒否結果が返る", function () {
+  assert.deepEqual(this.renderedPng, {
+    rendered: false,
+    reason: "invalid-png",
+  });
+});
+
+When("展開上限を超える既成 PNG を公開 API で描く", function () {
+  this.renderedPng = freshApi().renderPng(pngWithDimensions(3000, 2000), 80);
 });
 
 Given("利用者マクロを読む拡張 runtime がある", async function () {

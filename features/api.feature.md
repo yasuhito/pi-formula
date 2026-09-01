@@ -136,6 +136,18 @@ Pi の画面部品に依存せず PNG を配置したい
 - When 安全上限を超える既成 PNG を公開 API で描く
 - Then 安全上限による拒否結果が返る
 
+## Scenario: 途中で切れた既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 途中で切れた既成 PNG を公開 API で描く
+- Then 不正な PNG による拒否結果が返る
+
+## Scenario: 展開上限を超える既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 展開上限を超える既成 PNG を公開 API で描く
+- Then 安全上限による拒否結果が返る
+
 ## Scenario: 終了後の新しい拡張 runtime へ再登録する
 
 - Given 利用者マクロを読む拡張 runtime がある

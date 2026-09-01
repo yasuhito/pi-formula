@@ -6,6 +6,7 @@ const test = require("node:test");
 
 const formula = require("..");
 const { FORMULA_SAFETY_LIMITS } = require("../dist/typesetter.js");
+const { createPngFromScanlines } = require("./support/png-fixture.js");
 const {
   fakePi,
   resetFormulaState,
@@ -13,12 +14,13 @@ const {
   startWithText,
 } = require("./support/fake-pi");
 
-function pngWithDimensions(width, height, length = 33) {
-  const png = Buffer.alloc(length);
-  Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(png);
-  png.writeUInt32BE(width, 16);
-  png.writeUInt32BE(height, 20);
-  return png;
+function pngWithDimensions(width, height) {
+  return createPngFromScanlines(
+    width,
+    height,
+    Buffer.alloc(height * (width + 1)),
+    0,
+  );
 }
 
 async function useImagePath() {
@@ -97,6 +99,27 @@ test("renderPng rejects invalid PNG data", async () => {
   });
 });
 
+test("renderPng rejects a truncated PNG", async () => {
+  await useImagePath();
+  const png = pngWithDimensions(10, 10);
+
+  assert.deepEqual(formula.renderPng(png.subarray(0, png.length - 5), 80), {
+    rendered: false,
+    reason: "invalid-png",
+  });
+});
+
+test("renderPng rejects a non-regular file without reading it", {
+  skip: process.platform === "win32",
+}, async () => {
+  await useImagePath();
+
+  assert.deepEqual(formula.renderPng("/dev/zero", 80), {
+    rendered: false,
+    reason: "invalid-png",
+  });
+});
+
 test("renderPng rejects an invalid available width", async () => {
   await useImagePath();
 
@@ -117,7 +140,17 @@ test("renderPng rejects a PNG exceeding the row limit", async () => {
 
 test("renderPng rejects a PNG exceeding the byte limit", async () => {
   await useImagePath();
-  const png = pngWithDimensions(1, 1, FORMULA_SAFETY_LIMITS.cacheBytes + 1);
+  const png = Buffer.alloc(FORMULA_SAFETY_LIMITS.pngBytes + 1);
+
+  assert.deepEqual(formula.renderPng(png, 80), {
+    rendered: false,
+    reason: "safety-limit",
+  });
+});
+
+test("renderPng rejects a PNG exceeding the expanded pixel limit", async () => {
+  await useImagePath();
+  const png = pngWithDimensions(3000, 2000);
 
   assert.deepEqual(formula.renderPng(png, 80), {
     rendered: false,

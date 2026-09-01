@@ -1,6 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { formulaConfigPath } from "./path-settings";
-
 export type MacroDefinition =
   | string
   | readonly [replacement: string, argumentsCount: number];
@@ -8,7 +5,6 @@ export type FormulaMacros = Readonly<Record<string, MacroDefinition>>;
 
 interface NormalizedMacros {
   macros: Record<string, MacroDefinition>;
-  rejected: Set<string>;
   errors: string[];
 }
 
@@ -57,14 +53,12 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
       macros: {},
-      rejected: new Set(),
       errors: [`${source}: macro definitions must be a JSON object`],
     };
   }
 
   const result: NormalizedMacros = {
     macros: {},
-    rejected: new Set(),
     errors: [],
   };
   for (const [rawName, definition] of Object.entries(value)) {
@@ -90,7 +84,6 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
       normalized = [definition[0], definition[1]];
     }
     if (normalized === undefined) {
-      result.rejected.add(name);
       result.errors.push(
         `${source}: \\${name} must be a string or [replacement, argument count]`,
       );
@@ -104,7 +97,6 @@ function normalizeMacros(value: unknown, source: string): NormalizedMacros {
       argumentsCount,
     );
     if (invalidReference) {
-      result.rejected.add(name);
       result.errors.push(
         `${source}: ${invalidReference} in \\${name} exceeds its argument count`,
       );
@@ -122,57 +114,24 @@ function parseSource(raw: string, source: string): NormalizedMacros {
   } catch {
     return {
       macros: {},
-      rejected: new Set(),
       errors: [`${source}: invalid JSON`],
     };
   }
   return normalizeMacros(value, source);
 }
 
-function configMacros(env: NodeJS.ProcessEnv): NormalizedMacros {
-  const path = formulaConfigPath(env);
-  if (!existsSync(path)) return { macros: {}, rejected: new Set(), errors: [] };
-  let raw: string;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch (error) {
-    return {
-      macros: {},
-      rejected: new Set(),
-      errors: [
-        `XDG config: ${error instanceof Error ? error.message : String(error)}`,
-      ],
-    };
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return {
-      macros: {},
-      rejected: new Set(),
-      errors: ["XDG config: invalid JSON"],
-    };
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {
-      macros: {},
-      rejected: new Set(),
-      errors: ["XDG config: config must be a JSON object"],
-    };
-  }
-  const macros = (value as { macros?: unknown }).macros;
-  return macros === undefined
-    ? { macros: {}, rejected: new Set(), errors: [] }
-    : normalizeMacros(macros, "XDG config macros");
-}
-
-export function loadUserMacros(env: NodeJS.ProcessEnv): LoadedUserMacros {
-  const configured = configMacros(env);
+export function resolveUserMacros(
+  configuredValue: unknown,
+  environmentValue: string | undefined,
+): LoadedUserMacros {
+  const configured =
+    configuredValue === undefined
+      ? { macros: {}, errors: [] }
+      : normalizeMacros(configuredValue, "XDG config macros");
   const environment =
-    env.PI_FORMULA_MACROS === undefined
-      ? { macros: {}, rejected: new Set<string>(), errors: [] }
-      : parseSource(env.PI_FORMULA_MACROS, "PI_FORMULA_MACROS");
+    environmentValue === undefined
+      ? { macros: {}, errors: [] }
+      : parseSource(environmentValue, "PI_FORMULA_MACROS");
   const macros: Record<string, MacroDefinition> = { ...configured.macros };
   Object.assign(macros, environment.macros);
   return { macros, errors: [...configured.errors, ...environment.errors] };

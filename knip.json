@@ -1,6 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/extension.ts", ".pi/extensions/**/*.ts"],
+  "entry": [
+    "src/extension.ts",
+    ".pi/extensions/**/*.ts",
+    "scripts/check-display-session.js",
+    "scripts/detect-display-bands.js",
+    "scripts/plan-display.js",
+    "scripts/verify-display-dimensions.js",
+    "scripts/verify-echo.js",
+    "scripts/verify-image-path.js"
+  ],
   "project": [
     "src/**/*.ts",
     ".pi/extensions/**/*.ts",

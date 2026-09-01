@@ -121,10 +121,10 @@ Then(
         galleryImage:
           "https://raw.githubusercontent.com/yasuhito/pi-formula/main/assets/ghostty-formulas.png",
         pngSignature: "PNG",
-        width: 992,
-        height: 1044,
+        width: 775,
+        height: 830,
         sha256:
-          "2c6f7b3eec959b6278f4ac7682b08c69787b2cb6961d283a553ce7d0204d854d",
+          "e2366c3079f342604783945c98f9e3994b011d08806984ee7a8338d67baf47a1",
       },
     );
   },
