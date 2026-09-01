@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+COMMAND_TIMEOUT=8
+SESSION_TIMEOUT=150
+WINDOW_LIFETIME=180
+OUTPUT_NAME="pf-verify-$$"
+WORKSPACE_ID=$((900000 + ($$ % 90000)))
+WINDOW_TITLE="pi-formula-verify-$$"
+SCRIPT_DIR=${BASH_SOURCE[0]%/*}
+[[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
+ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+CORPUS=${1:-}
+TEMP_DIR=
+WINDOW_PID=
+OUTPUT_CREATED=false
+
+run() {
+  timeout --signal=TERM "$COMMAND_TIMEOUT" "$@"
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  if [[ -n "$WINDOW_TITLE" ]]; then
+    run hyprctl dispatch "hl.dsp.window.close({ window = \"title:${WINDOW_TITLE}\" })" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$WINDOW_PID" ]]; then
+    kill "$WINDOW_PID" >/dev/null 2>&1 || true
+    wait "$WINDOW_PID" >/dev/null 2>&1 || true
+  fi
+  if [[ "$OUTPUT_CREATED" == true ]]; then
+    run hyprctl output remove "$OUTPUT_NAME" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$TEMP_DIR" ]]; then
+    run rm -rf -- "$TEMP_DIR" >/dev/null 2>&1 || true
+  fi
+  exit "$status"
+}
+trap cleanup EXIT INT TERM HUP
+
+fail() {
+  printf 'verify-display: %s\n' "$*" >&2
+  exit 2
+}
+
+[[ -n "$CORPUS" ]] || fail "Usage: scripts/verify-display <corpus.md>"
+[[ -f "$CORPUS" ]] || fail "コーパスが見つかりません: $CORPUS"
+for command in timeout hyprctl ghostty grim pi jq node mktemp realpath rm sleep install; do
+  command -v "$command" >/dev/null 2>&1 || fail "必要なコマンドがありません: $command"
+done
+
+CORPUS=$(run realpath -- "$CORPUS")
+TEMP_DIR=$(run mktemp -d -t pi-formula-verify.XXXXXXXX)
+SESSION_FILE="$TEMP_DIR/session.jsonl"
+CAPTURE_FILE="$TEMP_DIR/full-history.png"
+RUNNER="$TEMP_DIR/run-pi"
+GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
+
+HEIGHT=$(run node -e '
+const fs = require("node:fs");
+const text = fs.readFileSync(process.argv[1], "utf8");
+const rows = text.split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil([...line].length / 120)), 0);
+const required = 2600 + rows * 56;
+if (required > 16000) process.exit(3);
+process.stdout.write(String(Math.max(8000, required)));
+' "$CORPUS") || fail "コーパス全体を 16000px 以下の headless 出力へ収められません"
+
+timeout --signal=TERM "$COMMAND_TIMEOUT" cat >"$GHOSTTY_CONFIG" <<'CONFIG'
+font-size = 12
+window-decoration = false
+window-padding-x = 8
+window-padding-y = 8
+background-opacity = 1
+scrollbar = never
+CONFIG
+
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\n' \
+  "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" >"$RUNNER"
+timeout --signal=TERM "$COMMAND_TIMEOUT" cat >>"$RUNNER" <<'RUNNER'
+args=(
+  --name "$PI_FORMULA_VERIFY_TITLE"
+  --session "$PI_FORMULA_VERIFY_SESSION"
+  --no-tools
+  --no-skills
+  --no-prompt-templates
+  --no-context-files
+  --approve
+  --thinking off
+  --system-prompt '添付された Markdown だけを、一字一句そのまま出力してください。説明、前置き、コードフェンスを追加しないでください。'
+)
+if [[ -n "${PI_FORMULA_VERIFY_MODEL:-}" ]]; then
+  args+=(--model "$PI_FORMULA_VERIFY_MODEL")
+fi
+exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
+  pi "${args[@]}" "@$PI_FORMULA_VERIFY_CORPUS" \
+  '次の Markdown を一字一句そのまま出力してください。'
+RUNNER
+run chmod +x "$RUNNER"
+
+BEFORE_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
+run hyprctl output create headless "$OUTPUT_NAME" >/dev/null
+OUTPUT_CREATED=true
+run hyprctl eval "hl.monitor({ output = \"$OUTPUT_NAME\", mode = \"1920x${HEIGHT}@60\", position = \"auto\", scale = \"1\" })" >/dev/null
+
+monitor_id=
+for _ in {1..8}; do
+  monitor_id=$(run hyprctl monitors all -j | run jq -r --arg name "$OUTPUT_NAME" '.[] | select(.name == $name and .disabled == false) | .id')
+  [[ -n "$monitor_id" ]] && break
+  run sleep 1
+done
+[[ -n "$monitor_id" ]] || fail "headless 出力を有効にできませんでした"
+
+launch="timeout --signal=TERM $WINDOW_LIFETIME ghostty --gtk-single-instance=false --title=$WINDOW_TITLE --config-file=$GHOSTTY_CONFIG -e $RUNNER"
+run hyprctl dispatch "hl.dsp.exec_cmd(\"$launch\", { workspace = \"$WORKSPACE_ID silent\", monitor = \"$OUTPUT_NAME silent\", no_initial_focus = true, no_focus = true, render_unfocused = true, no_anim = true })" >/dev/null
+
+window_address=
+for _ in {1..15}; do
+  window_address=$(run hyprctl clients -j | run jq -r --arg title "$WINDOW_TITLE" --argjson monitor "$monitor_id" \
+    '.[] | select(.title == $title and .monitor == $monitor) | .address')
+  [[ -n "$window_address" ]] && break
+  run sleep 1
+done
+[[ -n "$window_address" ]] || fail "Ghostty が headless 出力だけに作られたことを確認できませんでした"
+AFTER_FOCUS=$(run hyprctl activewindow -j | run jq -r '.address // ""')
+[[ "$AFTER_FOCUS" == "$BEFORE_FOCUS" ]] || fail "Ghostty の起動時に可視ワークスペースのフォーカスが変わりました"
+run hyprctl eval "hl.get_monitor(\"$OUTPUT_NAME\"):set_workspace({ workspace = $WORKSPACE_ID })" >/dev/null
+ACTIVE_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
+[[ "$ACTIVE_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+
+completed=false
+for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
+  if [[ -s "$SESSION_FILE" ]] && run node -e '
+const fs = require("node:fs");
+const records = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map(JSON.parse);
+process.exit(records.some((record) => record.type === "message" && record.message?.role === "assistant" && record.message?.stopReason === "stop") ? 0 : 1);
+' "$SESSION_FILE"; then
+    completed=true
+    break
+  fi
+  run sleep 1
+done
+[[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
+run sleep 2
+
+CURRENT_MONITOR=$(run hyprctl activewindow -j | run jq -r '.monitor // -1')
+[[ "$CURRENT_MONITOR" != "$monitor_id" ]] || fail "headless 出力へフォーカスが移りました"
+run grim -o "$OUTPUT_NAME" "$CAPTURE_FILE"
+
+if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
+  run install -m 0644 "$CAPTURE_FILE" "$PI_FORMULA_VERIFY_CAPTURE"
+  printf 'キャプチャ: %s\n' "$PI_FORMULA_VERIFY_CAPTURE"
+fi
+
+timeout --signal=TERM "$COMMAND_TIMEOUT" node "$ROOT/scripts/detect-display-bands.js" "$CAPTURE_FILE"
