@@ -98,7 +98,7 @@ MathJax と Resvg は、最初の表示数式が画像経路へ入るまで読�
 
 ## 拡張向け公開 API
 
-CommonJS パッケージは、同期的な `registerFormula`、`createFormulaPng`、`getFormulaPath`、`renderPng` を公開します。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
+CommonJS パッケージのルートは、同期的な `registerFormula`、`createFormulaPng`、`getFormulaPath`、`renderPng` を公開します。内部 subpath は公開しません。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
 
 ```js
 const {
@@ -133,7 +133,7 @@ return asciiCircuit;
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): コードの由来、直接依存の版、更新状況、ライセンス、日付付き脆弱性確認
 - [LICENSE](LICENSE): MIT License
 
-npm 配布物の内容は次のコマンドで確認できます。
+`npm run build` はコンパイル前に以前の `dist` を削除するため、削除済みソースの古い成果物は配布物に残りません。npm 配布物の内容は次のコマンドで確認できます。
 
 ```sh
 npm pack --dry-run

@@ -11,3 +11,4 @@
 - Bound formula input, image cells, and the in-memory result cache; cache failures and fall back to text per formula.
 - Delay MathJax and Resvg until the first display formula and follow the current exact theme RGB and display width.
 - Add English and Japanese installation guides, a Ghostty preview, support and coexistence notes, dependency audit details, and an intentionally limited npm tarball.
+- Let an explicit session `auto` preference bypass the saved global default and return display-path selection to the terminal probe.

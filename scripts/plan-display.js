@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const { transformDisplayMath } = require("../dist/markdown.js");
 const { typesetMath } = require("../dist/typesetter.js");
+const { VERIFY_DISPLAY_MACROS } = require("./verify-display-macros.js");
 
 const MIN_HEIGHT = 8000;
 const MAX_HEIGHT = 16000;
@@ -25,9 +26,17 @@ function sourceRows(markdown) {
 
 function planDisplay(input, options = {}) {
   const markdown = options.source ? input : fs.readFileSync(input, "utf8");
+  let displayFormulas = 0;
   let imageRows = 0;
   transformDisplayMath(markdown, (latex, original) => {
-    const image = typesetMath(latex, "#282823", AVAILABLE_COLUMNS, CELL);
+    const image = typesetMath(
+      latex,
+      "#282823",
+      AVAILABLE_COLUMNS,
+      CELL,
+      VERIFY_DISPLAY_MACROS,
+    );
+    displayFormulas += 1;
     imageRows += image.rows;
     return original;
   });
@@ -41,7 +50,11 @@ function planDisplay(input, options = {}) {
       `コーパス全体の表示には ${required}px 必要なため ${MAX_HEIGHT}px に収まりません`,
     );
   }
-  return { height: Math.max(MIN_HEIGHT, Math.ceil(required)), imageRows };
+  return {
+    height: Math.max(MIN_HEIGHT, Math.ceil(required)),
+    imageRows,
+    displayFormulas,
+  };
 }
 
 function main() {

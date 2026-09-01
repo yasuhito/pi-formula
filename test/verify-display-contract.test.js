@@ -50,6 +50,10 @@ test("利用者マクロを空に固定する", () => {
   assert.match(harness, /PI_FORMULA_MACROS='\{\}'/u);
 });
 
+test("検証専用の追加マクロ拡張を読み込む", () => {
+  assert.match(harness, /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u);
+});
+
 test("画像経路を確認してからキャプチャする", () => {
   assert.ok(markersAppearInOrder(harness, "verify-image-path.js", "run grim"));
 });

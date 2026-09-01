@@ -21,6 +21,12 @@
   "type": "commonjs",
   "main": "./dist/api.js",
   "types": "./dist/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
   "pi": {
     "extensions": [
       "./src/extension.ts"
@@ -41,7 +47,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/clean-dist.js && tsc",
     "prepack": "npm run build",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -56,6 +62,7 @@
     "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
     "test": "npm run coverage && npm run test:cucumber",
     "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
+    "verify:session-record": "node scripts/verify-session-tools.js",
     "release:prepare": "npm run check && node scripts/prepare-release.js"
   },
   "dependencies": {

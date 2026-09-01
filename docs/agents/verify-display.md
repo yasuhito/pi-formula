@@ -1,6 +1,6 @@
 # 表示数式の実表示検証
 
-`scripts/verify-display` は、Ghostty 上の Pi に Markdown コーパスをそのまま描画させ、表示数式の色帯や黒帯をピクセルで検出するローカル専用ハーネスである。
+`scripts/verify-display` は、Ghostty 上の Pi に Markdown コーパスをそのまま描画させ、表示数式の色帯や黒帯をピクセルで検出するローカル専用ハーネスである。表示が正常でも道具が期待どおり働かなかった状態は、独立した[セッション記録のツール失敗検査](verify-session-record.md)で検出する。
 
 ## 実行
 

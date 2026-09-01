@@ -101,9 +101,10 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_DISPLAY_READY=%q\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_DISPLAY_READY=%q\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$CORPUS" "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
-  "$ROOT/src/extension.ts" "$ROOT/.pi/extensions/pi-formula-verify-image-path.ts" \
+  "$ROOT/src/extension.ts" "$ROOT/scripts/verify-extensions/pi-formula-verify-macros.ts" \
+  "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
   "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" \
   "$DISPLAY_READY_MARKER" >"$RUNNER"
 run cat >>"$RUNNER" <<'RUNNER'
@@ -125,6 +126,7 @@ args=(
   --no-tools
   --no-extensions
   --extension "$PI_FORMULA_VERIFY_EXTENSION"
+  --extension "$PI_FORMULA_VERIFY_MACROS_EXTENSION"
   --extension "$PI_FORMULA_VERIFY_PATH_EXTENSION"
   --no-themes
   --theme "$PI_FORMULA_VERIFY_THEME"
