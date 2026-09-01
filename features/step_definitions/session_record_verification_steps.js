@@ -63,6 +63,28 @@ Given(
   },
 );
 
+Given(
+  "runner が単一の check コマンドで機能不足になったセッション記録がある",
+  function () {
+    createSession(this, [
+      toolCall("runner-call", "runner", { commands: [["check"]] }),
+      toolResult("runner-call", "runner", "unsupported check"),
+    ]);
+  },
+);
+
+Given(
+  "runner の2番目の deploy コマンドで途中停止したセッション記録がある",
+  function () {
+    createSession(this, [
+      toolCall("runner-call", "runner", {
+        commands: [["check"], ["deploy"]],
+      }),
+      toolResult("runner-call", "runner", "Stopped at command 2 of 2.", true),
+    ]);
+  },
+);
+
 Given("失敗後にモデルが代替手段へ切り替えたセッション記録がある", function () {
   createSession(this, [
     toolCall("bash-call", "bash", { command: "qni run --symbolic" }),
@@ -184,6 +206,20 @@ Then("qni の途中停止が停止したコマンドとともに報告される"
   assert.match(
     this.result.stdout,
     /種類: 途中停止[\s\S]*ツール: qni[\s\S]*コマンド: qni run --symbolic/u,
+  );
+});
+
+Then("機能不足のコマンドは runner check と報告される", function () {
+  assert.match(
+    this.result.stdout,
+    /種類: 機能不足[\s\S]*ツール: runner[\s\S]*コマンド: runner check/u,
+  );
+});
+
+Then("途中停止のコマンドは runner deploy と報告される", function () {
+  assert.match(
+    this.result.stdout,
+    /種類: 途中停止[\s\S]*ツール: runner[\s\S]*コマンド: runner deploy/u,
   );
 });
 

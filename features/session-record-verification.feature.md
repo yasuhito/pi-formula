@@ -22,6 +22,18 @@ pi-formula の worker として
 - When セッション記録検査を実行する
 - Then qni の途中停止が停止したコマンドとともに報告される
 
+## Scenario: 単一コマンドを実行したツール名で報告する
+
+- Given runner が単一の check コマンドで機能不足になったセッション記録がある
+- When セッション記録検査を実行する
+- Then 機能不足のコマンドは runner check と報告される
+
+## Scenario: 途中停止したコマンドを実行したツール名で報告する
+
+- Given runner の2番目の deploy コマンドで途中停止したセッション記録がある
+- When セッション記録検査を実行する
+- Then 途中停止のコマンドは runner deploy と報告される
+
 ## Scenario: 代替手段への切り替えを抽出する
 
 - Given 失敗後にモデルが代替手段へ切り替えたセッション記録がある

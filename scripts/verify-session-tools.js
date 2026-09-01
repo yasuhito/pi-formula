@@ -98,8 +98,8 @@ function shellArgument(value) {
     : `'${text.replaceAll("'", `'\\''`)}'`;
 }
 
-function qniCommand(arguments_) {
-  return `qni ${arguments_.map(shellArgument).join(" ")}`.trimEnd();
+function toolCommand(tool, arguments_) {
+  return `${tool ?? "不明"} ${arguments_.map(shellArgument).join(" ")}`.trimEnd();
 }
 
 function commandFromCall(call) {
@@ -107,9 +107,11 @@ function commandFromCall(call) {
   if (!arguments_ || typeof arguments_ !== "object") return "不明";
   if (typeof arguments_.command === "string") return arguments_.command;
   if (Array.isArray(arguments_.args))
-    return [call.name, ...arguments_.args].map(shellArgument).join(" ");
+    return [call.name ?? "不明", ...arguments_.args]
+      .map(shellArgument)
+      .join(" ");
   if (Array.isArray(arguments_.commands) && arguments_.commands.length === 1)
-    return qniCommand(arguments_.commands[0]);
+    return toolCommand(call.name, arguments_.commands[0]);
   return `${call.name ?? "不明"} ${JSON.stringify(arguments_)}`;
 }
 
@@ -117,7 +119,7 @@ function commandAt(call, position) {
   const commands = call?.arguments?.commands;
   if (!Array.isArray(commands) || !Array.isArray(commands[position - 1]))
     return commandFromCall(call);
-  return qniCommand(commands[position - 1]);
+  return toolCommand(call?.name, commands[position - 1]);
 }
 
 function nearestCommand(lines, lineIndex, call) {
