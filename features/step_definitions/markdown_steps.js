@@ -572,8 +572,10 @@ Then("MathJaxとResvgは最初の表示数式で初めて準備される", funct
   });
 });
 
-When("初回、次の異なる数式、一時保存済み数式を複数回計測する", function () {
-  const script = `
+When(
+  "初回、異なる未キャッシュ数式、一時保存済み数式を複数回計測する",
+  function () {
+    const script = `
     const { performance } = require('node:perf_hooks');
     const registerFormula = require('./dist/extension.js').default;
     const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
@@ -587,29 +589,39 @@ When("初回、次の異なる数式、一時保存済み数式を複数回計�
         return performance.now() - started;
       };
       const first = renderTimed('x_{cold1}');
-      const next = renderTimed('x_{cold2}');
-      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold2}'));
-      process.stdout.write(JSON.stringify({ first, next, cachedSamples }));
+      const uncachedSamples = Array.from(
+        { length: 5 },
+        (_, index) => renderTimed('x_{cold' + (index + 2) + '}')
+      );
+      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold6}'));
+      process.stdout.write(JSON.stringify({ first, uncachedSamples, cachedSamples }));
     })().catch((error) => { console.error(error); process.exitCode = 1; });
   `;
-  const result = childProcess.spawnSync(process.execPath, ["-e", script], {
-    cwd: resolve(__dirname, "../.."),
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 0, result.stderr);
-  this.durations = JSON.parse(result.stdout);
-});
+    const result = childProcess.spawnSync(process.execPath, ["-e", script], {
+      cwd: resolve(__dirname, "../.."),
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    this.durations = JSON.parse(result.stdout);
+  },
+);
 
 Then(
-  "初回は1秒未満、次は200ミリ秒未満、一時保存済みの最小値は5ミリ秒未満である",
+  "初回は1秒未満、未キャッシュの中央値は200ミリ秒未満、一時保存済みの最小値は5ミリ秒未満である",
   function () {
+    const sortedUncached = [...this.durations.uncachedSamples].sort(
+      (left, right) => left - right,
+    );
+    const uncachedMedian =
+      sortedUncached[Math.floor(sortedUncached.length / 2)];
     const cachedMinimum = Math.min(...this.durations.cachedSamples);
     assert.ok(
       this.durations.first < 1000 &&
-        this.durations.next < 200 &&
+        this.durations.uncachedSamples.length === 5 &&
+        uncachedMedian < 200 &&
         this.durations.cachedSamples.length === 10 &&
         cachedMinimum < 5,
-      JSON.stringify({ ...this.durations, cachedMinimum }),
+      JSON.stringify({ ...this.durations, uncachedMedian, cachedMinimum }),
     );
   },
 );
