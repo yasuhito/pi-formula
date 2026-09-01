@@ -8,6 +8,7 @@ const { resolve } = require('node:path');
 const { Given, Then, When } = require('@cucumber/cucumber');
 
 const registerFormula = require('../../dist/extension.js').default;
+const { inspectStreamingRegression, renderStreamingRegression } = require('../support/streaming-regression');
 const { fakePi, startWithKitty } = require('../../test/support/fake-pi');
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 
@@ -330,6 +331,23 @@ Then('失敗した数式は残り後続は画像になり失敗した配置は�
     repeatedFailureRemains: true,
     failedPlacementCalls: 1
   });
+});
+
+When('通常本文とインライン数式と大きな行列を含む再現本文を逐次描画する', function () {
+  this.streamingFormulaFrames = renderStreamingRegression(this.pi);
+});
+
+Then('各画像の転送チャンク列は他の描画出力を含まず配置まで完結する', function () {
+  const expected = [1, 2, 3, 4].map((imageCount) => ({
+    transformedTransferCount: imageCount,
+    transferLineCount: imageCount,
+    oneTransferPerLine: true,
+    completeChunks: true,
+    matchingPlacementIds: true,
+    matchingPlaceholderRows: true,
+    adjacentPlacements: true
+  }));
+  assert.deepEqual(inspectStreamingRegression(this.streamingFormulaFrames), expected);
 });
 
 When('外部作用を監視しながら表示数式を変換する', function () {
