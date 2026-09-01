@@ -85,6 +85,14 @@ When("ハーネスの安全条件を調べる", function () {
       /registerFormula\(pi, VERIFY_DISPLAY_MACROS\)/u.test(
         this.macrosExtension,
       ),
+    keptCapture:
+      /CAPTURE_DESTINATION=\$\{PI_FORMULA_VERIFY_CAPTURE:-/u.test(
+        this.harness,
+      ) &&
+      /printf 'キャプチャ: %s\\n' "\$CAPTURE_DESTINATION"/u.test(
+        this.harness,
+      ) &&
+      /キャプチャを開いて表示を確認してください/u.test(this.harness),
     imagePath: /verify-image-path\.js/u.test(this.harness),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
     exactEcho: /verify-echo\.js/u.test(this.harness),
@@ -145,6 +153,10 @@ Then("公開 API で追加マクロを登録する拡張を読み込む", functi
 
 Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
+});
+
+Then("保存先の指定がなくてもキャプチャを残して報告する", function () {
+  assert.equal(this.safety.keptCapture, true);
 });
 
 Then("ピクセル判定前に描画完了を確認する", function () {

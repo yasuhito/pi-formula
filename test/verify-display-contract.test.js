@@ -204,6 +204,28 @@ test("確認できたキャプチャだけを保存する", () => {
   );
 });
 
+test("保存先の指定がなくても既定の場所へキャプチャを残す", () => {
+  assert.match(
+    harness,
+    /CAPTURE_DESTINATION=\$\{PI_FORMULA_VERIFY_CAPTURE:-\$\{XDG_STATE_HOME:-\$HOME\/\.local\/state\}\/pi-formula\/verify-display-capture\.png\}/u,
+  );
+});
+
+test("キャプチャの保存先を必ず報告する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      'install -m 0644 "$CAPTURE_FILE" "$CAPTURE_DESTINATION"',
+      "キャプチャ: %s",
+      "detect-display-bands.js",
+    ),
+  );
+});
+
+test("帯を見つけたらキャプチャの確認を促す", () => {
+  assert.match(harness, /キャプチャを開いて表示を確認してください/u);
+});
+
 test("キャプチャの PNG 寸法をピクセル判定前に確認する", () => {
   assert.ok(
     markersAppearInOrder(

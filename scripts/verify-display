@@ -289,15 +289,17 @@ while ((SECONDS < capture_deadline)); do
 done
 [[ "$display_rendered" == true ]] \
   || fail "Ghostty の描画完了をキャプチャで確認できませんでした"
-if [[ -n "${PI_FORMULA_VERIFY_CAPTURE:-}" ]]; then
-  run install -m 0644 "$CAPTURE_FILE" "$PI_FORMULA_VERIFY_CAPTURE"
-  printf 'キャプチャ: %s\n' "$PI_FORMULA_VERIFY_CAPTURE"
-fi
+# 表示の正しさは人と Agent が目で確かめる。撮れた画面を必ず残して場所を伝える。
+CAPTURE_DESTINATION=${PI_FORMULA_VERIFY_CAPTURE:-${XDG_STATE_HOME:-$HOME/.local/state}/pi-formula/verify-display-capture.png}
+run mkdir -p -- "${CAPTURE_DESTINATION%/*}"
+run install -m 0644 "$CAPTURE_FILE" "$CAPTURE_DESTINATION"
+printf 'キャプチャ: %s\n' "$CAPTURE_DESTINATION"
 run "$ROOT/scripts/verify-display-window" "$WINDOW_TITLE" "$monitor_id" \
   "$window_address" "1920" "$HEIGHT" >/dev/null \
   || fail "キャプチャ中に Ghostty が終了または変形しました"
 
 trap - ERR
+detector_status=0
 "$ROOT/scripts/run-display-command" detector detect-display-bands \
   timeout --signal=TERM "$DETECTOR_TIMEOUT" node "$ROOT/scripts/detect-display-bands.js" \
   --background=250,248,240 --body=40,40,35 \
@@ -305,4 +307,8 @@ trap - ERR
   --ignore=150,60,60 --ignore=140,100,30 --ignore=100,100,96 \
   --ignore=130,130,124 --ignore=180,178,168 --ignore=220,216,202 \
   --ignore=238,235,224 --ignore=232,230,220 --ignore=228,236,224 \
-  --ignore=240,226,222 --ignore=232,226,236 "$CAPTURE_FILE"
+  --ignore=240,226,222 --ignore=232,226,236 "$CAPTURE_FILE" || detector_status=$?
+# 帯の座標だけでは表示が壊れているかを決められない。撮れた画面を見て判断する。
+[[ "$detector_status" -eq 0 ]] \
+  || printf 'キャプチャを開いて表示を確認してください: %s\n' "$CAPTURE_DESTINATION" >&2
+exit "$detector_status"

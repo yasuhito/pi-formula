@@ -17,7 +17,7 @@ scripts/verify-display docs/agents/verify-corpus/issue-21.md
 - x=120..1780, y=940..1012, rgb=210,0,170
 ```
 
-キャプチャを残す場合は保存先を明示する。
+撮れた画面は必ず `$XDG_STATE_HOME/pi-formula/verify-display-capture.png`（既定は `~/.local/state/pi-formula/verify-display-capture.png`）へ残し、その場所を標準出力へ示す。表示が正しいかどうかの最終的な判断は、このキャプチャを人と Agent が目で見て行う。帯を検出した場合は、座標に加えてキャプチャの確認を促す。保存先を変えたい場合は明示する。
 
 ```sh
 PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
