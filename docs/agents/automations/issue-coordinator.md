@@ -87,6 +87,26 @@ orca-ide worktree rm --worktree branch:<headRefName> --force --json
 
 完了条件: closed / merged PR に対応する不要な worker terminal は停止済み。安全な worker worktree は削除済み。削除できないものは要約用に記録済み。
 
+### 0.5. Sync: マージ済みの変更をローカル checkout へ反映する
+
+worker worktree の片付けの後、main workspace のローカル checkout を `origin/main` へ早送りする。このリポジトリが pi のパッケージ（拡張 / スキル）としてローカルパスで参照されている場合、GitHub でマージしただけでは利用者のセッションに変更が届かないため（2026-09-01 に qni-cli のスキル修正がマージ後もローカル未更新で発火せず、原因調査が発生した）。
+
+安全条件をすべて満たす場合だけ実行する。
+
+```bash
+cd /home/yasuhito/Work/pi-formula
+git status --short          # 空であること
+git fetch origin main
+git merge-base --is-ancestor HEAD origin/main   # 現在の HEAD が origin/main に含まれること
+git pull --ff-only origin main
+```
+
+- `git status --short` が空でない、または HEAD が `origin/main` の祖先でない場合は、何もせず理由を最後の要約に書く。ユーザーや別 agent が作業中の可能性があるため、`git reset`、`git stash`、`git checkout` による強制的な同期は禁止する。
+- ビルド成果物（`dist/` など）を配布物に使う構成では、pull が成功した場合に限り`npm run build` を 1 回実行する。失敗しても停止せず、要約に書く。
+- pull の要否にかかわらず、この段階では GitHub へ書き込まない。
+
+完了条件: ローカル checkout が `origin/main` と一致している、または同期しなかった理由を要約用に記録している。
+
 ### 1. Audit: stale `agent:in-progress` を報告用に検出する
 
 候補選択の前に、24時間以上更新がない `agent:in-progress` issue を調べる。これは報告だけで、自動回収しない。
@@ -408,4 +428,5 @@ gh issue edit <N> -R yasuhito/pi-formula --remove-label "agent:in-progress" || t
 - 停止した closed / merged PR の worker terminal（あれば）
 - 削除した closed / merged PR の worker worktree（あれば）
 - 削除できなかった closed / merged PR の worker worktree と理由（あれば）
+- ローカル checkout の同期結果（早送りした / しなかった理由）
 - 実行した検証（あれば）
