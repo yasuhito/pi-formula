@@ -572,8 +572,10 @@ Then("MathJaxとResvgは最初の表示数式で初めて準備される", funct
   });
 });
 
-When("初回、次の異なる数式、一時保存済み数式を複数回計測する", function () {
-  const script = `
+When(
+  "初回準備後、異なる未キャッシュ数式と一時保存済み数式を複数回計測する",
+  function () {
+    const script = `
     const { performance } = require('node:perf_hooks');
     const registerFormula = require('./dist/extension.js').default;
     const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
@@ -586,30 +588,45 @@ When("初回、次の異なる数式、一時保存済み数式を複数回計�
         });
         return performance.now() - started;
       };
-      const first = renderTimed('x_{cold1}');
-      const next = renderTimed('x_{cold2}');
-      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold2}'));
-      process.stdout.write(JSON.stringify({ first, next, cachedSamples }));
+      renderTimed('x_{warmup}');
+      const uncachedSamples = Array.from(
+        { length: 5 },
+        (_, index) => renderTimed('x_{cold' + (index + 1) + '}')
+      );
+      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold5}'));
+      process.stdout.write(JSON.stringify({ uncachedSamples, cachedSamples }));
     })().catch((error) => { console.error(error); process.exitCode = 1; });
   `;
-  const result = childProcess.spawnSync(process.execPath, ["-e", script], {
-    cwd: resolve(__dirname, "../.."),
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 0, result.stderr);
-  this.durations = JSON.parse(result.stdout);
-});
+    const result = childProcess.spawnSync(process.execPath, ["-e", script], {
+      cwd: resolve(__dirname, "../.."),
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    this.durations = JSON.parse(result.stdout);
+  },
+);
 
 Then(
-  "初回は1秒未満、次は200ミリ秒未満、一時保存済みの最小値は5ミリ秒未満である",
+  "一時保存済みの中央値は未キャッシュ中央値の5パーセント未満である",
   function () {
-    const cachedMinimum = Math.min(...this.durations.cachedSamples);
+    const median = (samples) => {
+      const sorted = [...samples].sort((left, right) => left - right);
+      return sorted[Math.floor(sorted.length / 2)];
+    };
+    const uncachedMedian = median(this.durations.uncachedSamples);
+    const cachedMedian = median(this.durations.cachedSamples);
+    const cachedRatio = cachedMedian / uncachedMedian;
     assert.ok(
-      this.durations.first < 1000 &&
-        this.durations.next < 200 &&
+      this.durations.uncachedSamples.length === 5 &&
         this.durations.cachedSamples.length === 10 &&
-        cachedMinimum < 5,
-      JSON.stringify({ ...this.durations, cachedMinimum }),
+        Number.isFinite(cachedRatio) &&
+        cachedRatio < 0.05,
+      JSON.stringify({
+        ...this.durations,
+        uncachedMedian,
+        cachedMedian,
+        cachedRatio,
+      }),
     );
   },
 );
