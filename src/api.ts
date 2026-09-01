@@ -6,22 +6,21 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with {
 };
 
 import {
+  type FormulaPathMode,
+  formulaConfigPath,
+  loadFormulaConfig,
+  saveDefaultPath,
+} from "./config";
+import {
   FormulaImageRenderer,
   type FormulaPng,
 } from "./formula-image-renderer";
 import {
   type FormulaMacros,
-  loadUserMacros,
   type MacroDefinition,
   validateAdditionalMacros,
 } from "./macros";
 import { transformDisplayMath } from "./markdown";
-import {
-  type FormulaPathMode,
-  formulaConfigPath,
-  readDefaultPath,
-  writeDefaultPath,
-} from "./path-settings";
 import {
   multiplexerProbeResult,
   probePngSupport,
@@ -204,9 +203,10 @@ export function registerFormula(
 
   pi.on("session_start", async (_event, ctx) => {
     state.textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
-    state.configPath = formulaConfigPath(process.env);
-    state.defaultPath = readDefaultPath(state.configPath);
-    state.userMacros = loadUserMacros(process.env).macros;
+    const config = loadFormulaConfig(process.env);
+    state.configPath = config.filePath;
+    state.defaultPath = config.defaultPath;
+    state.userMacros = config.macros;
     state.imageRenderer.clear();
     state.sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
     state.terminal = terminalName(process.env);
@@ -272,8 +272,7 @@ export function registerFormula(
       ) {
         if (saveDefault) {
           try {
-            writeDefaultPath(state.configPath, action);
-            state.defaultPath = readDefaultPath(state.configPath);
+            state.defaultPath = saveDefaultPath(state.configPath, action);
           } catch {
             ctx.ui.notify(
               "Could not save the pi-formula default; the session path was not changed.",
