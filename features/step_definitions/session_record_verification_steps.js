@@ -46,6 +46,16 @@ function toolResult(id, name, text, isError = false) {
   };
 }
 
+function assistantText(text) {
+  return {
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text }],
+    },
+  };
+}
+
 Given(
   "`unsupported symbolic gate column` を含むセッション記録がある",
   function () {
@@ -62,18 +72,9 @@ Given("失敗後にモデルが代替手段へ切り替えたセッション記�
       "unsupported symbolic gate column\nCommand exited with code 1",
       true,
     ),
-    {
-      type: "message",
-      message: {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: "シンボリック実行が対応していないので、代わりに数値で確認します。",
-          },
-        ],
-      },
-    },
+    assistantText(
+      "シンボリック実行が対応していないので、代わりに数値で確認します。",
+    ),
   ]);
 });
 
@@ -83,6 +84,29 @@ Given("ツールが成功したセッション記録がある", function () {
     toolResult("bash-call", "bash", "ok"),
   ]);
 });
+
+Given(
+  "成功したツールの後に「代わりに」を含む assistant 本文がある",
+  function () {
+    createSession(this, [
+      toolCall("bash-call", "bash", { command: "printf ok" }),
+      toolResult("bash-call", "bash", "ok"),
+      assistantText("前の例の代わりに、別の正常な例を示します。"),
+    ]);
+  },
+);
+
+Given(
+  "失敗後の次の assistant 本文には代替表現がなく後続本文に fallback がある",
+  function () {
+    createSession(this, [
+      toolCall("bash-call", "bash", { command: "false" }),
+      toolResult("bash-call", "bash", "Command exited with code 1", true),
+      assistantText("失敗内容を確認します。"),
+      assistantText("一般的な fallback の説明です。"),
+    ]);
+  },
+);
 
 Given("既知の機能不足を許容する無視リストがある", function () {
   this.session = regressionSession;
@@ -108,6 +132,21 @@ Given("既知の機能不足を許容する無視リストがある", function (
     )}\n`,
   );
 });
+
+Given(
+  /^`(kind|tool|command|pattern)` が空文字の無視リストがある$/u,
+  function (field) {
+    this.session = regressionSession;
+    this.directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "pi-formula-session-invalid-ignore-"),
+    );
+    this.ignoreList = path.join(this.directory, "ignore-list.json");
+    fs.writeFileSync(
+      this.ignoreList,
+      `${JSON.stringify({ ignore: [{ [field]: "" }] })}\n`,
+    );
+  },
+);
 
 When("セッション記録検査を実行する", function () {
   this.result = spawnSync(process.execPath, [checker, this.session], {
@@ -158,6 +197,14 @@ Then(
   },
 );
 
+Then("成功結果の後の代替表現は報告されない", function () {
+  assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+});
+
+Then("失敗直後より後の代替表現は報告されない", function () {
+  assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+});
+
 Then("セッション記録検査は終了コード1を返す", function () {
   assert.equal(this.result.status, 1);
 });
@@ -171,4 +218,16 @@ Then("セッション記録は正常と判定される", function () {
 
 Then("許容した機能不足だけが報告から除外される", function () {
   assert.doesNotMatch(this.result.stdout, /種類: 機能不足/u);
+});
+
+Then("無視対象外の非 0 終了が報告に残る", function () {
+  assert.match(this.result.stdout, /種類: 非 0 終了/u);
+});
+
+Then("無視対象外のヒットにより終了コード1を返す", function () {
+  assert.equal(this.result.status, 1);
+});
+
+Then("無効な無視リストとして終了コード2を返す", function () {
+  assert.equal(this.result.status, 2);
 });

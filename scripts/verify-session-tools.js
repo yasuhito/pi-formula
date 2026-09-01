@@ -72,6 +72,8 @@ function readIgnoreList(filename) {
         throw new Error(`ignore[${index}] に不明な項目があります: ${key}`);
       if (typeof value !== "string")
         throw new Error(`ignore[${index}].${key} は文字列にしてください`);
+      if (value.trim() === "")
+        throw new Error(`ignore[${index}].${key} は空文字にできません`);
     }
     if (Object.keys(entry).length === 0)
       throw new Error(`ignore[${index}] は条件を一つ以上持たせてください`);
@@ -156,25 +158,28 @@ function toolHits(recordIndex, message, call) {
       });
     }
   }
+  const failed = hits.length > 0 || message.isError === true;
   return {
     hits,
-    latestTool: {
-      tool,
-      command: nearestCommand(lines, lines.length - 1, call),
-    },
+    fallbackCandidate: failed
+      ? {
+          tool,
+          command: nearestCommand(lines, lines.length - 1, call),
+        }
+      : undefined,
   };
 }
 
-function fallbackHits(recordIndex, message, latestTool) {
-  if (!latestTool) return [];
+function fallbackHits(recordIndex, message, fallbackCandidate) {
+  if (!fallbackCandidate) return [];
   const lines = textContent(message).split("\n");
   return lines.flatMap((line, lineIndex) =>
     FALLBACK_PATTERN.test(line)
       ? [
           {
             kind: "代替手段",
-            tool: latestTool.tool,
-            command: latestTool.command,
+            tool: fallbackCandidate.tool,
+            command: fallbackCandidate.command,
             recordIndex,
             text: line,
             context: contextAt(lines, lineIndex),
@@ -197,19 +202,21 @@ function ignored(hit, ignoreList) {
 function inspectSession(records, ignoreList) {
   const calls = new Map();
   const hits = [];
-  let latestTool;
+  let fallbackCandidate;
   for (const { index, record } of records) {
     const message = record.message;
     if (message?.role === "assistant") {
       for (const content of message.content ?? []) {
         if (content.type === "toolCall") calls.set(content.id, content);
       }
-      hits.push(...fallbackHits(index, message, latestTool));
+      hits.push(...fallbackHits(index, message, fallbackCandidate));
+      fallbackCandidate = undefined;
     }
     if (message?.role === "toolResult") {
       const result = toolHits(index, message, calls.get(message.toolCallId));
       hits.push(...result.hits);
-      latestTool = result.latestTool;
+      if (result.fallbackCandidate)
+        fallbackCandidate = result.fallbackCandidate;
     }
   }
   return hits.filter((hit) => !ignored(hit, ignoreList));

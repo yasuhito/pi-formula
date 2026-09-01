@@ -17,9 +17,9 @@ npm run verify:session-record -- ~/.pi/agent/sessions/<project>/<session>.jsonl
 - `exited with status N`、`exited with code N`、`Command exited with code N` の非0終了
 - 「未対応」「対応していない」「unsupported」「not supported」を含むツール出力
 - `Stopped at command N of M` による一括実行の途中停止
-- 「代わりに」「代替手段」「切り替え」「fallback」を含む、ツール実行後の assistant 本文
+- 「代わりに」「代替手段」「切り替え」「fallback」を含む、失敗したツール実行直後の assistant 本文
 
-複数コマンドを一括実行した記録では、ツール出力の直前にある `$ ...`、または `Stopped at command N of M` の N 番目から該当コマンドを決める。代替手段は、直前のツールと最後に実行されたコマンドへ関連付ける。
+複数コマンドを一括実行した記録では、ツール出力の直前にある `$ ...`、または `Stopped at command N of M` の N 番目から該当コマンドを決める。代替手段は、失敗、機能不足、途中停止のいずれかを含むか `isError` が真であるツール結果だけを候補にする。その次の assistant メッセージだけを検査して候補を消費するため、成功結果の後や後続ターンの無関係な表現は関連付けない。
 
 ## 無視リスト
 
@@ -44,7 +44,7 @@ npm run verify:session-record -- \
   ~/.pi/agent/sessions/<project>/<session>.jsonl
 ```
 
-各項目には `kind`、`tool`、`command`、`pattern` の一つ以上を指定する。指定した条件をすべて満たすヒットだけを除外する。`pattern` は大文字と小文字を区別しない正規表現として、ヒットした行へ適用する。
+各項目には `kind`、`tool`、`command`、`pattern` の一つ以上を空文字以外で指定する。指定した条件をすべて満たすヒットだけを除外する。`pattern` は大文字と小文字を区別しない正規表現として、ヒットした行へ適用する。空文字の条件は設定ミスとして終了コード2で拒否する。
 
 ## 表示検査との関係
 
