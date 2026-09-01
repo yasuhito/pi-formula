@@ -110,6 +110,16 @@ pi-formula の worker として
 - Given Issue 26 の再現コーパスがある
 - Then 追加マクロを含む3つの表示数式を組版できる
 
+## Scenario: Issue 48 の Grover コーパスを組版する
+
+- Given Issue 48 の Grover コーパスがある
+- Then bra と braket を含む表示数式を組版できる
+
+## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
+
+- Given 検証ハーネスと qni-cli の追加マクロ定義がある
+- Then 検証ハーネスの追加マクロは qni-cli と一致する
+
 ## Scenario: 短いが高い表示数式を事前に拒否する
 
 - Given 16000px を超える高い表示数式を含む短いコーパスがある

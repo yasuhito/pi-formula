@@ -9,6 +9,26 @@ const { createPng } = require("../../test/support/png-fixture");
 const { planDisplay } = require("../../scripts/plan-display");
 const root = path.resolve(__dirname, "../..");
 
+function readQniCliAdditionalMacros() {
+  const sourcePath =
+    process.env.QNI_CLI_TYPESETTER ??
+    path.join(root, "features/fixtures/qni-cli-typesetter.txt");
+  const source = fs.readFileSync(sourcePath, "utf8");
+  const lines = source.slice(source.indexOf("macros: {")).split("\n").slice(1);
+  const macros = {};
+  for (const line of lines) {
+    if (line.trim() === "},") break;
+    if (line.trim() === "...configured,") continue;
+    const definition = line
+      .trim()
+      .match(/^([A-Za-z][A-Za-z0-9]*): (\[.*\]),?$/u);
+    if (!definition)
+      throw new Error(`qni-cli の追加マクロを解析できません: ${line}`);
+    macros[definition[1]] = JSON.parse(definition[2]);
+  }
+  return macros;
+}
+
 function normalDisplay(x, y) {
   if (y >= 8 && y <= 13 && x >= 8 && x <= 111) return [230, 228, 217];
   if (y === 28 && x >= 18 && x <= 101) return [40, 40, 35];
@@ -182,6 +202,27 @@ Then("追加マクロを含む3つの表示数式を組版できる", function (
     { displayFormulas: plan.displayFormulas, hasImageRows: plan.imageRows > 0 },
     { displayFormulas: 3, hasImageRows: true },
   );
+});
+
+Given("Issue 48 の Grover コーパスがある", function () {
+  this.corpus = fs.readFileSync(
+    path.join(root, "docs/agents/verify-corpus/issue-48.md"),
+    "utf8",
+  );
+});
+
+Then("bra と braket を含む表示数式を組版できる", function () {
+  assert.ok(planDisplay(this.corpus, { source: true }).imageRows > 0);
+});
+
+Given("検証ハーネスと qni-cli の追加マクロ定義がある", function () {
+  this.verifyDisplayMacros =
+    require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
+  this.qniCliMacros = readQniCliAdditionalMacros();
+});
+
+Then("検証ハーネスの追加マクロは qni-cli と一致する", function () {
+  assert.deepEqual(this.verifyDisplayMacros, this.qniCliMacros);
 });
 
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
