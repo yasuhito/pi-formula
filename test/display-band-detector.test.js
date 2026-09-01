@@ -75,9 +75,9 @@ test('行が欠けた PNG を破損 PNG として拒否する', () => {
   assert.match(result.stderr, /展開長/u);
 });
 
-test('色変化が多い実キャプチャ寸法を時間上限内で判定する', { timeout: 15_000 }, () => {
+test('色変化が多い最大寸法を時間上限内で判定する', { timeout: 15_000 }, () => {
   const width = 1920;
-  const height = 8000;
+  const height = 16000;
   const stride = width * 3;
   const scanlines = Buffer.alloc((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
