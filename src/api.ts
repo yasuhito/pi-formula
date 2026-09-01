@@ -50,7 +50,7 @@ interface FormulaState {
   path: "image" | "text";
   selectionReason: string;
   probe: TerminalProbe;
-  sessionMode: FormulaPathMode;
+  sessionPreference: FormulaPathMode | undefined;
   defaultPath?: "image" | "text";
   configPath: string;
   terminal: string;
@@ -92,7 +92,9 @@ function effectiveMacros(state: FormulaState): FormulaMacros {
   return { ...state.userMacros, ...state.additionalMacros };
 }
 
-function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
+function restoredSessionPreference(
+  entries: readonly unknown[],
+): FormulaPathMode | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index] as {
       type?: unknown;
@@ -103,7 +105,7 @@ function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
     const path = entry.data?.path;
     if (path === "auto" || path === "image" || path === "text") return path;
   }
-  return "auto";
+  return undefined;
 }
 
 function terminalName(env: NodeJS.ProcessEnv): string {
@@ -121,10 +123,13 @@ function selectPath(state: FormulaState): void {
   if (state.imagePathForbidden) {
     state.path = "text";
     state.selectionReason = state.probe.reason;
-  } else if (state.sessionMode !== "auto") {
-    state.path = state.sessionMode;
+  } else if (
+    state.sessionPreference === "image" ||
+    state.sessionPreference === "text"
+  ) {
+    state.path = state.sessionPreference;
     state.selectionReason = "manual session setting";
-  } else if (state.defaultPath) {
+  } else if (state.sessionPreference === undefined && state.defaultPath) {
     state.path = state.defaultPath;
     state.selectionReason = "default setting";
   } else {
@@ -142,7 +147,7 @@ function newState(): FormulaState {
       reason: "session has not started",
       response: "not started",
     },
-    sessionMode: "auto",
+    sessionPreference: undefined,
     configPath: formulaConfigPath(process.env),
     terminal: "unknown",
     hasTerminalScreen: false,
@@ -233,7 +238,9 @@ export function registerFormula(
     state.defaultPath = config.defaultPath;
     state.userMacros = config.macros;
     state.imageRenderer.clear();
-    state.sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
+    state.sessionPreference = restoredSessionPreference(
+      ctx.sessionManager.getBranch(),
+    );
     state.terminal = terminalName(process.env);
     state.hasTerminalScreen = ctx.mode === "tui";
 
@@ -310,7 +317,7 @@ export function registerFormula(
             return;
           }
         }
-        state.sessionMode = action;
+        state.sessionPreference = action;
         pi.appendEntry(PATH_ENTRY, { path: action });
         selectPath(state);
         ctx.ui.notify(
