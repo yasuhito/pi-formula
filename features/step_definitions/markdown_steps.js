@@ -6,6 +6,7 @@ const https = require('node:https');
 const net = require('node:net');
 const { resolve } = require('node:path');
 const { Given, Then, When } = require('@cucumber/cucumber');
+const { Markdown } = require('@earendil-works/pi-tui');
 
 const registerFormula = require('../../dist/extension.js').default;
 const { fakePi, startWithKitty } = require('../../test/support/fake-pi');
@@ -330,6 +331,58 @@ Then('失敗した数式は残り後続は画像になり失敗した配置は�
     repeatedFailureRemains: true,
     failedPlacementCalls: 1
   });
+});
+
+When('大きな行列を含む4件の表示数式をストリーミング相当で逐次描画する', function () {
+  const formulas = [
+    String.raw`\mathrm{QFT}_N|x\rangle = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} e^{2\pi i\, xk/N}\, |k\rangle`,
+    String.raw`\mathrm{QFT}_N \sum_x \alpha_x |x\rangle = \frac{1}{\sqrt{N}} \sum_{k=0}^{N-1} \left(\sum_x \alpha_x\, e^{2\pi i xk/N}\right) |k\rangle`,
+    String.raw`F_N[j,k] = \frac{\omega^{jk}}{\sqrt{N}}`,
+    String.raw`F_8 = \frac{1}{\sqrt{8}}\begin{pmatrix}
+1 & 1 & 1 & 1 & 1 & 1 & 1 & 1 \\
+1 & \omega & \omega^2 & \omega^3 & \omega^4 & \omega^5 & \omega^6 & \omega^7 \\
+1 & \omega^2 & \omega^4 & \omega^6 & 1 & \omega^2 & \omega^4 & \omega^6 \\
+1 & \omega^3 & \omega^6 & \omega & \omega^4 & \omega^7 & \omega^2 & \omega^5 \\
+1 & \omega^4 & 1 & \omega^4 & 1 & \omega^4 & 1 & \omega^4 \\
+1 & \omega^5 & \omega^2 & \omega^7 & \omega^4 & \omega & \omega^6 & \omega^3 \\
+1 & \omega^6 & \omega^4 & \omega^2 & 1 & \omega^6 & \omega^4 & \omega^2 \\
+1 & \omega^7 & \omega^6 & \omega^5 & \omega^4 & \omega^3 & \omega^2 & \omega
+\end{pmatrix}`
+  ];
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  this.streamingFormulaFrames = formulas.map((_formula, index) => {
+    const source = formulas.slice(0, index + 1)
+      .map((latex, formulaIndex) => `式${formulaIndex + 1}\n\n$$\n${latex}\n$$`)
+      .join('\n\n');
+    const transformed = this.pi.transformer()(source, {
+      messageType: 'assistant', isStreaming: true, availableWidth: 80
+    });
+    return {
+      transformed,
+      terminalLines: new Markdown(transformed, 0, 0, passthroughTheme).render(80)
+    };
+  });
+});
+
+Then('各画像の転送チャンク列は他の描画出力を含まず配置まで完結する', function () {
+  const results = this.streamingFormulaFrames.map(({ transformed, terminalLines }) => {
+    const transferLines = terminalLines.filter((line) => line.includes('\x1b_G'));
+    const count = imageCount(transformed);
+    return {
+      imageCount: count,
+      allImagesPlaced: placeholderLines(transformed).length >= count,
+      isolatedTransfers: transferLines.every((line) => {
+        const withoutGraphics = line.replace(/\x1b_G[^;]*;[^\x1b]*\x1b\\/gu, '');
+        return !line.includes('\n') && line.includes('\x1b\\')
+          && withoutGraphics.replace(/\x1b\[[0-9;]*m/gu, '') === '';
+      })
+    };
+  });
+  assert.deepEqual(results, [1, 2, 3, 4].map((count) => ({
+    imageCount: count,
+    allImagesPlaced: true,
+    isolatedTransfers: true
+  })));
 });
 
 When('外部作用を監視しながら表示数式を変換する', function () {

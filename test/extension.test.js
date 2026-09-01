@@ -3,6 +3,7 @@ const { mkdirSync, mkdtempSync, readFileSync, writeFileSync } = require('node:fs
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
+const { Markdown } = require('@earendil-works/pi-tui');
 
 const registerFormula = require('../dist/extension.js').default;
 const {
@@ -44,6 +45,30 @@ test('display formulas use a Kitty PNG transfer and placeholder rows', async () 
     hasPngTransfer: true,
     hasPlaceholder: true,
     hasLatex: false
+  });
+});
+
+test('a display formula keeps each Kitty transfer line free of other drawing output', async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const transformed = pi.transformer()('Before\n$$x$$\nAfter', {
+    messageType: 'assistant', isStreaming: true, availableWidth: 80
+  });
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  const renderedLines = new Markdown(transformed, 0, 0, passthroughTheme).render(80);
+  const transferLine = renderedLines.find((line) => line.includes('\x1b_G'));
+
+  const withoutGraphics = transferLine?.replace(/\x1b_G[^;]*;[^\x1b]*\x1b\\/gu, '');
+  assert.deepEqual({
+    containsOtherLine: transferLine?.includes('\n'),
+    hasCompleteTransfer: transferLine?.includes('\x1b\\'),
+    visibleRemainder: withoutGraphics?.replace(/\x1b\[[0-9;]*m/gu, '')
+  }, {
+    containsOtherLine: false,
+    hasCompleteTransfer: true,
+    visibleRemainder: ''
   });
 });
 
