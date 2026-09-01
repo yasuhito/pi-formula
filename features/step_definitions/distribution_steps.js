@@ -1,5 +1,11 @@
 const assert = require("node:assert/strict");
-const { mkdirSync, mkdtempSync, readFileSync, rmSync } = require("node:fs");
+const {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -16,6 +22,7 @@ const {
   isInside,
   PACKAGE_TRIAL_STEP_TIMEOUT_MS,
 } = require("../../test/support/package-trial");
+const { installPackedPackage } = require("../../test/support/packed-install");
 
 setDefaultTimeout(30_000);
 
@@ -44,6 +51,8 @@ After(function () {
   if (this.packageTrialRoot) {
     rmSync(this.packageTrialRoot, { recursive: true, force: true });
   }
+  rmSync(join(root, "dist/macro-settings.js"), { force: true });
+  rmSync(join(root, "dist/macro-settings.d.ts"), { force: true });
 });
 
 Given("pi-formula の英語と日本語の README がある", function () {
@@ -168,6 +177,77 @@ Then(
 
 Then("Ghostty の表示見本が配布される", function () {
   assert.equal(this.packedFiles.includes("assets/ghostty-formulas.png"), true);
+});
+
+Given("削除済みソースに対応する古い成果物がある", () => {
+  mkdirSync(join(root, "dist"), { recursive: true });
+  writeFileSync(join(root, "dist/macro-settings.js"), "module.exports = {};\n");
+  writeFileSync(join(root, "dist/macro-settings.d.ts"), "export {};\n");
+});
+
+When("pi-formula を build する", function () {
+  this.build = spawnSync("npm", ["run", "build"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+});
+
+Then("生成後の dist に古い成果物が残らない", function () {
+  const staleFiles = [
+    "dist/macro-settings.js",
+    "dist/macro-settings.d.ts",
+  ].filter((path) => {
+    try {
+      readProjectFile(path);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  assert.deepEqual(
+    { buildStatus: this.build.status, staleFiles },
+    { buildStatus: 0, staleFiles: [] },
+    this.build.stderr || this.build.stdout,
+  );
+});
+
+Then("tarball に古い成果物が配布されない", function () {
+  assert.deepEqual(
+    this.packedFiles.filter((path) => path.includes("macro-settings")),
+    [],
+  );
+});
+
+Given("pi-formula の npm tarball を一時環境へ導入する", function () {
+  this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-exports-"));
+  this.installedRequire = installPackedPackage(root, this.packageTrialRoot);
+});
+
+When("導入したパッケージのルートを読み込む", function () {
+  const api = this.installedRequire("pi-formula");
+  this.publicOperations = {
+    registerFormula: typeof api.registerFormula,
+    createFormulaPng: typeof api.createFormulaPng,
+  };
+});
+
+Then("拡張登録と同期的な PNG 作成が使える", function () {
+  assert.deepEqual(this.publicOperations, {
+    registerFormula: "function",
+    createFormulaPng: "function",
+  });
+});
+
+When("導入したパッケージの内部 Markdown subpath を読み込む", function () {
+  try {
+    this.installedRequire("pi-formula/dist/markdown.js");
+  } catch (error) {
+    this.subpathErrorCode = error.code;
+  }
+});
+
+Then("内部 subpath は公開されていない", function () {
+  assert.equal(this.subpathErrorCode, "ERR_PACKAGE_PATH_NOT_EXPORTED");
 });
 
 Given("pi-formula の公開候補 tarball がある", function () {
