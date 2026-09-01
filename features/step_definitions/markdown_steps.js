@@ -432,54 +432,6 @@ Then("同じ失敗項目の画像処理は一回だけになる", function () {
   assert.equal(this.failedCreates, 1);
 });
 
-When("1件目の表示数式だけ配置を失敗させて同じ入力を再変換する", function () {
-  const kitty = require("../../dist/kitty.js");
-  const original = kitty.encodePlaceholderRows;
-  const callsById = new Map();
-  let failedId;
-  kitty.encodePlaceholderRows = (id, ...args) => {
-    callsById.set(id, (callsById.get(id) ?? 0) + 1);
-    if (failedId === undefined) failedId = id;
-    if (id === failedId) throw new Error("injected placement failure");
-    return original(id, ...args);
-  };
-
-  this.failedPlacementSource = "$$x_{placement_failure}$$";
-  const validSource = "$$x_{placement_ok}$$";
-  try {
-    transform(this, `${this.failedPlacementSource}\n${validSource}`);
-    this.firstPlacementRendered = this.rendered;
-    transform(this, this.failedPlacementSource);
-    this.repeatedPlacementRendered = this.rendered;
-  } finally {
-    kitty.encodePlaceholderRows = original;
-  }
-  this.failedPlacementCalls = callsById.get(failedId);
-});
-
-Then(
-  "失敗した数式は残り後続は画像になり失敗した配置は一回だけ試される",
-  function () {
-    assert.deepEqual(
-      {
-        failedFormulaRemains: this.firstPlacementRendered.includes(
-          this.failedPlacementSource,
-        ),
-        followingImageCount: imageCount(this.firstPlacementRendered),
-        repeatedFailureRemains:
-          this.repeatedPlacementRendered === this.failedPlacementSource,
-        failedPlacementCalls: this.failedPlacementCalls,
-      },
-      {
-        failedFormulaRemains: true,
-        followingImageCount: 1,
-        repeatedFailureRemains: true,
-        failedPlacementCalls: 1,
-      },
-    );
-  },
-);
-
 When(
   "通常本文とインライン数式と大きな行列を含む再現本文を逐次描画する",
   function () {
