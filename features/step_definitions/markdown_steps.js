@@ -528,7 +528,7 @@ When("入力上限を超えた表示数式を変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.oversizedPreparation = JSON.parse(result.stdout);
 });
 
@@ -560,7 +560,7 @@ When("表示数式を初めて変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.lazyPreparation = JSON.parse(result.stdout);
 });
 
@@ -601,7 +601,7 @@ When(
       cwd: resolve(__dirname, "../.."),
       encoding: "utf8",
     });
-    assert.equal(result.status, 0, result.stderr);
+    if (result.status !== 0) throw new Error(result.stderr);
     this.durations = JSON.parse(result.stdout);
   },
 );

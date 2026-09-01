@@ -39,6 +39,8 @@ for (const responseValue of ["OK", "EINVAL"]) {
   const responseKind = responseValue === "OK" ? "successful" : "rejected";
   test(`a ${responseKind} PNG response is recognized across every byte boundary`, async () => {
     const expectedPath = responseValue === "OK" ? "image" : "text";
+    const actual = [];
+    const expected = [];
     for (let split = 1; ; split += 1) {
       const probe = probeHarness();
       const response = `\x1b_Gi=${probe.imageId};${responseValue}\x1b\\`;
@@ -48,19 +50,21 @@ for (const responseValue of ["OK", "EINVAL"]) {
         probe.input(`${response.slice(split)}typed-after`),
       ];
 
-      assert.deepEqual(
-        {
-          path: (await probe.result).path,
-          returnedInput: returnedInput(handled),
-          returnedControls: returnedInput(handled).includes("\x1b"),
-        },
-        {
-          path: expectedPath,
-          returnedInput: "typed-beforetyped-after",
-          returnedControls: false,
-        },
-      );
+      actual.push({
+        split,
+        path: (await probe.result).path,
+        returnedInput: returnedInput(handled),
+        returnedControls: returnedInput(handled).includes("\x1b"),
+      });
+      expected.push({
+        split,
+        path: expectedPath,
+        returnedInput: "typed-beforetyped-after",
+        returnedControls: false,
+      });
     }
+
+    assert.deepEqual(actual, expected);
   });
 }
 

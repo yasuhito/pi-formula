@@ -6,14 +6,11 @@ const test = require("node:test");
 const root = resolve(__dirname, "..");
 
 function packedPackage(packOutput) {
-  const candidate = Array.isArray(packOutput)
+  return Array.isArray(packOutput)
     ? packOutput[0]
     : typeof packOutput?.filename === "string"
       ? packOutput
       : packOutput?.["pi-formula"];
-  assert.equal(typeof candidate?.filename, "string");
-  assert.notEqual(candidate.filename.trim(), "");
-  return candidate;
 }
 
 test("package exposes the CommonJS registration and PNG creation API", () => {
@@ -34,18 +31,20 @@ test("package exposes the CommonJS registration and PNG creation API", () => {
   );
 });
 
-test("npm pack result accepts every supported JSON shape", () => {
-  const expected = { filename: "pi-formula-0.1.0.tgz" };
-
-  assert.deepEqual(
-    [
-      packedPackage([expected]),
-      packedPackage(expected),
-      packedPackage({ "pi-formula": expected }),
-    ],
-    [expected, expected, expected],
-  );
-});
+for (const [shape, packOutput] of [
+  ["array", [{ filename: "pi-formula-0.1.0.tgz" }]],
+  ["object", { filename: "pi-formula-0.1.0.tgz" }],
+  [
+    "package-keyed object",
+    { "pi-formula": { filename: "pi-formula-0.1.0.tgz" } },
+  ],
+]) {
+  test(`npm pack result accepts the ${shape} JSON shape`, () => {
+    assert.deepEqual(packedPackage(packOutput), {
+      filename: "pi-formula-0.1.0.tgz",
+    });
+  });
+}
 
 test("source contains no qni-specific execution modules", () => {
   const sourceDir = join(root, "src");

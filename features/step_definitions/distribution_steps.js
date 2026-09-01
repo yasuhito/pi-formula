@@ -135,7 +135,7 @@ Given("pi-formula の npm tarball を作る", function () {
     cwd: root,
     encoding: "utf8",
   });
-  assert.equal(packed.status, 0, packed.stderr);
+  if (packed.status !== 0) throw new Error(packed.stderr);
   const output = JSON.parse(packed.stdout);
   this.packResult = Array.isArray(output) ? output[0] : output["pi-formula"];
   this.tarball = join(root, this.packResult.filename);
@@ -163,12 +163,12 @@ Then(
       "package.json",
       "src",
     ]);
-    assert.equal(
-      this.packedFiles.includes("assets/ghostty-formulas.png"),
-      true,
-    );
   },
 );
+
+Then("Ghostty の表示見本が配布される", function () {
+  assert.equal(this.packedFiles.includes("assets/ghostty-formulas.png"), true);
+});
 
 Given("pi-formula の公開候補 tarball がある", function () {
   this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-candidate-"));
