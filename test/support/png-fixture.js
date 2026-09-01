@@ -1,4 +1,4 @@
-const { deflateSync } = require('node:zlib');
+const { deflateSync } = require("node:zlib");
 
 const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
   let value = byte;
@@ -10,12 +10,13 @@ const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
 
 function crc32(buffer) {
   let value = 0xffffffff;
-  for (const byte of buffer) value = (value >>> 8) ^ crcTable[(value ^ byte) & 0xff];
+  for (const byte of buffer)
+    value = (value >>> 8) ^ crcTable[(value ^ byte) & 0xff];
   return (value ^ 0xffffffff) >>> 0;
 }
 
 function chunk(type, data) {
-  const name = Buffer.from(type, 'ascii');
+  const name = Buffer.from(type, "ascii");
   const crc = Buffer.alloc(4);
   crc.writeUInt32BE(crc32(Buffer.concat([name, data])));
   const length = Buffer.alloc(4);
@@ -30,10 +31,10 @@ function createPngFromScanlines(width, height, scanlines, colorType = 6) {
   header[8] = 8;
   header[9] = colorType;
   return Buffer.concat([
-    Buffer.from('89504e470d0a1a0a', 'hex'),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(scanlines)),
-    chunk('IEND', Buffer.alloc(0))
+    Buffer.from("89504e470d0a1a0a", "hex"),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(scanlines)),
+    chunk("IEND", Buffer.alloc(0)),
   ]);
 }
 
