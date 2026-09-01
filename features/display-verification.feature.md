@@ -1,14 +1,14 @@
-# Feature: headless 出力で表示数式を検証する
+# Feature: 独立した検証セッションで表示数式を検証する
 
 pi-formula の worker として
-利用者の可視画面を変えずに
+利用者の画面と作業を妨げずに
 表示数式の実表示を履歴全体で回帰検証したい
 
-## Scenario: headless 出力を作成する
+## Scenario: 利用者の画面から独立した検証セッションを使う
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then 検証専用の headless 出力を作成する
+- Then 利用者の画面から独立した検証セッションで描画する
 
 ## Scenario: 全履歴を1枚で取得する
 
@@ -16,11 +16,11 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then 計画した全履歴を1枚で取得する
 
-## Scenario: 検証ウィンドウを不可視で起動する
+## Scenario: 検証セッションの出力を計画高へ広げる
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then 検証ウィンドウを headless 出力へフォーカスなしで起動する
+- Then 検証セッションの出力を計画高へ広げてから描画する
 
 ## Scenario: 外部処理へ時間上限を設ける
 
@@ -28,11 +28,11 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then 外部処理と検証ウィンドウへ時間上限を設ける
 
-## Scenario: 可視画面のフォーカスを変えない
+## Scenario: キャプチャを検証セッションへ向ける
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then 起動後も可視画面のフォーカスが変わらないことを確認する
+- Then 検証セッションの窓口へキャプチャを向ける
 
 ## Scenario: 現在の拡張だけを読み込む
 
@@ -46,17 +46,11 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then 一時設定と空の利用者マクロを使う
 
-## Scenario: 背景を判定対象から除外する
+## Scenario: 検証セッションの起動失敗を報告する
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then headless 出力の検証ウィンドウ矩形だけをキャプチャする
-
-## Scenario: 画面ロック中は検証を始めない
-
-- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
-- When ハーネスの安全条件を調べる
-- Then 描画前に画面ロック状態を確認する
+- Then 検証セッションが起動しない場合は理由を添えて停止する
 
 ## Scenario: キャプチャの無応答を打ち切る
 
@@ -100,11 +94,11 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then キャプチャ前に応答一致を確認する
 
-## Scenario: process group と headless 出力を後片付けする
+## Scenario: 検証セッションを後片付けする
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - When ハーネスの安全条件を調べる
-- Then 失敗時も process group と headless 出力を後片付けする
+- Then 失敗時も検証セッションの process group を止める
 
 ## Scenario: Issue 21 の再現コーパスを使う
 

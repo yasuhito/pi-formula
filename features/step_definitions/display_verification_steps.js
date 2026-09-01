@@ -34,17 +34,25 @@ Given("実表示検証ハーネスと Issue 21 の再現コーパスがある", 
 
 When("ハーネスの安全条件を調べる", function () {
   this.safety = {
-    headless: /output create headless/u.test(this.harness),
+    isolatedSession:
+      /env -u WAYLAND_DISPLAY -u DISPLAY/u.test(this.harness) &&
+      /WLR_BACKENDS=headless/u.test(this.harness) &&
+      /setsid cage -d --/u.test(this.harness),
     tallOutput:
-      /plan-display\.js/u.test(this.harness) && /grim -o/u.test(this.harness),
-    launchRule:
-      /workspace = .* silent/u.test(this.harness) &&
-      /monitor = .* silent/u.test(this.harness) &&
-      /no_initial_focus = true/u.test(this.harness),
+      /plan-display\.js/u.test(this.harness) &&
+      /run_inside grim/u.test(this.harness),
+    sessionOutput:
+      /--custom-mode "1920x\$\{PI_FORMULA_VERIFY_HEIGHT\}"/u.test(
+        this.harness,
+      ) &&
+      this.harness.indexOf("--custom-mode") <
+        this.harness.indexOf('>"$PI_FORMULA_VERIFY_DISPLAY_FILE"'),
     timeouts:
       /run\(\).*timeout/su.test(this.harness) &&
       /PI_FORMULA_VERIFY_WINDOW_LIFETIME/u.test(this.harness),
-    focusGuard: /AFTER_FOCUS.*BEFORE_FOCUS/su.test(this.harness),
+    captureTarget: /WAYLAND_DISPLAY="\$VERIFY_WAYLAND_DISPLAY"/u.test(
+      this.harness,
+    ),
     isolatedExtension:
       /--no-extensions/u.test(this.harness) &&
       /--extension "\$PI_FORMULA_VERIFY_EXTENSION"/u.test(this.harness) &&
@@ -52,19 +60,10 @@ When("ハーネスの安全条件を調べる", function () {
     isolatedSettings:
       /XDG_CONFIG_HOME="\$PI_FORMULA_VERIFY_CONFIG_HOME"/u.test(this.harness) &&
       /PI_FORMULA_MACROS='\{\}'/u.test(this.harness),
-    windowCapture:
-      /verify-display-window[^\n]*[\s\S]*"\$window_address" "1920" "\$HEIGHT"/u.test(
-        this.harness,
-      ) &&
-      /grim -o "\$OUTPUT_NAME" "\$OUTPUT_CAPTURE_FILE"/u.test(this.harness) &&
-      /crop-display-capture\.js/u.test(this.harness),
-    lockGuard:
-      /check-display-lock/u.test(this.harness) &&
-      this.harness.indexOf("check-display-lock") <
-        this.harness.indexOf("output create headless"),
+    startupFailure: /検証セッションが起動しませんでした/u.test(this.harness),
     captureTimeout:
       /run\(\).*timeout/su.test(this.harness) &&
-      /run grim -o/u.test(this.harness) &&
+      /run_inside grim/u.test(this.harness) &&
       /run-display-command[\s\S]*exit 2/u.test(
         fs.readFileSync(path.join(root, "scripts/run-display-command"), "utf8"),
       ),
@@ -98,29 +97,28 @@ When("ハーネスの安全条件を調べる", function () {
     exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
-      /setsid timeout/u.test(this.harness) &&
-      /cleanup-display/u.test(this.harness),
+      /kill -- "-\$CAGE_PID"/u.test(this.harness),
   };
 });
 
-Then("検証専用の headless 出力を作成する", function () {
-  assert.equal(this.safety.headless, true);
+Then("利用者の画面から独立した検証セッションで描画する", function () {
+  assert.equal(this.safety.isolatedSession, true);
 });
 
 Then("計画した全履歴を1枚で取得する", function () {
   assert.equal(this.safety.tallOutput, true);
 });
 
-Then("検証ウィンドウを headless 出力へフォーカスなしで起動する", function () {
-  assert.equal(this.safety.launchRule, true);
+Then("検証セッションの出力を計画高へ広げてから描画する", function () {
+  assert.equal(this.safety.sessionOutput, true);
 });
 
 Then("外部処理と検証ウィンドウへ時間上限を設ける", function () {
   assert.equal(this.safety.timeouts, true);
 });
 
-Then("起動後も可視画面のフォーカスが変わらないことを確認する", function () {
-  assert.equal(this.safety.focusGuard, true);
+Then("検証セッションの窓口へキャプチャを向ける", function () {
+  assert.equal(this.safety.captureTarget, true);
 });
 
 Then("利用者の拡張を除外して現在の pi-formula を読み込む", function () {
@@ -131,12 +129,8 @@ Then("一時設定と空の利用者マクロを使う", function () {
   assert.equal(this.safety.isolatedSettings, true);
 });
 
-Then("headless 出力の検証ウィンドウ矩形だけをキャプチャする", function () {
-  assert.equal(this.safety.windowCapture, true);
-});
-
-Then("描画前に画面ロック状態を確認する", function () {
-  assert.equal(this.safety.lockGuard, true);
+Then("検証セッションが起動しない場合は理由を添えて停止する", function () {
+  assert.equal(this.safety.startupFailure, true);
 });
 
 Then("キャプチャへ時間上限と検証不能の終了コードを使う", function () {
@@ -167,7 +161,7 @@ Then("キャプチャ前に応答一致を確認する", function () {
   assert.equal(this.safety.exactEcho, true);
 });
 
-Then("失敗時も process group と headless 出力を後片付けする", function () {
+Then("失敗時も検証セッションの process group を止める", function () {
   assert.equal(this.safety.cleanup, true);
 });
 

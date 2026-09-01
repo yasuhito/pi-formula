@@ -4,7 +4,6 @@
     ".pi/extensions/**/*.ts",
     "scripts/check-display-rendered.js",
     "scripts/check-display-session.js",
-    "scripts/crop-display-capture.js",
     "scripts/detect-display-bands.js",
     "scripts/plan-display.js",
     "scripts/verify-display-dimensions.js",
