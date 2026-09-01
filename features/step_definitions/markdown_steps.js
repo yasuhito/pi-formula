@@ -69,26 +69,36 @@ When("コードフェンスと文中コードに数式がある本文を変換�
   );
 });
 
-When(
-  "混在文字、深い字下げ、末尾空白を含む長いコードフェンスを変換する",
-  function () {
-    transform(
-      this,
-      [
-        "````text",
-        "$$x^2$$",
-        "````~~~",
-        "    `````",
-        "  `````   ",
-        "$$y^2$$",
-      ].join("\n"),
-    );
-  },
-);
+When("長い区切りと字下げと末尾空白を持つコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "$$backtick$$",
+      "````  \t",
+      "   ~~~~text",
+      "   $$tilde$$",
+      "   ~~~~~   ",
+      "$$x+1$$",
+    ].join("\n"),
+  );
+});
 
-Then("正しい閉じフェンスの後にある表示数式だけが画像になる", function () {
-  assert.equal(imageCount(this.rendered), 1);
-  assert.match(this.rendered, /\$\$x\^2\$\$/u);
+When("正規表現メタ文字を含む行があるコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "```.*",
+      "$$afterBacktickMetacharacters$$",
+      "```",
+      "~~~text",
+      "~~~[a-z]+",
+      "$$afterTildeMetacharacters$$",
+      "~~~",
+      "$$x+1$$",
+    ].join("\n"),
+  );
 });
 
 When("thinking の本文を変換する", function () {
@@ -145,6 +155,43 @@ Then("インライン数式は残り、2 つの表示数式だけが画像にな
 
 Then("コード内の本文は変更されない", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then(
+  "2 種類のコードフェンスが閉じて後続の表示数式だけが画像になる",
+  function () {
+    assert.deepEqual(
+      {
+        backtickFormulaRemains: this.rendered.includes("$$backtick$$"),
+        tildeFormulaRemains: this.rendered.includes("$$tilde$$"),
+        imageCount: imageCount(this.rendered),
+      },
+      {
+        backtickFormulaRemains: true,
+        tildeFormulaRemains: true,
+        imageCount: 1,
+      },
+    );
+  },
+);
+
+Then("正規表現メタ文字を含む行の後もコード内の表示数式は残る", function () {
+  assert.deepEqual(
+    {
+      backtickFormulaRemains: this.rendered.includes(
+        "$$afterBacktickMetacharacters$$",
+      ),
+      tildeFormulaRemains: this.rendered.includes(
+        "$$afterTildeMetacharacters$$",
+      ),
+      imageCount: imageCount(this.rendered),
+    },
+    {
+      backtickFormulaRemains: true,
+      tildeFormulaRemains: true,
+      imageCount: 1,
+    },
+  );
 });
 
 Then("thinking の本文は変更されない", function () {
@@ -550,7 +597,7 @@ When("入力上限を超えた表示数式を変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.oversizedPreparation = JSON.parse(result.stdout);
 });
 
@@ -582,7 +629,7 @@ When("表示数式を初めて変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.lazyPreparation = JSON.parse(result.stdout);
 });
 
@@ -623,7 +670,7 @@ When(
       cwd: resolve(__dirname, "../.."),
       encoding: "utf8",
     });
-    assert.equal(result.status, 0, result.stderr);
+    if (result.status !== 0) throw new Error(result.stderr);
     this.durations = JSON.parse(result.stdout);
   },
 );

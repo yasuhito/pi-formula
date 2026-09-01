@@ -20,3 +20,9 @@
 - Orca automation `pi-formula PR reviewer` が `agent:review` の PR をレビューし、ゲートを通過した場合だけマージする。
 - 自動化に渡したくない issue には `agent:implement` を付けない。`agent:blocked` が付いた issue / PR は人間が原因を確認するまで自動処理されない。
 - prompt と precheck の原本は `docs/agents/automations/` にある。
+
+## テスト
+
+- 1 テストケースのアサーションは 1 つまでにする。Node Test Runner の各 `test(...)` と Cucumber の各 Scenario を、それぞれ 1 テストケースとして数える。
+- 2 つ以上のアサーションが必要な場合はテストケースを分割し、共通の準備だけをヘルパーや hook へ抽出する。アサーションをヘルパーへ隠した場合も 1 つとして数える。
+- 件数を満たすためだけに、無関係な期待値を 1 つの集約アサーションへまとめない。Given と When は準備に限定し、結果のアサーションは Then に置く。

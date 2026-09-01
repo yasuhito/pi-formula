@@ -22,6 +22,12 @@ pi-formula の利用者として
 - When tarball のファイル一覧を調べる
 - Then src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品情報、表示見本だけが配布される
 
+## Scenario: npm tarball に Ghostty の表示見本を入れる
+
+- Given pi-formula の npm tarball を作る
+- When tarball のファイル一覧を調べる
+- Then Ghostty の表示見本が配布される
+
 ## Scenario: 公開候補 tarball を隔離環境で試験する
 
 - Given pi-formula の公開候補 tarball がある

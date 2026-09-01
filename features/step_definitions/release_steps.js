@@ -203,7 +203,6 @@ Then(
 );
 
 Then("Release の題名と本文は同じ版の CHANGELOG に一致する", function () {
-  assert.equal(this.preparation.status, 0, this.preparation.stderr);
   const manifest = JSON.parse(readProjectFile("package.json"));
   const changelogLines = readProjectFile("CHANGELOG.md").split("\n");
   const headingIndex = changelogLines.findIndex(

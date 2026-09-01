@@ -35,18 +35,21 @@ function indentationWidth(value: string): number {
   );
 }
 
-function isClosingFence(
-  value: string,
+function isFenceClosingCandidate(
+  candidate: string,
   character: string,
   minimumLength: number,
 ): boolean {
-  let index = 0;
-  while (index < 3 && value[index] === " ") index += 1;
-  if (value[index] === " ") return false;
-
-  const runStart = index;
-  while (value[index] === character) index += 1;
-  return index - runStart >= minimumLength && index === value.length;
+  const value = candidate.trimEnd();
+  let delimiterStart = 0;
+  while (value[delimiterStart] === " ") delimiterStart += 1;
+  if (delimiterStart > 3 || value.length - delimiterStart < minimumLength) {
+    return false;
+  }
+  for (let index = delimiterStart; index < value.length; index += 1) {
+    if (value[index] !== character) return false;
+  }
+  return true;
 }
 
 function protectCode(markdown: string): ProtectedMarkdown {
@@ -69,9 +72,9 @@ function protectCode(markdown: string): ProtectedMarkdown {
     if (fence) {
       fence.content += line;
       const candidate = line.startsWith(fence.continuation)
-        ? line.slice(fence.continuation.length).trimEnd()
+        ? line.slice(fence.continuation.length)
         : "";
-      if (isClosingFence(candidate, fence.character, fence.length)) {
+      if (isFenceClosingCandidate(candidate, fence.character, fence.length)) {
         withoutFences += token(fence.content);
         fence = undefined;
       }
