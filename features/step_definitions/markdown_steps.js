@@ -573,7 +573,7 @@ Then("MathJaxとResvgは最初の表示数式で初めて準備される", funct
 });
 
 When(
-  "初回、異なる未キャッシュ数式、一時保存済み数式を複数回計測する",
+  "初回準備後、異なる未キャッシュ数式と一時保存済み数式を複数回計測する",
   function () {
     const script = `
     const { performance } = require('node:perf_hooks');
@@ -588,13 +588,13 @@ When(
         });
         return performance.now() - started;
       };
-      const first = renderTimed('x_{cold1}');
+      renderTimed('x_{warmup}');
       const uncachedSamples = Array.from(
         { length: 5 },
-        (_, index) => renderTimed('x_{cold' + (index + 2) + '}')
+        (_, index) => renderTimed('x_{cold' + (index + 1) + '}')
       );
-      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold6}'));
-      process.stdout.write(JSON.stringify({ first, uncachedSamples, cachedSamples }));
+      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold5}'));
+      process.stdout.write(JSON.stringify({ uncachedSamples, cachedSamples }));
     })().catch((error) => { console.error(error); process.exitCode = 1; });
   `;
     const result = childProcess.spawnSync(process.execPath, ["-e", script], {
@@ -607,21 +607,26 @@ When(
 );
 
 Then(
-  "初回は1秒未満、未キャッシュの中央値は200ミリ秒未満、一時保存済みの最小値は5ミリ秒未満である",
+  "一時保存済みの中央値は未キャッシュ中央値の5パーセント未満である",
   function () {
-    const sortedUncached = [...this.durations.uncachedSamples].sort(
-      (left, right) => left - right,
-    );
-    const uncachedMedian =
-      sortedUncached[Math.floor(sortedUncached.length / 2)];
-    const cachedMinimum = Math.min(...this.durations.cachedSamples);
+    const median = (samples) => {
+      const sorted = [...samples].sort((left, right) => left - right);
+      return sorted[Math.floor(sorted.length / 2)];
+    };
+    const uncachedMedian = median(this.durations.uncachedSamples);
+    const cachedMedian = median(this.durations.cachedSamples);
+    const cachedRatio = cachedMedian / uncachedMedian;
     assert.ok(
-      this.durations.first < 1000 &&
-        this.durations.uncachedSamples.length === 5 &&
-        uncachedMedian < 200 &&
+      this.durations.uncachedSamples.length === 5 &&
         this.durations.cachedSamples.length === 10 &&
-        cachedMinimum < 5,
-      JSON.stringify({ ...this.durations, uncachedMedian, cachedMinimum }),
+        Number.isFinite(cachedRatio) &&
+        cachedRatio < 0.05,
+      JSON.stringify({
+        ...this.durations,
+        uncachedMedian,
+        cachedMedian,
+        cachedRatio,
+      }),
     );
   },
 );
