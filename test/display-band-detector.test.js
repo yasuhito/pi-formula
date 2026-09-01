@@ -42,8 +42,13 @@ function normalDisplay(x, y) {
 test("本文色の長い分数線と非数式 UI を正常と判定する", () => {
   const result = runPng(createPng(120, 80, normalDisplay));
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /異常な水平帯はありません/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsNoBands: /異常な水平帯はありません/u.test(result.stdout),
+    },
+    { status: 0, reportsNoBands: true },
+  );
 });
 
 test("ID 色の水平帯を座標付きで検出する", () => {
@@ -54,8 +59,13 @@ test("ID 色の水平帯を座標付きで検出する", () => {
     }),
   );
 
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /x=18\.\.105, y=36\.\.43/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsCoordinates: /x=18\.\.105, y=36\.\.43/u.test(result.stdout),
+    },
+    { status: 1, reportsCoordinates: true },
+  );
 });
 
 test("本文色とは異なる黒帯を検出する", () => {
@@ -66,8 +76,13 @@ test("本文色とは異なる黒帯を検出する", () => {
     }),
   );
 
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /rgb=0,0,0/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsBlack: /rgb=0,0,0/u.test(result.stdout),
+    },
+    { status: 1, reportsBlack: true },
+  );
 });
 
 test("途中で切れた scanline を破損 PNG として拒否する", () => {
@@ -76,8 +91,13 @@ test("途中で切れた scanline を破損 PNG として拒否する", () => {
     createPngFromScanlines(120, 80, Buffer.alloc(expected - 10)),
   );
 
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /展開長/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsLength: /展開長/u.test(result.stderr),
+    },
+    { status: 2, reportsLength: true },
+  );
 });
 
 test("行が欠けた PNG を破損 PNG として拒否する", () => {
@@ -85,13 +105,28 @@ test("行が欠けた PNG を破損 PNG として拒否する", () => {
     createPngFromScanlines(120, 80, Buffer.alloc((120 * 4 + 1) * 79)),
   );
 
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /展開長/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsLength: /展開長/u.test(result.stderr),
+    },
+    { status: 2, reportsLength: true },
+  );
 });
 
-test("色変化が多い代表寸法を時間上限内で判定する", { timeout: 15_000 }, () => {
+test("宣言寸法を超えて展開する PNG を拒否する", () => {
+  const result = runPng(
+    createPngFromScanlines(1, 1, Buffer.alloc(1024 * 1024)),
+  );
+
+  assert.equal(result.status, 2);
+});
+
+test("色変化が多い最大寸法を判定器の時間上限内で判定する", {
+  timeout: 40_000,
+}, () => {
   const width = 1920;
-  const height = 4000;
+  const height = 16000;
   const stride = width * 3;
   const scanlines = Buffer.alloc((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
@@ -105,9 +140,8 @@ test("色変化が多い代表寸法を時間上限内で判定する", { timeou
   }
   const result = runPng(
     createPngFromScanlines(width, height, scanlines, 2),
-    8_000,
+    30_000,
   );
 
-  assert.notEqual(result.status, null, result.error?.message);
-  assert.notEqual(result.status, 124);
+  assert.equal(result.status, 0, result.error?.message ?? result.stderr);
 });

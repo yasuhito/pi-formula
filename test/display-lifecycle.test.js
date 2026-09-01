@@ -41,7 +41,9 @@ printf '[]\\n'
   });
   await sleep(1_200);
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(fs.existsSync(marker), false);
+  assert.deepEqual(
+    { status: result.status, lateWindowExists: fs.existsSync(marker) },
+    { status: 0, lateWindowExists: false },
+  );
   fs.rmSync(directory, { recursive: true, force: true });
 });

@@ -60,7 +60,6 @@ When("ハーネスの安全条件を調べる", function () {
 Then(
   "隔離した設定で現在の画像経路だけを確認する headless 起動、画像行数を含む全履歴キャプチャ、応答一致、時間上限、フォーカス不変確認、process group の後片付けが揃っている",
   function () {
-    assert.ok(this.corpus.includes("F_8"));
     assert.deepEqual(this.safety, {
       headless: true,
       tallOutput: true,
@@ -75,6 +74,10 @@ Then(
     });
   },
 );
+
+Then("Issue 21 の最後の表示数式がコーパスに含まれる", function () {
+  assert.ok(this.corpus.includes("F_8"));
+});
 
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
   this.directory = fs.mkdtempSync(
@@ -97,8 +100,13 @@ When("表示数式の画像行数を含む出力高を計画する", function ()
 });
 
 Then("全履歴が収まらないコーパスは描画前に拒否される", function () {
-  assert.equal(this.planResult.status, 2);
-  assert.match(this.planResult.stderr, /16000px/u);
+  assert.deepEqual(
+    {
+      status: this.planResult.status,
+      reportsLimit: /16000px/u.test(this.planResult.stderr),
+    },
+    { status: 2, reportsLimit: true },
+  );
 });
 
 Given(
@@ -145,8 +153,13 @@ When("応答とコーパスの一致を検証する", function () {
 });
 
 Then("改変された応答はキャプチャ前に拒否される", function () {
-  assert.equal(this.echoResult.status, 2);
-  assert.match(this.echoResult.stderr, /一字一句一致しません/u);
+  assert.deepEqual(
+    {
+      status: this.echoResult.status,
+      reportsMismatch: /一字一句一致しません/u.test(this.echoResult.stderr),
+    },
+    { status: 2, reportsMismatch: true },
+  );
 });
 
 function givenPng(world, withBand) {
@@ -188,11 +201,21 @@ When("ピクセル判定を実行する", function () {
 });
 
 Then("表示数式のキャプチャは正常と判定される", function () {
-  assert.equal(this.result.status, 0, this.result.stderr);
-  assert.match(this.result.stdout, /異常な水平帯はありません/u);
+  assert.deepEqual(
+    {
+      status: this.result.status,
+      reportsNoBands: /異常な水平帯はありません/u.test(this.result.stdout),
+    },
+    { status: 0, reportsNoBands: true },
+  );
 });
 
 Then("水平帯の座標が報告される", function () {
-  assert.equal(this.result.status, 1);
-  assert.match(this.result.stdout, /x=18\.\.105, y=36\.\.43/u);
+  assert.deepEqual(
+    {
+      status: this.result.status,
+      reportsCoordinates: /x=18\.\.105, y=36\.\.43/u.test(this.result.stdout),
+    },
+    { status: 1, reportsCoordinates: true },
+  );
 });

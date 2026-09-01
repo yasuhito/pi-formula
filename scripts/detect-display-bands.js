@@ -51,13 +51,14 @@ function decodePng(png) {
     throw new Error(`PNG の画素数が上限 ${MAX_PIXELS} を超えています`);
   }
 
+  const stride = width * channels;
+  const expectedLength = (stride + 1) * height;
   const packed = inflateSync(
     Buffer.concat(
       chunks.filter(({ type }) => type === "IDAT").map(({ data }) => data),
     ),
+    { maxOutputLength: expectedLength },
   );
-  const stride = width * channels;
-  const expectedLength = (stride + 1) * height;
   if (packed.length !== expectedLength) {
     throw new Error(
       `PNG の展開長が不正です: expected ${expectedLength}, got ${packed.length}`,

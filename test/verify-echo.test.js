@@ -49,7 +49,12 @@ for (const [name, answer] of [
 ]) {
   test(`${name}を不一致として拒否する`, () => {
     const result = validate(answer);
-    assert.equal(result.status, 2);
-    assert.match(result.stderr, /一字一句一致しません/u);
+    assert.deepEqual(
+      {
+        status: result.status,
+        reportsMismatch: /一字一句一致しません/u.test(result.stderr),
+      },
+      { status: 2, reportsMismatch: true },
+    );
   });
 }

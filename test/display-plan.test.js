@@ -9,11 +9,13 @@ const issueCorpus = path.resolve(
   "../docs/agents/verify-corpus/issue-21.md",
 );
 
-test("Issue 21 の表示数式を画像行数込みで縦長出力へ収める", () => {
-  const plan = planDisplay(issueCorpus);
+test("Issue 21 の表示数式を画像行数として数える", () => {
+  assert.ok(planDisplay(issueCorpus).imageRows > 0);
+});
 
-  assert.ok(plan.imageRows > 0);
-  assert.ok(plan.height >= 8000 && plan.height <= 16000);
+test("Issue 21 のコーパスを対応する出力高へ収める", () => {
+  const { height } = planDisplay(issueCorpus);
+  assert.ok(height >= 8000 && height <= 16000);
 });
 
 test("短いが高い表示数式を複数含むコーパスを事前に拒否する", () => {

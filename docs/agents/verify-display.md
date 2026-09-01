@@ -37,7 +37,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ハーネスは実行ごとに一意な headless 出力を作る。Ghostty は `hl.dsp.exec_cmd` の `workspace` と `monitor` の `silent` 規則で、その出力へ作成時から割り当てる。`no_initial_focus` も指定する。後追い移動はしない。起動後は、Ghostty の monitor ID と実行前後の active window が変わっていないことを検査する。条件を満たさなければキャプチャせず失敗する。
 
-すべての外部処理には時間上限がある。Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、Hyprland の close が失敗しても process group を停止し、対象ウィンドウが消えたことを確認してから headless 出力と一時ファイルを削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
+すべての外部処理には時間上限がある。通常の外部処理は8秒、ビルドは120秒、最大画像のピクセル判定は30秒とする。Ghostty は専用の process group で起動し、その ID をウィンドウ待機より前に保存する。`EXIT`、`INT`、`TERM`、`HUP` の trap は、Hyprland の close が失敗しても process group を停止し、対象ウィンドウが消えたことを確認してから headless 出力と一時ファイルを削除する。利用者の可視出力は撮影しない。`grim` には一意な headless 出力名だけを渡す。
 
 ## 履歴全体
 
@@ -51,6 +51,6 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ハーネスは専用の Pi theme と Ghostty の背景色・本文色を使う。判定器へ背景色、本文色、theme の全 UI 色を明示し、それらを候補から除く。このため、本文色の長い分数線、コード、URL、金額、シェル変数、非数式 UI を水平帯と誤認しない。専用 palette にない ID 色や黒色が、画面幅の 20% 以上に連続して 3 行以上続く場合を水平帯とする。字形で途切れた同色領域は近接する座標へまとめる。画面上下 1% の compositor 部品は対象外にする。
 
-画素色は 24-bit 整数で扱い、背景色は固定長 histogram の一走査で求める。判定時間は画素数に比例する。CI では、横方向に色が変わり続ける 1920×4000 の合成 PNG を代表入力とし、実処理と同じ8秒の上限で回帰試験する。上限画像の4分の1にして、runner の性能差に対する余裕を確保する。
+画素色は 24-bit 整数で扱い、背景色は固定長 histogram の一走査で求める。判定時間は画素数に比例する。横方向に色が変わり続ける上限寸法 1920×16000 の合成 PNG を、実処理と同じ30秒の上限で判定する回帰試験を置く。
 
 この判定は決定的な一次判定であり、数式の組版品質や内容の正しさまでは判定しない。

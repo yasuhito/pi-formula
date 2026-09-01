@@ -26,12 +26,22 @@ test("画像経路の確認だけを受理する", () => {
 
 test("PNG 問い合わせ失敗で選ばれたテキスト経路を拒否する", () => {
   const result = verify("text");
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /画像経路/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsImagePath: /画像経路/u.test(result.stderr),
+    },
+    { status: 2, reportsImagePath: true },
+  );
 });
 
 test("画像経路の確認記録がない場合を拒否する", () => {
   const result = verify(undefined);
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /画像経路/u);
+  assert.deepEqual(
+    {
+      status: result.status,
+      reportsImagePath: /画像経路/u.test(result.stderr),
+    },
+    { status: 2, reportsImagePath: true },
+  );
 });
