@@ -100,6 +100,17 @@ Then("Issue 21 の最後の表示数式がコーパスに含まれる", function
   assert.ok(this.corpus.includes("F_8"));
 });
 
+Given("Issue 26 の再現コーパスがある", function () {
+  this.corpus = fs.readFileSync(
+    path.join(root, "docs/agents/verify-corpus/issue-26.md"),
+    "utf8",
+  );
+});
+
+Then("最初の表示数式と後続二式がコーパスに含まれる", function () {
+  assert.equal([...this.corpus.matchAll(/^\$\$$/gmu)].length / 2, 3);
+});
+
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
   this.directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),

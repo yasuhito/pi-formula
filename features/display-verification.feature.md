@@ -69,6 +69,11 @@ pi-formula の worker として
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
 - Then Issue 21 の最後の表示数式がコーパスに含まれる
 
+## Scenario: Issue 26 の再現原文を使う
+
+- Given Issue 26 の再現コーパスがある
+- Then 最初の表示数式と後続二式がコーパスに含まれる
+
 ## Scenario: 短いが高い表示数式を事前に拒否する
 
 - Given 16000px を超える高い表示数式を含む短いコーパスがある

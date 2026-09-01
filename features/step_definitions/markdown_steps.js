@@ -460,6 +460,37 @@ Then(
   },
 );
 
+When("ツール出力に続けて同じ表示数式を二度配置する", function () {
+  transform(
+    this,
+    ["qni のツール出力", "$$x_{cached}$$", "描画更新", "$$x_{cached}$$"].join(
+      "\n\n",
+    ),
+  );
+});
+
+Then("各プレースホルダーの直前で表示数式を転送する", function () {
+  assert.equal(
+    imageCount(this.rendered),
+    placeholderLines(this.rendered).length,
+  );
+});
+
+When("一時保存済みの表示数式を端末から失った後に再配置する", function () {
+  transform(this, "$$x_{cached}$$\n\n端末から画像を破棄\n\n$$x_{cached}$$");
+  const lines = this.rendered.split("\n");
+  const secondPlaceholder = lines.findLastIndex((line) =>
+    line.includes(PLACEHOLDER),
+  );
+  this.secondPlacement = lines
+    .slice(secondPlaceholder - 2, secondPlaceholder + 1)
+    .join("\n");
+});
+
+Then("再配置する表示数式を転送してからプレースホルダーを置く", function () {
+  assert.equal(imageCount(this.secondPlacement), 1);
+});
+
 When("外部作用を監視しながら表示数式を変換する", function () {
   const calls = [];
   const patches = [];
