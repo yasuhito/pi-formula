@@ -48,6 +48,26 @@ test('display formulas use a Kitty PNG transfer and placeholder rows', async () 
   });
 });
 
+test('the same display formula transfers once and keeps every placement', async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()('$$x$$\n間\n$$x$$', {
+    messageType: 'assistant', isStreaming: false, availableWidth: 80
+  });
+
+  assert.deepEqual({
+    transfers: (rendered.match(/\x1b_Ga=T,f=100/gu) ?? []).length,
+    placeholderRows: (rendered.match(/\x1b\[38;2;\d+;\d+;\d+m/gu) ?? []).length,
+    hasPlaceholder: rendered.includes(String.fromCodePoint(0x10eeee))
+  }, {
+    transfers: 1,
+    placeholderRows: 2,
+    hasPlaceholder: true
+  });
+});
+
 test('a display formula keeps each Kitty transfer line free of other drawing output', async () => {
   const pi = fakePi();
   registerFormula(pi.api);

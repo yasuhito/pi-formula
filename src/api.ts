@@ -263,17 +263,20 @@ export function registerFormula(
 
   pi.registerMarkdownTransformer((markdown, context) => {
     if (context.messageType === "assistant-thinking" || state.path === "text") return markdown;
+    const transferredIds = new Set<number>();
     return transformDisplayMath(markdown, (latex, original) => {
       const cached = cachedImage(state, latex, context.availableWidth);
       if (!cached) return original;
       try {
         const id = stableImageId(cached.key);
-        const transfer = encodeTransfer(
-          cached.image.png, id, cached.image.columns, cached.image.rows
-        );
         const placeholder = encodePlaceholderRows(
           id, cached.image.columns, cached.image.rows
         ).join("\n");
+        if (transferredIds.has(id)) return placeholder;
+        const transfer = encodeTransfer(
+          cached.image.png, id, cached.image.columns, cached.image.rows
+        );
+        transferredIds.add(id);
         // Keep the final Kitty terminator away from Markdown's line-ending
         // backslash handling, and isolate the transfer as its own rendered line.
         return `${transfer}\x1b[0m\n\n${placeholder}`;
