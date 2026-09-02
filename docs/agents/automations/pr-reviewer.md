@@ -314,7 +314,9 @@ PASS 相当として扱う場合:
 
 ### 6.5. Review record: 各 HEAD に1件だけ記録する
 
-レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
+レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。
+見た目を変える修正を返した場合は、Review record にも修正前後の画像を添付する。`gh pr comment <PR> -R yasuhito/pi-formula --body-file <file> --attach '<path>#<説明>'` を使う。文章だけで「直った」と書かない。
+生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
 
 コメント先頭には次の機械識別子を置く。
 
