@@ -55,6 +55,38 @@ prs_json=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review -
 
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
 
+### 1.7. Conflict gate: main と衝突している PR を解消する
+
+対象 PR の `mergeableState` を確認する。`DIRTY`（main と衝突）なら、レビューへ進む前に解消する。
+
+```bash
+gh pr view <PR> -R yasuhito/pi-formula --json mergeable,mergeStateStatus,headRefName
+```
+
+`DIRTY` のときは worker worktree で main を取り込み、衝突を解消させる。coordinator と同じ手順で worker terminal を作り、次を送る。
+
+```text
+PR #<PR> のブランチ <headRefName> が main と衝突しています。解消してください。
+
+- `git fetch origin main` のあと `git merge origin/main` で取り込む
+- 衝突は内容を読んで解消する。どちらかを機械的に捨てない。両側が別々の追記なら両方残す
+- 解消後に `npm run check` を成功させる
+- commit まで行う。push はしない
+- 完了したら `<promise>COMPLETE</promise>`、解消できなければ理由とともに `<promise>BLOCKED: 理由</promise>`
+```
+
+worker の完了後、reviewer が `npm run check` を実行してから push する。解消できない場合は `agent:blocked` を付け、衝突の内容を PR へ書いて終了する。
+
+`DIRTY` でなくても、対象 PR の base が main より古い場合は先に main を取り込む。この repository の CI は外部 repository の現在の状態を参照するため、古い base のままだと**その PR の変更と無関係な理由で CI が落ちる**（2026-09-02 に、#60 マージ前の main から切られた PR が、マクロ定義の突き合わせで落ちた）。
+
+```bash
+gh pr update-branch <PR> -R yasuhito/pi-formula
+```
+
+衝突なく取り込めた場合はそのままレビューへ進む。衝突した場合は上の worker 手順で解消する。
+
+完了条件: 対象 PR が main と衝突していない、または衝突を解消できない理由が PR に記録されている。
+
 ### 2. Draft gate: draft PR なら ready にする
 
 対象 PR が draft の場合:
