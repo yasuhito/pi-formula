@@ -313,7 +313,7 @@ review_record_count=$(gh api repos/yasuhito/pi-formula/issues/<PR>/comments --pa
 
 PASS 相当として扱う場合:
 
-- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。`ready-for-agent` / `agent:implement` は付けない。
+- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。 follow-up issue にも実装契約（`## What to build` / `## Acceptance criteria` / `## Out of scope`）を含める。含めないと triage で毎回書き直しになる（2026-09-03 に pi-formula で 4 件が契約なしで滞留した）。`What to build` には再現手順と、件数だけでなく**何が起きているか**が分かる出力例を書く。`ready-for-agent` / `agent:implement` は付けない。
 - Review record の判定を `PASS（後続 issue #M へ切り出し）` とし、切り出した finding と issue 番号を「指摘と対応」に書く。
 - high 以上の finding が 1 件でもあれば、この打ち切りは適用せず通常どおり 7 の Fix へ進む。
 
