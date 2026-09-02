@@ -12,7 +12,7 @@ cage、wlr-randr、Ghostty、grim、jq、Node.js、Pi が必要になる。利�
 scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-探索モードは `--prompt` に自由なプロンプトを渡す。安全な接頭辞を付けた入力を、検証補助拡張が Pi の公開 `input` event で元の文字列へ戻すため、先頭が `-` や `@` でも CLI のオプションやファイル入力にはならない。Pi は応答を生成しながら描画するため、ストリーミング中のテキスト経路と、応答確定後の画像経路への切り替えを同じセッションで検査できる。応答の内容やプロンプトとの一致は判定しない。
+探索モードは `--prompt` に自由なプロンプトを渡す。安全な接頭辞を付けた入力を、検証補助拡張が Pi の公開 `input` event で元の文字列へ戻すため、先頭が `-` や `@` でも CLI のオプションやファイル入力にはならない。検証補助拡張は、2回目の公開 `message_update` を受けた時点で応答の進行を一時停止する。ハーネスは、その未完了状態を確認して撮影・ピクセル判定し、応答を再開する。続いて、同じセッションで応答確定後の画像経路も撮影・判定する。応答の内容やプロンプトとの一致は判定しない。
 
 ```sh
 scripts/verify-display --prompt '表示数式を使ってフーリエ変換を説明してください。'
@@ -20,7 +20,9 @@ scripts/verify-display --prompt '表示数式を使ってフーリエ変換を�
 
 探索モードへ tool 用の拡張を追加する場合は、`--extension` を繰り返し渡し、使用を許可するツール名だけを `--tools` のカンマ区切りで渡す。拡張の自動探索と、指定していないツールは無効のままにする。追加する拡張は Markdown transformer を登録せず、必要な追加マクロを pi-formula の公開 `registerFormula(pi, macros)` へ渡すものに限る。これにより、ストリーミング中のテキスト経路と確定後の画像経路を pi-formula 一つで描画する。
 
-現在の qni-cli 0.1.0 にある `dist/qni-math/index.js` は、`qni` tool と独自の Markdown transformer を一緒に登録するため互換性がない。ハーネスはこの entry point を拒否する。qni-cli と併用するには、qni-cli 側へ tool の登録と `registerFormula` による追加マクロ登録だけを行う互換 entry point を追加する必要がある。それが用意されるまで、qni-cli との併用は検証済みとして扱わない。
+現在の qni-cli 0.1.0 にある `dist/qni-math/index.js` は、`qni` tool と独自の Markdown transformer を一緒に登録するため互換性がない。ハーネスはこの entry point を拒否する。qni-cli と併用するには、qni-cli 側へ tool の登録と `registerFormula` による追加マクロ登録だけを行う互換 entry point を追加する必要がある。
+
+この依存作業が終わるまで Issue #49 の「qni-cli など他の拡張と組み合わせた実利用の再現」は未達であり、Issue #49 を閉じない。対応 PR は `Closes #49` ではなく `Refs #49` とし、qni-cli 側の follow-up issue を依存先として示す。その他の受け入れ基準（自由なプロンプト、終了コード、応答保存、コーパスモード非退行、同一セッションでの未完了時と確定後の撮影・判定、利用方法、`npm run check`）は、このリポジトリで検証する。
 
 異常を回帰検証へ昇格させる場合は、`--save-response` で完了した応答を一字一句そのままコーパスへ保存する。保存はピクセル判定より先に行うため、水平帯を検出して exit 1 になった応答も残る。
 
@@ -37,7 +39,7 @@ scripts/verify-display \
 - x=120..1780, y=940..1012, rgb=210,0,170
 ```
 
-撮れた画面は必ず `$XDG_STATE_HOME/pi-formula/verify-display-capture.png`（既定は `~/.local/state/pi-formula/verify-display-capture.png`）へ残し、その場所を標準出力へ示す。表示が正しいかどうかの最終的な判断は、このキャプチャを人と Agent が目で見て行う。帯を検出した場合は、座標に加えてキャプチャの確認を促す。保存先を変えたい場合は明示する。
+確定後に撮れた画面は必ず `$XDG_STATE_HOME/pi-formula/verify-display-capture.png`（既定は `~/.local/state/pi-formula/verify-display-capture.png`）へ残し、その場所を標準出力へ示す。探索モードは未完了時の画面も同じ場所の `verify-display-capture-streaming.png` へ残す。保存先はそれぞれ `PI_FORMULA_VERIFY_CAPTURE` と `PI_FORMULA_VERIFY_STREAM_CAPTURE` で変更できる。表示が正しいかどうかの最終的な判断は、これらのキャプチャを人と Agent が目で見て行う。どちらかで帯を検出した場合は、両方の判定を終えてから exit 1 にする。
 
 ```sh
 PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
@@ -69,7 +71,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 コーパスモードでは、コーパスを現在の typesetter で事前に組版し、各表示数式の実際の画像行数を求める。Markdown の行数・折り返し量、入力と応答の2回分の画像行数、Pi の画面部品を含む保守的な余白から、8000〜16000 px の縦長 headless 出力を選ぶ。短い LaTeX でも画像が高ければ必要高へ加算する。16000 px に収まらないコーパスは、ビューポートだけを撮らず描画前に拒否する。探索モードは応答を事前に計画できないため、上限の16000 pxを使う。
 
-受理した入力はスクロールや画像結合を使わず、`grim` の 1 枚で履歴全体を取得する。PNGのIHDRが計画した出力寸法に一致しなければ、履歴欠落としてexit 2にする。コーパスモードだけ、キャプチャ前に session JSONL の最後の完了した assistant message から text content を取り出し、コーパスと一字一句比較する。コードフェンス、Unicode 化、前置き、欠落を含む不一致は exit 2 とし、キャプチャへ進まない。探索モードはこの一致検証を行わず、モデルが生成した応答をそのまま描画する。
+受理した入力はスクロールや画像結合を使わず、`grim` の 1 枚で履歴全体を取得する。PNGのIHDRが計画した出力寸法に一致しなければ、履歴欠落としてexit 2にする。コーパスモードだけ、キャプチャ前に session JSONL の最後の完了した assistant message から text content を取り出し、コーパスと一字一句比較する。コードフェンス、Unicode 化、前置き、欠落を含む不一致は exit 2 とし、キャプチャへ進まない。探索モードはこの一致検証を行わず、モデルが生成した応答をそのまま描画する。探索モードでは、公開 `message_update` のゲートが応答を未完了に保つ間に1枚を撮影・判定し、ゲート解除後に確定した画面をもう1枚撮影・判定する。2回目の text update が来ない応答は、未完了時の画面を保証できないため exit 2 にする。
 
 応答が完了していてもGhosttyがまだ描き終えていないことがあるため、帯の判定より前に描画完了を確認する。判定は内容を解釈せず、次の3条件だけで決める。専用の端末背景がキャプチャの1%以上を占めること（端末が写っている）、背景以外の描画が0.1%以上あること（何かが描かれている）、そして前回のキャプチャとピクセルが完全に一致すること（描画が安定した）である。端末背景には素の背景色に加えてPiの引用ブロック背景も渡す。表示数式は引用ブロックの中へ描かれるため、ブロック背景を背景として数えないと描画量を正しく測れない。
 

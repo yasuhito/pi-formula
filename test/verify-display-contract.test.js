@@ -144,6 +144,39 @@ test("探索で得た応答をキャプチャ前にコーパスへ保存する",
   );
 });
 
+test("探索モードは未完了を確認してからストリーミング画面を判定する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "stream_ready=false",
+      'check-display-session.js" "$SESSION_FILE"',
+      'run_inside grim "$STREAM_CAPTURE_FILE"',
+      "detect-streaming-display-bands",
+      'run touch "$STREAM_CAPTURE_ACK"',
+    ),
+  );
+});
+
+test("探索モードはストリーミング画面の後で確定画面も判定する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "detect-streaming-display-bands",
+      'run touch "$STREAM_CAPTURE_ACK"',
+      "completed=false",
+      'run_inside grim "$CAPTURE_FILE"',
+      "detector detect-display-bands",
+    ),
+  );
+});
+
+test("探索モードは二つの画面のどちらに帯があっても終了コード1にする", () => {
+  assert.match(
+    harness,
+    /stream_detector_status" -eq 1 \|\| "\$detector_status" -eq 1/u,
+  );
+});
+
 test("描画完了をピクセル判定前に確認する", () => {
   assert.ok(
     markersAppearInOrder(
