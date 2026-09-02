@@ -31,7 +31,7 @@ function validate(answer, expected = corpus) {
   const result = spawnSync(
     process.execPath,
     [validator, corpusFile, sessionFile],
-    { encoding: "utf8" },
+    { encoding: "utf8", timeout: 2_000 },
   );
   fs.rmSync(directory, { recursive: true, force: true });
   return result;
@@ -47,6 +47,26 @@ test("コーパスだけが末尾改行を持つ応答を受理する", () => {
 
 test("応答だけが末尾改行を持つ応答を受理する", () => {
   assert.equal(validate(`${corpus}\n`).status, 0);
+});
+
+test("コーパス末尾のCRLFを受理する", () => {
+  assert.equal(validate(corpus, `${corpus}\r\n`).status, 0);
+});
+
+test("応答末尾のCRを受理する", () => {
+  assert.equal(validate(`${corpus}\r`).status, 0);
+});
+
+test("多数のCRLFの後に本文があっても時間内に不一致を報告する", () => {
+  const result = validate(`${corpus}${"\r\n".repeat(40)}x`);
+  assert.deepEqual(
+    {
+      status: result.status,
+      timedOut: result.error?.code === "ETIMEDOUT",
+      reportsMismatch: /一字一句一致しません/u.test(result.stderr),
+    },
+    { status: 2, timedOut: false, reportsMismatch: true },
+  );
 });
 
 test("末尾改行以外の一文字差は位置と文字数を報告する", () => {

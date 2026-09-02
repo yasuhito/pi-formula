@@ -22,7 +22,13 @@ function assistantText(session) {
 }
 
 function withoutTrailingNewlines(text) {
-  return text.replace(/(?:\r\n|\n|\r)+$/u, "");
+  let end = text.length;
+  while (end > 0) {
+    const code = text.charCodeAt(end - 1);
+    if (code !== 10 && code !== 13) break;
+    end -= 1;
+  }
+  return text.slice(0, end);
 }
 
 function verifyEcho(corpus, session) {
