@@ -259,7 +259,7 @@ function urlTokenStart(source: string, openingIndex: number): number {
 function bareUrlEnd(source: string, openingIndex: number): number | undefined {
   const tokenStart = urlTokenStart(source, openingIndex);
   if (
-    !/(?:[a-z][a-z0-9+.-]*:\/\/|www\.|\/\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#]|$))\S*$/iu.test(
+    !/(?:[a-z][a-z0-9+.-]*:\S+|www\.|\/\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#]|$))\S*$/iu.test(
       source.slice(tokenStart, openingIndex),
     )
   ) {

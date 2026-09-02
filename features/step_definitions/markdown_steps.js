@@ -135,6 +135,21 @@ When(
   },
 );
 
+When(
+  "スラッシュなしスキーム URL の ket 追加マクロ風文字列を変換する",
+  function () {
+    transform(
+      this,
+      [
+        String.raw`mailto:user+$\ket{s}$@example.com`,
+        String.raw`tel:+81-$\ket{t}$`,
+        String.raw`urn:example:$\ket{u}$`,
+        String.raw`data:text/plain,$\ket{v}$`,
+      ].join("\n"),
+    );
+  },
+);
+
 When("braket 追加マクロを含む丸括弧区切りのインライン数式を描く", function () {
   transform(this, String.raw`\(\braket{s|\psi}\)`);
   this.unicode = renderUnicode(this.rendered);
@@ -293,6 +308,10 @@ Then(
 );
 
 Then("スキーム付き URL と www URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("スラッシュなしスキーム URL は変更されない", function () {
   assert.equal(this.rendered, this.source);
 });
 
