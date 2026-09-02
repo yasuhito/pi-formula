@@ -70,7 +70,7 @@ function fontFilesUnder(root: string): string[] {
   return files;
 }
 
-export function selectFormulaSerifFamily(
+function selectFormulaSerifFamily(
   fontFiles: readonly string[],
 ): string | undefined {
   const fileNames = fontFiles.map((path) => basename(path));

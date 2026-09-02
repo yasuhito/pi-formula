@@ -1,56 +1,89 @@
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
+const { resolve } = require("node:path");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
-const registerFormula = require("../../dist/extension.js").default;
-const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
-
-function imageCount(rendered) {
-  return rendered.split("\x1b_Ga=T,f=100").length - 1;
-}
-
-function transform(world, latex) {
-  world.rendered = world.pi.transformer()(`$$${latex}$$`, {
-    messageType: "assistant",
-    isStreaming: false,
-    availableWidth: 80,
-  });
-}
-
-Given("画像経路で text を組版できる Pi がある", async function () {
-  this.pi = fakePi();
-  registerFormula(this.pi.api);
-  this.started = await startWithKitty(this.pi);
-});
-
-When("日本語の text を含む表示数式を変換する", function () {
-  transform(this, "A(j)=\\begin{cases}0&\\text{それ以外}\\end{cases}");
-});
-
-Then("日本語を含む表示数式が画像になる", function () {
-  assert.equal(imageCount(this.rendered), 1);
-});
-
-When("ASCII の text を含む表示数式を変換する", function () {
-  transform(this, "A(j)=\\begin{cases}0&\\text{otherwise}\\end{cases}");
-});
-
-Then("ASCII を含む表示数式が画像になる", function () {
-  assert.equal(imageCount(this.rendered), 1);
-});
-
-When("表示数式を変換して formula status を実行する", async function () {
-  transform(this, "\\text{解}");
-  await this.pi.commands.get("formula").handler("status", this.started.ctx);
-  this.status = this.started.widgets.get("pi-formula-status");
-});
-
-Then("選ばれたセリフ体またはシステムの代替が表示される", function () {
-  assert.equal(
-    this.status.some((line) =>
-      /^serif: (Noto Serif CJK JP|Source Han Serif JP|Source Han Serif|IPAexMincho|system fallback)$/u.test(
-        line,
-      ),
-    ),
-    true,
+function runProbe(inventory, text) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(__dirname, "../../test/support/typesetting-probe.js"),
+      inventory,
+      text,
+    ],
+    { encoding: "utf8" },
   );
+  if (result.status !== 0) throw new Error(result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+Given("{word} のセリフ体候補がある画像経路", function (inventory) {
+  this.fontInventory = inventory;
+});
+
+Given("CJK 対応セリフ体がない画像経路", function () {
+  this.fontInventory = "fallback";
+});
+
+When("日本語の text を含む表示数式を Resvg まで組版する", function () {
+  this.probe = runProbe(this.fontInventory, "それ以外");
+});
+
+When("ASCII の text を含む表示数式を Resvg まで組版する", function () {
+  this.probe = runProbe(this.fontInventory, "otherwise");
+});
+
+Then("選んだセリフ体と日本語の組版尺度が Resvg へ渡る", function () {
+  assert.deepEqual(this.probe, {
+    image: true,
+    pngSignature: "89504e470d0a1a0a",
+    font: {
+      loadSystemFonts: true,
+      defaultFontFamily: "Noto Serif CJK JP",
+      serifFamily: "Noto Serif CJK JP",
+    },
+    pathCount: 19,
+    text: {
+      value: "それ以外",
+      family: "serif",
+      size: "884px",
+      baseline: "scale(1,-1)",
+    },
+    status: "serif: Noto Serif CJK JP",
+  });
+});
+
+Then("{string} が表示数式のセリフ体に選ばれる", function (family) {
+  assert.equal(this.probe.font.serifFamily, family);
+});
+
+Then("ASCII は従来どおりパスとして Resvg へ渡る", function () {
+  assert.deepEqual(this.probe, {
+    image: true,
+    pngSignature: "89504e470d0a1a0a",
+    font: {
+      loadSystemFonts: true,
+      defaultFontFamily: "Noto Serif CJK JP",
+      serifFamily: "Noto Serif CJK JP",
+    },
+    pathCount: 26,
+    text: null,
+    status: "serif: Noto Serif CJK JP",
+  });
+});
+
+Then("システムのセリフ体へ戻って日本語の PNG 描画を続ける", function () {
+  assert.deepEqual(this.probe, {
+    image: true,
+    pngSignature: "89504e470d0a1a0a",
+    font: { loadSystemFonts: true },
+    pathCount: 19,
+    text: {
+      value: "それ以外",
+      family: "serif",
+      size: "884px",
+      baseline: "scale(1,-1)",
+    },
+    status: "serif: system fallback",
+  });
 });
