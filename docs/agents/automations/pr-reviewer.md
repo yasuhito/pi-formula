@@ -27,6 +27,7 @@
 - `agent:review` はレビュー待ち、`agent:reviewing` はレビュー中を表す。`ready-for-human` は既存の手動確認用ラベルとして候補から除外するが、この automation は追加しない。
 - Copilot の inline comment、review summary、top-level comment を確認し、actionable な指摘は修正するか、理由を明記して対応不要と判断する。
 - GitHub Copilot は新しい commit push 後に自動で再レビューされないことがある。最新 HEAD に対する Copilot review が無い場合は `gh pr edit <PR> --add-reviewer "@copilot"` で明示的に再依頼する。ただし、その HEAD に対して本文が「quota limit に達したためレビューできない」という趣旨（例: "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."）の Copilot review が既に付いている場合は、quota 枯渇と判断して再依頼しない。quota 枯渇の間は Copilot に関する待ち条件と merge 条件をすべて無視して独立レビューと merge 判定に進み、その旨を最後の要約に書く（2026-08-31 PR #19 で再依頼の無限ループが起きた）。この依頼が「Copilot をレビュアーに追加できない」という趣旨のエラーで失敗する場合は、このリポジトリで Copilot code review が利用できないと判断し、Copilot に関する待ち条件と merge 条件をすべて無視する。その旨を最後の要約に書く。
+- bot review の待ちには上限を設ける。同じ HEAD に対して bot review を依頼した run から数えて 2 run 経っても応答が無い場合は、その bot を利用不可とみなし、待ち条件と merge 条件から外して独立レビューと merge 判定へ進む。その旨を最後の要約に書く。加えて、直近 3 時間以内にこの repository のいずれかの PR で「quota limit に達した」趣旨の review が観測されている場合は、応答が来ていない他の PR についても quota 枯渇中と判断し、同じく待たない（2026-09-02 に、quota 枯渇中で応答が来ない PR が複数 run にわたって merge 判定へ進めなかった）。
 - GitHub PR コメントは日本語で書く。引用やエラーメッセージ、コード識別子、ファイルパス、コマンドは原文でよい。
 - GitHub issue / PR コメントには、読み手に必要な成果、判断、ブロッカー、レビュー対応、検証だけを書く。`ready-for-agent`、`agent:implement`、`agent:review`、`agent:reviewing`、`ready-for-human` などのラベル付けや内部状態遷移を「付けた」「外した」という作業ログとして書かない。ラベル名を書くのは、ユーザーに見える待ち状態やブロッカーそのものを説明する必要がある場合だけにする。
 - `npm run check` を成功させずに修正の push や merge をしない。
