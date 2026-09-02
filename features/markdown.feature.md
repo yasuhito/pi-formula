@@ -24,6 +24,40 @@ Formula for Pi の利用者として
 - When braket 追加マクロを含む丸括弧区切りのインライン数式を描く
 - Then braket 追加マクロが Unicode で描かれる
 
+## Scenario: braket 利用者マクロをドル区切りのインライン数式で使う
+
+- Given braket の利用者マクロを設定した画像経路の Pi がある
+- When braket 利用者マクロを含むドル区切りのインライン数式を描く
+- Then braket 利用者マクロが Unicode で描かれる
+
+## Scenario: Object prototype 名を未登録マクロとして扱う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When Object prototype 名と ket 追加マクロを含む本文を変換する
+- Then Object prototype 名は残り ket 追加マクロだけが展開される
+
+## Scenario: 金額とシェル変数の後にあるインライン数式を描く
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 金額とシェル変数の後に ket 追加マクロがある本文を描く
+- Then 金額とシェル変数は残り後続の ket 追加マクロが Unicode で描かれる
+
+## Scenario: 相対 Markdown URL のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する
+- Then 相対 Markdown URL は変更されない
+
+## Scenario: スキームなし URL のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When スキームなし URL に ket 追加マクロ風文字列がある本文を変換する
+- Then スキームなし URL は変更されない
+
 ## Scenario: 追加マクロがなければインライン数式を変えない
 
 - Given 画像経路で数式を描ける Pi がある

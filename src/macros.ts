@@ -97,7 +97,8 @@ function expandMacros(
   for (let index = 0; index < source.length; ) {
     const command = /^\\([A-Za-z]+)/u.exec(source.slice(index));
     const name = command?.[1];
-    const definition = name ? macros[name] : undefined;
+    const definition =
+      name && Object.hasOwn(macros, name) ? macros[name] : undefined;
     if (!command || !name || definition === undefined || active.has(name)) {
       expanded += source[index];
       index += 1;

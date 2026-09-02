@@ -195,13 +195,17 @@ function hierarchyContinuation(source: string, openingIndex: number): string {
 }
 
 function isUrlDollar(source: string, openingIndex: number): boolean {
+  const lineStart = source.lastIndexOf("\n", openingIndex - 1) + 1;
+  const linePrefix = source.slice(lineStart, openingIndex);
+  if (/!?\[[^\]\n]*\]\([^\s)\n]*$/u.test(linePrefix)) return true;
+
   const tokenStart =
     Math.max(
       source.lastIndexOf(" ", openingIndex - 1),
       source.lastIndexOf("\n", openingIndex - 1),
       source.lastIndexOf("\t", openingIndex - 1),
     ) + 1;
-  return /(?:[a-z][a-z0-9+.-]*:\/\/|www\.)\S*$/iu.test(
+  return /(?:[a-z][a-z0-9+.-]*:|www\.|\/\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#]|$))\S*$/iu.test(
     source.slice(tokenStart, openingIndex),
   );
 }
@@ -328,15 +332,19 @@ export function transformInlineMath(
     const end = closing + closingDelimiter.length;
     const original = source.slice(index, end);
     const content = source.slice(contentStart, closing);
-    if (
-      !content ||
-      content.includes("\n") ||
-      (opening === "$" &&
-        (isUrlDollar(source, index) ||
-          piRejectsDollarInline(source, content, closing)))
-    ) {
+    if (!content || content.includes("\n")) {
+      transformed += opening === "$" ? opening : original;
+      index = opening === "$" ? contentStart : end;
+      continue;
+    }
+    if (opening === "$" && isUrlDollar(source, index)) {
       transformed += original;
       index = end;
+      continue;
+    }
+    if (opening === "$" && piRejectsDollarInline(source, content, closing)) {
+      transformed += opening;
+      index = contentStart;
       continue;
     }
 
