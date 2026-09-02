@@ -34,7 +34,7 @@ function saveResponse(message, formula) {
   return { result, saved };
 }
 
-test("探索で得た完了済み応答を一字一句そのまま保存する", () => {
+test("探索で得た完了済み応答を末尾改行なしで保存する", () => {
   const response = "本文です。\n\n$$\\frac{1}{2}$$\n";
   const { result, saved } = saveResponse({
     role: "assistant",
@@ -43,8 +43,18 @@ test("探索で得た完了済み応答を一字一句そのまま保存する",
   });
   assert.deepEqual(
     { status: result.status, saved },
-    { status: 0, saved: response },
+    { status: 0, saved: response.slice(0, -1) },
   );
+});
+
+test("探索で得た応答の末尾空白は保存する", () => {
+  const response = "本文です。 \n";
+  const { saved } = saveResponse({
+    role: "assistant",
+    stopReason: "stop",
+    content: [{ type: "text", text: response }],
+  });
+  assert.equal(saved, "本文です。 ");
 });
 
 test("tool前に検査した対象式を含むassistant messageを保存する", () => {

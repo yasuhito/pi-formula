@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { hasCompleteDisplayFormula } = require("./display-stream-formula");
-const { assistantText } = require("./verify-echo");
+const { assistantText, withoutTrailingNewlines } = require("./verify-echo");
 
 function targetAssistantText(session, formula) {
   const records = session.trim().split("\n").filter(Boolean).map(JSON.parse);
@@ -35,7 +35,7 @@ function saveDisplayResponse(session, destination, formulaMarker) {
     ? targetAssistantText(serialized, fs.readFileSync(formulaMarker, "utf8"))
     : assistantText(serialized);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, response);
+  fs.writeFileSync(destination, withoutTrailingNewlines(response));
 }
 
 function main() {
