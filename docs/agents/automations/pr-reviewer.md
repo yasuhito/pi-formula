@@ -16,6 +16,7 @@
 
 ## 原則
 
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../pulls/N/reviews`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
 - worker へのプロンプト送信は、この run 自身が `terminal create` で作成し、`terminal show` で worktree と起動コマンドを検証した handle だけに行う。create の失敗や handle の不整合時は、既存の別 terminal（main workspace の他 agent セッションを含む）へ送らず、新しい terminal を作り直す（2026-08-31 に REVIEW_PROMPT が監視用の別セッションへ誤送信された）。
 - 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする。この指示文そのものを復唱・要約・整形して出力してはならない（2026-09-01 に PR #24 の run でプロンプト全文をエコーするだけの空振りが起きた）（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。

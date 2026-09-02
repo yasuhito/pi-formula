@@ -30,6 +30,7 @@
 - PR タイトルと本文は、issue 番号だけの汎用文にしない。worker の実際の差分と commit から、変更内容が分かる題名と概要を書く。タイトルは「何が起きているか」が分かる具体的な一文にし、「issue 対応」「レビュー指摘を修正」のような中身を読まないと分からない題名は禁止。本文は「問題 → 原因 → 修正」の順で書く。
 - PR は最初からレビュー可能な状態で作る。`gh pr create --draft` は使わない。人間のマージ待ちは `agent:review` / `ready-for-human` label で表す。
 - merged / closed PR に対応する worker terminal は停止し、不要な worker worktree は安全確認後に削除する。
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。GraphQL でしか取れない Relationships（`parent` / `subIssues` / `blockedBy` / `blocking`）が取れなかった場合は、本文・コメントの依存記述だけで判断し、確認できなかったことを最後の要約に明記する。
 - どの経路でも、最後に短い日本語要約を出す。
 
 ## ループ
