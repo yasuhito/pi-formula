@@ -250,6 +250,13 @@ test("tool後のassistant応答を待ってから撮影不能を確定する", (
   );
 });
 
+test("確定後だけの検査は再試行でも基準画面との差分を求める", () => {
+  assert.match(
+    harness,
+    /install -m 0644 "\$CAPTURE_FILE" "\$PREVIOUS_CAPTURE_FILE"[\s\S]*if \[\[ "\$final_only" == true \]\]; then[\s\S]*rendered_options\+=\("--different-from=\$BASELINE_CAPTURE_FILE"\)[\s\S]*rendered_options\+=\("--previous=\$PREVIOUS_CAPTURE_FILE"\)/u,
+  );
+});
+
 test("確定後だけの検査を出力と終了コード3で区別する", () => {
   assert.deepEqual(
     {

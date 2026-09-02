@@ -170,7 +170,29 @@ When("確定後だけ検査する終了を調べる", function () {
     this.finalOnlyReason === "表示数式が現れなかった"
       ? "表示数式が現れませんでした"
       : "表示数式が確定と同時に現れました";
+  const retryOptions = this.harness.slice(
+    this.harness.indexOf(
+      'run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"',
+      this.harness.indexOf(
+        'if [[ "$MODE" == corpus || "$final_only" == true ]]',
+      ),
+    ),
+    this.harness.indexOf(
+      "done",
+      this.harness.indexOf(
+        'run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"',
+        this.harness.indexOf(
+          'if [[ "$MODE" == corpus || "$final_only" == true ]]',
+        ),
+      ),
+    ),
+  );
   this.finalOnlyInspection = {
+    keepsBaselineDifference:
+      retryOptions.includes('if [[ "$final_only" == true ]]') &&
+      retryOptions.includes(
+        'rendered_options+=("--different-from=$BASELINE_CAPTURE_FILE")',
+      ),
     reasonIsRecorded: this.promptExtension.includes(expectedReason),
     reportsFinalOnly: this.harness.includes("確定後のみ検査しました"),
     status: combineDisplayStatuses([0], true),
@@ -181,6 +203,7 @@ Then(
   "撮影できなかった理由と確定後のみの検査を終了コード3で知らせる",
   function () {
     assert.deepEqual(this.finalOnlyInspection, {
+      keepsBaselineDifference: true,
       reasonIsRecorded: true,
       reportsFinalOnly: true,
       status: 3,

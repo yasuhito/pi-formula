@@ -616,8 +616,11 @@ while ((SECONDS < capture_deadline)); do
     [[ "$poll_status" -eq 1 ]] || fail "キャプチャの描画完了を検査できませんでした"
   fi
   run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
-  rendered_options=(--background=250,248,240 --background=238,235,224 \
-    "--previous=$PREVIOUS_CAPTURE_FILE")
+  rendered_options=(--background=250,248,240 --background=238,235,224)
+  if [[ "$final_only" == true ]]; then
+    rendered_options+=("--different-from=$BASELINE_CAPTURE_FILE")
+  fi
+  rendered_options+=("--previous=$PREVIOUS_CAPTURE_FILE")
   run sleep "$CAPTURE_READY_INTERVAL"
 done
 [[ "$display_rendered" == true ]] \
