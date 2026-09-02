@@ -113,10 +113,24 @@ test("コーパスモードだけ応答一致を確認する", () => {
   );
 });
 
-test("探索モードは自由なプロンプトをPiへ直接渡す", () => {
+test("探索モードは公開APIの補助拡張から自由なプロンプトを送る", () => {
   assert.match(
     harness,
-    /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == prompt \]\][\s\S]*pi "\$\{args\[@\]\}" "\$PI_FORMULA_VERIFY_PROMPT"/u,
+    /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == exploration \]\][\s\S]*pi "\$\{args\[@\]\}"/u,
+  );
+});
+
+test("探索モードは明示した追加拡張を読み込む", () => {
+  assert.match(
+    harness,
+    /PI_FORMULA_VERIFY_EXTRA_EXTENSIONS[\s\S]*args\+=\(--extension "\$extension"\)/u,
+  );
+});
+
+test("探索モードは明示したツールだけを有効にする", () => {
+  assert.match(
+    harness,
+    /PI_FORMULA_VERIFY_TOOLS[\s\S]*args\+=\(--tools "\$PI_FORMULA_VERIFY_TOOLS"\)/u,
   );
 });
 

@@ -7,6 +7,10 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 
 const { createPng } = require("../../test/support/png-fixture");
 const { planDisplay } = require("../../scripts/plan-display");
+const {
+  DISPLAY_PROMPT_PREFIX,
+  transformDisplayPrompt,
+} = require("../../scripts/transform-display-prompt");
 const root = path.resolve(__dirname, "../..");
 
 function normalDisplay(x, y) {
@@ -100,8 +104,17 @@ When("ハーネスの安全条件を調べる", function () {
       ),
     promptExploration:
       /--prompt/u.test(this.harness) &&
-      /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == prompt \]\]/u.test(this.harness) &&
-      /pi "\$\{args\[@\]\}" "\$PI_FORMULA_VERIFY_PROMPT"/u.test(this.harness),
+      /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == exploration \]\]/u.test(
+        this.harness,
+      ) &&
+      /pi "\$\{args\[@\]\}"/u.test(this.harness) &&
+      /pi-formula-verify-prompt\.ts/u.test(this.harness),
+    explicitResources:
+      /--extension/u.test(this.harness) &&
+      /--tools/u.test(this.harness) &&
+      /PI_FORMULA_VERIFY_EXTRA_EXTENSIONS/u.test(this.harness) &&
+      /args\+=\(--tools "\$PI_FORMULA_VERIFY_TOOLS"\)/u.test(this.harness) &&
+      /--no-extensions/u.test(this.harness),
     exitStatuses:
       /run-display-command" detector detect-display-bands/u.test(
         this.harness,
@@ -180,6 +193,50 @@ Then(
     assert.equal(this.safety.promptExploration, true);
   },
 );
+
+Then("探索モードでは明示した拡張とツールだけを追加できる", function () {
+  assert.equal(this.safety.explicitResources, true);
+});
+
+Given(/^`([^`]+)` という探索用プロンプトがある$/u, function (prompt) {
+  this.explorationPrompt = prompt;
+});
+
+When("公開 API で探索用プロンプトを送る", function () {
+  const transformed = transformDisplayPrompt(
+    `${DISPLAY_PROMPT_PREFIX}${this.explorationPrompt}`,
+  );
+  this.sentPrompt = transformed?.text;
+});
+
+Then(
+  /^CLI 記法と解釈せず `([^`]+)` と一字一句同じ user message を送る$/u,
+  function (prompt) {
+    assert.equal(this.sentPrompt, prompt);
+  },
+);
+
+Given("未対応の引数を持つ実表示検証コマンドがある", function () {
+  this.verifyDisplayArguments = [
+    path.join(root, "docs/agents/verify-corpus/issue-21.md"),
+    "--unknown",
+  ];
+});
+
+When("実表示検証コマンドを実行する", function () {
+  this.verifyDisplayResult = spawnSync(
+    path.join(root, "scripts/verify-display"),
+    this.verifyDisplayArguments,
+    { encoding: "utf8", timeout: 5_000 },
+  );
+});
+
+Then("エラー本文と Usage を stderr の別の行へ表示する", function () {
+  assert.match(
+    this.verifyDisplayResult.stderr,
+    /^verify-display: 未対応の引数です: --unknown\nUsage:/u,
+  );
+});
 
 Given("探索で得た完了済みの応答がある", function () {
   this.directory = fs.mkdtempSync(

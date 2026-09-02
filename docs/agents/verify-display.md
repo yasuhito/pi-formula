@@ -12,10 +12,19 @@ cage、wlr-randr、Ghostty、grim、jq、Node.js、Pi が必要になる。利�
 scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-探索モードは `--prompt` に自由なプロンプトを渡す。Pi は応答を生成しながら描画するため、ストリーミング中のテキスト経路と、応答確定後の画像経路への切り替えを同じセッションで検査できる。応答の内容やプロンプトとの一致は判定しない。
+探索モードは `--prompt` に自由なプロンプトを渡す。安全な接頭辞を付けた入力を、検証補助拡張が Pi の公開 `input` event で元の文字列へ戻すため、先頭が `-` や `@` でも CLI のオプションやファイル入力にはならない。Pi は応答を生成しながら描画するため、ストリーミング中のテキスト経路と、応答確定後の画像経路への切り替えを同じセッションで検査できる。応答の内容やプロンプトとの一致は判定しない。
 
 ```sh
 scripts/verify-display --prompt '表示数式を使ってフーリエ変換を説明してください。'
+```
+
+qni-cli などと組み合わせる場合は、探索モードへ `--extension` を繰り返し渡し、使用を許可するツール名だけを `--tools` のカンマ区切りで渡す。拡張の自動探索と、指定していないツールは無効のままにする。
+
+```sh
+scripts/verify-display \
+  --prompt 'qni を使って量子フーリエ変換を説明してください。' \
+  --extension "$HOME/Work/qni-cli/dist/qni-math/index.js" \
+  --tools qni
 ```
 
 異常を回帰検証へ昇格させる場合は、`--save-response` で完了した応答を一字一句そのままコーパスへ保存する。保存はピクセル判定より先に行うため、水平帯を検出して exit 1 になった応答も残る。
@@ -40,7 +49,7 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
   scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-どちらのモードも、既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` だけを読み込む。qni-cli など、導入済み package の状態は検証結果へ影響しない。
+どちらのモードも、既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` と検証補助拡張を読み込む。コーパスモードは追加の拡張を受け付けず、すべてのツールを無効にする。探索モードも、明示した追加拡張とツールだけを有効にする。
 
 pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。現在の checkout の公開 API で試験用 PNG を作り、8 byte の PNG 署名が完全に一致したことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
 
