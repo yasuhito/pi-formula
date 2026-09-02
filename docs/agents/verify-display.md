@@ -26,7 +26,7 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
 
 既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` だけを読み込む。qni-cli など、導入済み package の状態は検証結果へ影響しない。
 
-pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。検証専用の追加マクロは qni-cli の `ket`、`bra`、`braket` と同じ定義を使う。CI は qni-cli の現在の `src/qni-math/typesetter.ts` と照合するため、qni-cli 側で追加マクロが変わった場合は同期漏れとして失敗する。現在の checkout の公開 API で試験用 PNG を作り、8 byte の PNG 署名が完全に一致したことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
+pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。検証専用の追加マクロは qni-cli の `ket`、`bra`、`braket` と同じ定義を使う。CI は qni-cli の現在の `src/qni-math/typesetter.ts` を TypeScript の構文として読み、追加マクロの名前、展開値、引数数を照合する。ソースの書式だけが変わっても受理し、追加マクロが変わった場合は同期漏れとして失敗する。現在の checkout の公開 API で試験用 PNG を作り、8 byte の PNG 署名が完全に一致したことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
 
 ```sh
 PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \

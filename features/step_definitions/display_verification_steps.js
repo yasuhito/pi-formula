@@ -7,27 +7,11 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 
 const { createPng } = require("../../test/support/png-fixture");
 const { planDisplay } = require("../../scripts/plan-display");
+const {
+  extractQniCliAdditionalMacros,
+  readQniCliAdditionalMacros,
+} = require("../../scripts/qni-cli-additional-macros");
 const root = path.resolve(__dirname, "../..");
-
-function readQniCliAdditionalMacros() {
-  const sourcePath =
-    process.env.QNI_CLI_TYPESETTER ??
-    path.join(root, "features/fixtures/qni-cli-typesetter.txt");
-  const source = fs.readFileSync(sourcePath, "utf8");
-  const lines = source.slice(source.indexOf("macros: {")).split("\n").slice(1);
-  const macros = {};
-  for (const line of lines) {
-    if (line.trim() === "},") break;
-    if (line.trim() === "...configured,") continue;
-    const definition = line
-      .trim()
-      .match(/^([A-Za-z][A-Za-z0-9]*): (\[.*\]),?$/u);
-    if (!definition)
-      throw new Error(`qni-cli の追加マクロを解析できません: ${line}`);
-    macros[definition[1]] = JSON.parse(definition[2]);
-  }
-  return macros;
-}
 
 function normalDisplay(x, y) {
   if (y >= 8 && y <= 13 && x >= 8 && x <= 111) return [230, 228, 217];
@@ -215,14 +199,63 @@ Then("bra と braket を含む表示数式を組版できる", function () {
   assert.ok(planDisplay(this.corpus, { source: true }).imageRows > 0);
 });
 
-Given("検証ハーネスと qni-cli の追加マクロ定義がある", function () {
-  this.verifyDisplayMacros =
+function setMacroDefinitions(world, qniCliSource) {
+  world.verifyDisplayMacros =
     require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
-  this.qniCliMacros = readQniCliAdditionalMacros();
+  world.qniCliMacros = extractQniCliAdditionalMacros(
+    qniCliSource,
+    "qni-cli-typesetter.ts",
+  );
+}
+
+Given(
+  "検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある",
+  function () {
+    const sourcePath =
+      process.env.QNI_CLI_TYPESETTER ??
+      path.join(root, "features/fixtures/qni-cli-typesetter.txt");
+    this.verifyDisplayMacros =
+      require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
+    this.qniCliMacros = readQniCliAdditionalMacros(sourcePath);
+  },
+);
+
+Given("検証ハーネスと値が異なる qni-cli の追加マクロ定義がある", function () {
+  const source = fs
+    .readFileSync(
+      path.join(root, "features/fixtures/qni-cli-typesetter.txt"),
+      "utf8",
+    )
+    .replace("      2,", "      1,");
+  setMacroDefinitions(this, source);
 });
 
 Then("検証ハーネスの追加マクロは qni-cli と一致する", function () {
   assert.deepEqual(this.verifyDisplayMacros, this.qniCliMacros);
+});
+
+Then("検証ハーネスは qni-cli の定義差分を検出する", function () {
+  assert.notDeepEqual(this.verifyDisplayMacros, this.qniCliMacros);
+});
+
+Given("追加マクロ定義のない qni-cli ソースがある", function () {
+  this.qniCliSourcePath = "missing-qni-cli-typesetter.ts";
+  this.qniCliSource = "const mathjax = new TeX({ packages: [] });";
+});
+
+When("qni-cli の追加マクロ定義を読み取る", function () {
+  try {
+    extractQniCliAdditionalMacros(this.qniCliSource, this.qniCliSourcePath);
+  } catch (error) {
+    this.qniCliMacroError = error;
+  }
+});
+
+Then("読み取り失敗は対象ファイルを示す", function () {
+  assert.match(
+    this.qniCliMacroError?.message ?? "",
+    /macros 定義が見つかりません: missing-qni-cli-typesetter\.ts/u,
+  );
 });
 
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {

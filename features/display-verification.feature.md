@@ -117,8 +117,19 @@ pi-formula の worker として
 
 ## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
 
-- Given 検証ハーネスと qni-cli の追加マクロ定義がある
+- Given 検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある
 - Then 検証ハーネスの追加マクロは qni-cli と一致する
+
+## Scenario: qni-cli の追加マクロ変更を検出する
+
+- Given 検証ハーネスと値が異なる qni-cli の追加マクロ定義がある
+- Then 検証ハーネスは qni-cli の定義差分を検出する
+
+## Scenario: qni-cli の追加マクロ定義が見つからない理由を示す
+
+- Given 追加マクロ定義のない qni-cli ソースがある
+- When qni-cli の追加マクロ定義を読み取る
+- Then 読み取り失敗は対象ファイルを示す
 
 ## Scenario: 短いが高い表示数式を事前に拒否する
 
