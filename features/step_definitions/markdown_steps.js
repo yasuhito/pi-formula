@@ -176,9 +176,20 @@ When("改行を含むシェルの $$ と後続の表示数式を含む本文を�
   transform(this, "run echo $$;\nkill $$ after 2 seconds.\n\n$$x = 1$$");
 });
 
+When("行頭の $$ を含む通常本文と後続の表示数式を変換する", function () {
+  transform(
+    this,
+    "前置き $$ は数式ではありません。\n$$100 です。\n\n$$x = 1$$",
+  );
+});
+
+When("数式でない $$ とラベル付き表示数式を含む本文を変換する", function () {
+  transform(this, "閉じていない $$ は数式になりません。\n\n式: $$\nx = 1\n$$");
+});
+
 When("数式でない $$ を一万個含む本文を変換する", function () {
   const started = performance.now();
-  transform(this, "$$本文".repeat(10_000));
+  transform(this, "$$通常本文\n".repeat(10_000));
   this.scanDuration = performance.now() - started;
 });
 
@@ -305,6 +316,26 @@ Then("シェルに続く表示数式だけが画像になる", function () {
 Then("改行を含むシェルの通常本文は入力どおり残る", function () {
   const shellText = "run echo $$;\nkill $$ after 2 seconds.";
   assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("行頭の $$ を含む通常本文は入力どおり残る", function () {
+  const text = "前置き $$ は数式ではありません。\n$$100 です。";
+  assert.equal(this.rendered.split(text).length - 1, 1);
+});
+
+Then("後続の x = 1 だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
+});
+
+Then("ラベル付き表示数式の前の本文は入力どおり一度だけ残る", function () {
+  const text = "閉じていない $$ は数式になりません。\n\n式: ";
+  assert.equal(this.rendered.split(text).length - 1, 1);
 });
 
 Then("走査は一秒以内に終わる", function () {
