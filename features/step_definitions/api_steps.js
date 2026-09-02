@@ -327,8 +327,18 @@ Then("現在の表示経路はテキスト経路である", function () {
   assert.equal(this.path, "text");
 });
 
+Given("危険域のバイトを含む画像 ID になる既成 PNG がある", async function () {
+  await registeredImageApi(this);
+  this.dangerousIdPng = createPngFromScanlines(
+    1,
+    1,
+    Buffer.from([0, 7, 0, 0, 255]),
+  );
+});
+
 When("Buffer の既成 PNG を公開 API で描く", function () {
-  this.renderedPng = freshApi().renderPng(pngWithDimensions(100, 50), 8);
+  const png = this.dangerousIdPng ?? pngWithDimensions(100, 50);
+  this.renderedPng = freshApi().renderPng(png, 8);
 });
 
 Then("端末寸法に合わせた画像転送と配置が返る", function () {
@@ -350,6 +360,42 @@ Then("端末寸法に合わせた画像転送と配置が返る", function () {
       hasPlaceholder: true,
       withinWidth: true,
       positiveRows: true,
+    },
+  );
+});
+
+Then("下線色はコロン形式になり背景色と dim は残らない", function () {
+  const output = this.renderedPng.output ?? "";
+  const id = Number(/(?:^|,)i=(\d+)(?:,|$)/u.exec(output)?.[1]);
+  const state = { background: null, dim: false };
+  for (const match of output.matchAll(/\x1b\[([\d;]*)m/gu)) {
+    const parameters = match[1].split(";").map(Number);
+    for (let index = 0; index < parameters.length; index += 1) {
+      const parameter = parameters[index];
+      if (parameter === 38 || parameter === 48) index += 4;
+      else if (parameter === 0) {
+        state.background = null;
+        state.dim = false;
+      } else if (parameter === 2) state.dim = true;
+      else if (
+        (parameter >= 40 && parameter <= 47) ||
+        (parameter >= 100 && parameter <= 107)
+      ) {
+        state.background = parameter;
+      }
+    }
+  }
+  assert.deepEqual(
+    {
+      idBytes: [(id >> 16) & 0xff, (id >> 8) & 0xff, id & 0xff],
+      colonUnderline: /\x1b\[58:2::216:242:43m/u.test(output),
+      ...state,
+    },
+    {
+      idBytes: [216, 242, 43],
+      colonUnderline: true,
+      background: null,
+      dim: false,
     },
   );
 });

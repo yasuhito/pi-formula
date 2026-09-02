@@ -3,7 +3,7 @@ const path = require("node:path");
 const { Markdown, TuiMainScreen } = require("@earendil-works/pi-tui");
 
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
-const SGR = /\x1b\[[0-9;]*m/gu;
+const SGR = /\x1b\[[0-9;:]*m/gu;
 
 const REPRODUCTION_PARTS = [
   String.raw`N 次元の計算基底 $|x\rangle$（$x = 0, \dots, N-1$）に対して
@@ -54,7 +54,9 @@ function controls(command) {
 }
 
 function placeholderId(line) {
-  const match = /\x1b\[38;2;(\d+);(\d+);(\d+)m\x1b\[58;2;\1;\2;\3m/u.exec(line);
+  const match = /\x1b\[38;2;(\d+);(\d+);(\d+)m\x1b\[58:2::\1:\2:\3m/u.exec(
+    line,
+  );
   if (!match || !line.includes(PLACEHOLDER)) return undefined;
   return (Number(match[1]) << 16) | (Number(match[2]) << 8) | Number(match[3]);
 }
