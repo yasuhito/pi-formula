@@ -14,16 +14,21 @@ function fixture(response, formula, finalPath = "image") {
   const session = path.join(directory, "session.jsonl");
   const marker = path.join(directory, "formula.md");
   const finalMarker = path.join(directory, "final-path.txt");
+  const responses = Array.isArray(response) ? response : [response];
   fs.writeFileSync(
     session,
-    `${JSON.stringify({
-      type: "message",
-      message: {
-        role: "assistant",
-        stopReason: "stop",
-        content: [{ type: "text", text: response }],
-      },
-    })}\n`,
+    `${responses
+      .map((text, index) =>
+        JSON.stringify({
+          type: "message",
+          message: {
+            role: "assistant",
+            stopReason: index === responses.length - 1 ? "stop" : "toolUse",
+            content: [{ type: "text", text }],
+          },
+        }),
+      )
+      .join("\n")}\n`,
   );
   fs.writeFileSync(marker, formula);
   fs.writeFileSync(finalMarker, `${finalPath}\n`);
@@ -32,6 +37,17 @@ function fixture(response, formula, finalPath = "image") {
 
 test("確定本文にストリーミング中と同じ表示数式があれば受理する", () => {
   const files = fixture("説明です。\n\n$$x^2$$", "$$x^2$$");
+  assert.doesNotThrow(() =>
+    verifyStreamedFormula(files.session, files.marker, files.finalMarker),
+  );
+  fs.rmSync(files.directory, { recursive: true, force: true });
+});
+
+test("tool利用後の最終messageに式がなくても対象messageの画像経路を受理する", () => {
+  const files = fixture(
+    ["説明です。\n\n$$x^2$$", "tool の結果を確認しました。"],
+    "$$x^2$$",
+  );
   assert.doesNotThrow(() =>
     verifyStreamedFormula(files.session, files.marker, files.finalMarker),
   );

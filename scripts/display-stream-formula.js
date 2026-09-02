@@ -34,6 +34,9 @@ function advanceDisplayFormulaGate(readyFormula, message) {
   const markdown = assistantMarkdown(message);
   return {
     formulaToCapture: readyFormula,
+    hasReadyFormula:
+      readyFormula !== undefined &&
+      hasCompleteDisplayFormula(markdown, readyFormula),
     readyFormula: readyFormula ?? findCompleteDisplayFormula(markdown),
   };
 }
@@ -52,6 +55,7 @@ function inspectTargetFormulaRendering(markdown) {
       ? markdown.slice(start + TARGET_START.length, end)
       : "";
   return {
+    foundTarget: start >= 0 && end >= 0,
     markdown: markdown.replaceAll(TARGET_START, "").replaceAll(TARGET_END, ""),
     renderedAsImage: target.includes("\x1b_Ga=T,f=100"),
   };

@@ -3,24 +3,39 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const {
   advanceDisplayFormulaGate,
+  hasCompleteDisplayFormula,
   inspectTargetFormulaRendering,
 } = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
 
 const STREAM_GATE_TIMEOUT_MS = 60_000;
 
-function waitForCapture(acknowledgement: string): Promise<void> {
+function waitForMarker(
+  marker: string,
+  expected: string | undefined,
+  timeoutMessage: string,
+  deadline: number,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const deadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
     const poll = () => {
-      if (fs.existsSync(acknowledgement)) {
+      let value: string | undefined;
+      try {
+        value = fs.readFileSync(marker, "utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          reject(error);
+          return;
+        }
+      }
+      if (
+        value !== undefined &&
+        (expected === undefined || value === expected)
+      ) {
         resolve();
         return;
       }
       if (Date.now() >= deadline) {
-        reject(
-          new Error("ストリーミング中のキャプチャ確認が timeout しました"),
-        );
+        reject(new Error(timeoutMessage));
         return;
       }
       setTimeout(poll, 25);
@@ -30,42 +45,94 @@ function waitForCapture(acknowledgement: string): Promise<void> {
 }
 
 export default function (pi: ExtensionAPI) {
+  const processMarker = process.env.PI_FORMULA_VERIFY_STREAM_PROCESS_MARKER;
+  if (process.env.PI_FORMULA_VERIFY_MODE === "exploration" && processMarker)
+    fs.writeFileSync(processMarker, `${process.pid}\n`);
+
   let readyFormula: string | undefined;
-  let waitingForCapture = false;
+  let captureStarted = false;
+  let targetInCurrentMessage = false;
 
   const gateWhenFormulaIsRendered = async (message: unknown) => {
     const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
+    const renderedMarker = process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
     const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
       !marker ||
+      !renderedMarker ||
       !acknowledgement ||
-      waitingForCapture
+      captureStarted
     )
       return;
 
     const next = advanceDisplayFormulaGate(readyFormula, message);
     readyFormula = next.readyFormula;
+    targetInCurrentMessage ||= readyFormula !== undefined;
     if (!next.formulaToCapture) return;
 
-    waitingForCapture = true;
+    captureStarted = true;
+    const gateDeadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
+    await waitForMarker(
+      renderedMarker,
+      next.formulaToCapture,
+      "対象式をストリーミング用 Markdown 描画へ渡せませんでした",
+      gateDeadline,
+    );
     fs.writeFileSync(marker, next.formulaToCapture);
-    await waitForCapture(acknowledgement);
+    await waitForMarker(
+      acknowledgement,
+      undefined,
+      "ストリーミング中のキャプチャ確認が timeout しました",
+      gateDeadline,
+    );
   };
 
   pi.on("input", (event) => transformDisplayPrompt(event.text));
+  pi.on("message_start", (event) => {
+    if (event.message.role === "assistant" && !captureStarted) {
+      readyFormula = undefined;
+      targetInCurrentMessage = false;
+    }
+  });
   pi.on("message_update", (event) => gateWhenFormulaIsRendered(event.message));
-  pi.on("message_end", (event) => gateWhenFormulaIsRendered(event.message));
+  pi.on("message_end", async (event) => {
+    const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
+    if (
+      finalMarker &&
+      targetInCurrentMessage &&
+      readyFormula &&
+      !advanceDisplayFormulaGate(readyFormula, event.message).hasReadyFormula &&
+      !fs.existsSync(finalMarker)
+    )
+      fs.writeFileSync(finalMarker, "text\n");
+    await gateWhenFormulaIsRendered(event.message);
+    if (targetInCurrentMessage && captureStarted)
+      targetInCurrentMessage = false;
+  });
   pi.registerMarkdownTransformer((markdown, context) => {
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
-      context.messageType !== "assistant" ||
-      context.isStreaming
+      context.messageType !== "assistant"
     )
       return markdown;
+
+    if (context.isStreaming) {
+      const renderedMarker =
+        process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
+      if (
+        renderedMarker &&
+        readyFormula &&
+        targetInCurrentMessage &&
+        hasCompleteDisplayFormula(markdown, readyFormula)
+      )
+        fs.writeFileSync(renderedMarker, readyFormula);
+      return markdown;
+    }
+
     const result = inspectTargetFormulaRendering(markdown);
     const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
-    if (finalMarker)
+    if (finalMarker && result.foundTarget && !fs.existsSync(finalMarker))
       fs.writeFileSync(
         finalMarker,
         result.renderedAsImage ? "image\n" : "text\n",

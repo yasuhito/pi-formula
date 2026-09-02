@@ -14,6 +14,13 @@ const promptExtension = fs.readFileSync(
   ),
   "utf8",
 );
+const targetExtension = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    "../scripts/verify-extensions/pi-formula-verify-target.ts",
+  ),
+  "utf8",
+);
 const runFunction = harness.slice(
   harness.indexOf("run()"),
   harness.indexOf("cleanup()"),
@@ -162,16 +169,49 @@ test("探索で得た応答をキャプチャ前にコーパスへ保存する",
   );
 });
 
-test("探索モードは未完了を確認してからストリーミング画面を判定する", () => {
+test("探索モードは未完了と描画安定を確認してからストリーミング画面を判定する", () => {
   assert.ok(
     markersAppearInOrder(
       harness,
       "stream_ready=false",
+      'run kill -STOP "$stream_process_pid"',
       'check-display-session.js" "$SESSION_FILE"',
+      "stream_capture_deadline=",
       'run_inside grim "$STREAM_CAPTURE_FILE"',
+      "check-streaming-display-rendered",
       "detect-streaming-display-bands",
+      'run kill -CONT "$stream_process_pid"',
       'run touch "$STREAM_CAPTURE_ACK"',
     ),
+  );
+});
+
+test("対象式をストリーミング描画へ渡してから撮影markerを書く", () => {
+  assert.ok(
+    markersAppearInOrder(
+      promptExtension,
+      "await waitForMarker(\n      renderedMarker",
+      "fs.writeFileSync(marker, next.formulaToCapture)",
+      "await waitForMarker(\n      acknowledgement",
+    ),
+  );
+});
+
+test("公開Markdown transformerが対象式のテキスト経路を記録する", () => {
+  assert.match(
+    promptExtension,
+    /context\.isStreaming[\s\S]*hasCompleteDisplayFormula\(markdown, readyFormula\)[\s\S]*fs\.writeFileSync\(renderedMarker, readyFormula\)/u,
+  );
+});
+
+test("確定描画の印はストリーミング描画で記録した対象式を使う", () => {
+  assert.match(targetExtension, /PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER/u);
+});
+
+test("対象messageの確定結果を後続messageで上書きしない", () => {
+  assert.match(
+    promptExtension,
+    /advanceDisplayFormulaGate\(readyFormula, event\.message\)\.hasReadyFormula[\s\S]*!fs\.existsSync\(finalMarker\)[\s\S]*result\.foundTarget && !fs\.existsSync\(finalMarker\)/u,
   );
 });
 
@@ -216,7 +256,7 @@ test("探索モードの寿命は全段階の期限と余裕を含む", () => {
     milliseconds / 1000 +
     seconds("FINAL_FORMULA_TIMEOUT") +
     seconds("SESSION_TIMEOUT") +
-    seconds("CAPTURE_READY_TIMEOUT") +
+    2 * seconds("CAPTURE_READY_TIMEOUT") +
     2 * seconds("DETECTOR_TIMEOUT") +
     seconds("COMMAND_TIMEOUT");
   assert.ok(seconds("EXPLORATION_WINDOW_LIFETIME") > boundedStages);

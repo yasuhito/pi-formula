@@ -16,6 +16,9 @@ const {
   DISPLAY_PROMPT_PREFIX,
   transformDisplayPrompt,
 } = require("../../scripts/transform-display-prompt");
+const {
+  verifyStreamedFormula,
+} = require("../../scripts/verify-streamed-formula");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
 const root = path.resolve(__dirname, "../..");
 
@@ -77,8 +80,12 @@ When("同じ表示数式の探索中と確定後の描画経路を調べる", fu
   this.harnessSequence = markersAppearInOrder(
     this.harness,
     "stream_ready=false",
+    'run kill -STOP "$stream_process_pid"',
+    "stream_capture_deadline=",
     'run_inside grim "$STREAM_CAPTURE_FILE"',
+    "check-streaming-display-rendered",
     "detect-streaming-display-bands",
+    'run kill -CONT "$stream_process_pid"',
     'run touch "$STREAM_CAPTURE_ACK"',
     "completed=false",
     "verify-streamed-formula.js",
@@ -152,6 +159,91 @@ Then("対象式が画像経路を通らない確定応答は検証不能にす�
     targetUsesImage: false,
   });
 });
+
+Given(
+  "表示数式の後に tool を使って別の回答を返す探索応答がある",
+  async function () {
+    this.directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "pi-formula-cucumber-messages-"),
+    );
+    this.targetFormula = "$$x^2+y^2=1$$";
+    this.firstAssistant = `計算します。\n\n${this.targetFormula}`;
+    this.lastAssistant = "計算結果を確認しました。";
+    this.explorationPi = fakePi();
+    registerFormula(this.explorationPi.api);
+    await startWithKitty(this.explorationPi);
+  },
+);
+
+When("tool 前の対象式と tool 後の回答を検証する", function () {
+  const transform = (markdown, isStreaming) =>
+    this.explorationPi.transformer()(markdown, {
+      messageType: "assistant",
+      isStreaming,
+      availableWidth: 80,
+    });
+  const streaming = transform(this.firstAssistant, true);
+  const renderedTarget = transform(
+    markTargetFormula(this.firstAssistant, this.targetFormula),
+    false,
+  );
+  const targetInspection = inspectTargetFormulaRendering(renderedTarget);
+  const laterInspection = inspectTargetFormulaRendering(
+    transform(this.lastAssistant, false),
+  );
+  const session = path.join(this.directory, "session.jsonl");
+  const marker = path.join(this.directory, "formula.md");
+  const finalMarker = path.join(this.directory, "final-path.txt");
+  const records = [
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        stopReason: "toolUse",
+        content: [{ type: "text", text: this.firstAssistant }],
+      },
+    },
+    { type: "message", message: { role: "toolResult", content: [] } },
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: this.lastAssistant }],
+      },
+    },
+  ];
+  fs.writeFileSync(session, `${records.map(JSON.stringify).join("\n")}\n`);
+  fs.writeFileSync(marker, this.targetFormula);
+  fs.writeFileSync(finalMarker, "image\n");
+  let accepted = true;
+  try {
+    verifyStreamedFormula(session, marker, finalMarker);
+  } catch {
+    accepted = false;
+  }
+  this.multiMessageInspection = {
+    accepted,
+    laterMessageHasNoTarget: !laterInspection.foundTarget,
+    targetUsesImage: targetInspection.renderedAsImage,
+    targetUsesTextWhileStreaming:
+      streaming.includes(this.targetFormula) &&
+      !streaming.includes("\x1b_Ga=T,f=100"),
+  };
+});
+
+Then(
+  "tool 前の同じ式のテキスト経路から画像経路への切り替えを受理する",
+  function () {
+    fs.rmSync(this.directory, { recursive: true, force: true });
+    assert.deepEqual(this.multiMessageInspection, {
+      accepted: true,
+      laterMessageHasNoTarget: true,
+      targetUsesImage: true,
+      targetUsesTextWhileStreaming: true,
+    });
+  },
+);
 
 Given("qni-math の描画 entry point を指定した探索コマンドがある", function () {
   this.verifyDisplayArguments = [

@@ -11,7 +11,7 @@ STREAM_CAPTURE_TIMEOUT=30
 FINAL_FORMULA_TIMEOUT=15
 IMAGE_PATH_TIMEOUT=15
 WINDOW_LIFETIME=240
-EXPLORATION_WINDOW_LIFETIME=420
+EXPLORATION_WINDOW_LIFETIME=450
 SESSION_READY_TIMEOUT=30
 WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
@@ -89,6 +89,7 @@ cleanup() {
   trap - EXIT INT TERM HUP ERR
   if [[ -n "$CAGE_PID" ]]; then
     kill -- "-$CAGE_PID" 2>/dev/null || kill "$CAGE_PID" 2>/dev/null || true
+    kill -CONT -- "-$CAGE_PID" 2>/dev/null || true
     wait "$CAGE_PID" 2>/dev/null || true
   fi
   if [[ -n "$TEMP_DIR" ]]; then
@@ -156,8 +157,11 @@ GHOSTTY_CONFIG="$TEMP_DIR/ghostty.conf"
 CONFIG_HOME="$TEMP_DIR/config"
 IMAGE_MARKER="$TEMP_DIR/image-path"
 STREAM_MARKER="$TEMP_DIR/assistant-streaming"
+STREAM_RENDERED_MARKER="$TEMP_DIR/assistant-streaming-rendered"
+STREAM_PROCESS_MARKER="$TEMP_DIR/assistant-process"
 STREAM_CAPTURE_ACK="$TEMP_DIR/assistant-streaming-captured"
 STREAM_CAPTURE_FILE="$TEMP_DIR/streaming.png"
+STREAM_PREVIOUS_CAPTURE_FILE="$TEMP_DIR/previous-streaming.png"
 FINAL_FORMULA_MARKER="$TEMP_DIR/final-formula-path"
 DISPLAY_FILE="$TEMP_DIR/wayland-display"
 CAGE_LOG="$TEMP_DIR/cage.log"
@@ -189,7 +193,7 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_MODE=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_PROMPT_INPUT=%q\nPI_FORMULA_VERIFY_TOOLS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_TARGET_EXTENSION=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_PROMPT_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_ACK=%q\nPI_FORMULA_VERIFY_FINAL_FORMULA_MARKER=%q\nPI_FORMULA_VERIFY_EXTRA_EXTENSIONS=()\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_MODE=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_PROMPT_INPUT=%q\nPI_FORMULA_VERIFY_TOOLS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_TARGET_EXTENSION=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_PROMPT_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_RENDERED_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_PROCESS_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_ACK=%q\nPI_FORMULA_VERIFY_FINAL_FORMULA_MARKER=%q\nPI_FORMULA_VERIFY_EXTRA_EXTENSIONS=()\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$MODE" "$CORPUS" "$PROMPT_INPUT" "$TOOLS" \
   "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-target.ts" "$ROOT/src/extension.ts" \
@@ -197,7 +201,8 @@ printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_
   "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-prompt.ts" \
   "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" \
-  "$STREAM_MARKER" "$STREAM_CAPTURE_ACK" "$FINAL_FORMULA_MARKER" >"$RUNNER"
+  "$STREAM_MARKER" "$STREAM_RENDERED_MARKER" "$STREAM_PROCESS_MARKER" \
+  "$STREAM_CAPTURE_ACK" "$FINAL_FORMULA_MARKER" >"$RUNNER"
 for extension in "${EXTRA_EXTENSIONS[@]}"; do
   printf 'PI_FORMULA_VERIFY_EXTRA_EXTENSIONS+=(%q)\n' "$extension" >>"$RUNNER"
 done
@@ -207,6 +212,8 @@ export PI_FORMULA_MACROS='{}'
 export PI_FORMULA_VERIFY_MODE
 export PI_FORMULA_VERIFY_IMAGE_MARKER
 export PI_FORMULA_VERIFY_STREAM_MARKER
+export PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER
+export PI_FORMULA_VERIFY_STREAM_PROCESS_MARKER
 export PI_FORMULA_VERIFY_STREAM_ACK
 export PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER
 unset TMUX STY
@@ -327,6 +334,10 @@ if [[ "$MODE" == exploration ]]; then
   done
   [[ "$stream_ready" == true ]] \
     || fail "assistant 応答のストリーミング中フレームを撮影できませんでした"
+  read -r stream_process_pid <"$STREAM_PROCESS_MARKER"
+  [[ "$stream_process_pid" =~ ^[1-9][0-9]*$ ]] \
+    || fail "Pi の process ID を確認できませんでした"
+  run kill -STOP "$stream_process_pid"
 
   if "$ROOT/scripts/run-display-command" poll check-display-session \
     timeout --signal=TERM "$COMMAND_TIMEOUT" node \
@@ -337,10 +348,32 @@ if [[ "$MODE" == exploration ]]; then
     [[ "$poll_status" -eq 1 ]] || fail "Pi のセッション記録を検査できませんでした"
   fi
 
-  run_inside grim "$STREAM_CAPTURE_FILE"
-  run node "$ROOT/scripts/verify-display-dimensions.js" png \
-    "$STREAM_CAPTURE_FILE" 1920 "$HEIGHT" \
-    || fail "ストリーミング中のキャプチャ寸法が不正です"
+  stream_display_rendered=false
+  stream_capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
+  stream_rendered_options=(--background=250,248,240 --background=238,235,224)
+  while ((SECONDS < stream_capture_deadline)); do
+    run_inside grim "$STREAM_CAPTURE_FILE"
+    run node "$ROOT/scripts/verify-display-dimensions.js" png \
+      "$STREAM_CAPTURE_FILE" 1920 "$HEIGHT" \
+      || fail "ストリーミング中のキャプチャ寸法が不正です"
+    if "$ROOT/scripts/run-display-command" poll check-streaming-display-rendered \
+      timeout --signal=TERM "$COMMAND_TIMEOUT" node \
+      "$ROOT/scripts/check-display-rendered.js" \
+      "${stream_rendered_options[@]}" "$STREAM_CAPTURE_FILE"; then
+      stream_display_rendered=true
+      break
+    else
+      poll_status=$?
+      [[ "$poll_status" -eq 1 ]] \
+        || fail "ストリーミング中の描画完了を検査できませんでした"
+    fi
+    run install -m 0644 "$STREAM_CAPTURE_FILE" "$STREAM_PREVIOUS_CAPTURE_FILE"
+    stream_rendered_options=(--background=250,248,240 --background=238,235,224 \
+      "--previous=$STREAM_PREVIOUS_CAPTURE_FILE")
+    run sleep "$CAPTURE_READY_INTERVAL"
+  done
+  [[ "$stream_display_rendered" == true ]] \
+    || fail "ストリーミング中の描画完了をキャプチャで確認できませんでした"
 
   "$ROOT/scripts/run-display-command" detector detect-streaming-display-bands \
     timeout --signal=TERM "$DETECTOR_TIMEOUT" node "$ROOT/scripts/detect-display-bands.js" \
@@ -359,6 +392,7 @@ if [[ "$MODE" == exploration ]]; then
   run mkdir -p -- "${STREAM_CAPTURE_DESTINATION%/*}"
   run install -m 0644 "$STREAM_CAPTURE_FILE" "$STREAM_CAPTURE_DESTINATION"
   printf 'ストリーミング中のキャプチャ: %s\n' "$STREAM_CAPTURE_DESTINATION"
+  run kill -CONT "$stream_process_pid"
   run touch "$STREAM_CAPTURE_ACK"
 fi
 

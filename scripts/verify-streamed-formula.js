@@ -2,19 +2,44 @@
 
 const fs = require("node:fs");
 const { hasCompleteDisplayFormula } = require("./display-stream-formula");
-const { assistantText } = require("./verify-echo");
+
+function assistantTexts(session) {
+  return session
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map(JSON.parse)
+    .filter(
+      (record) =>
+        record.type === "message" && record.message?.role === "assistant",
+    )
+    .map((record) => {
+      if (!Array.isArray(record.message.content))
+        throw new Error("assistant content が配列ではありません");
+      return record.message.content
+        .filter(
+          (part) => part?.type === "text" && typeof part.text === "string",
+        )
+        .map((part) => part.text)
+        .join("");
+    });
+}
 
 function verifyStreamedFormula(session, marker, finalMarker) {
   const formula = fs.readFileSync(marker, "utf8");
   if (!formula) throw new Error("ストリーミング中の表示数式 marker が空です");
-  const response = assistantText(fs.readFileSync(session, "utf8"));
-  if (!hasCompleteDisplayFormula(response, formula))
+  const responses = assistantTexts(fs.readFileSync(session, "utf8"));
+  if (
+    !responses.some((response) => hasCompleteDisplayFormula(response, formula))
+  )
     throw new Error(
-      "確定した応答でストリーミング中の式が表示数式として認識されません",
+      "確定した assistant message でストリーミング中の式が表示数式として認識されません",
     );
   const finalPath = fs.readFileSync(finalMarker, "utf8").trim();
   if (finalPath !== "image")
-    throw new Error("確定した応答でストリーミング中の式が画像経路を通りません");
+    throw new Error(
+      "対象の assistant message で表示数式が画像経路を通りません",
+    );
 }
 
 function main(session, marker, finalMarker) {

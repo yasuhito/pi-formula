@@ -5,7 +5,7 @@ const { markTargetFormula } = require("../display-stream-formula");
 
 export default function (pi: ExtensionAPI) {
   pi.registerMarkdownTransformer((markdown, context) => {
-    const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
+    const marker = process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
       context.messageType !== "assistant" ||

@@ -124,6 +124,12 @@ pi-formula の worker として
   | 上限超過 |
   | 文中コード |
 
+## Scenario: tool 前の対象式を複数の assistant message にまたがって追跡する
+
+- Given 表示数式の後に tool を使って別の回答を返す探索応答がある
+- When tool 前の対象式と tool 後の回答を検証する
+- Then tool 前の同じ式のテキスト経路から画像経路への切り替えを受理する
+
 ## Scenario: qni-math の描画 entry point を探索モードへ重ねない
 
 - Given qni-math の描画 entry point を指定した探索コマンドがある
