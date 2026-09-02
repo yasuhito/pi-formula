@@ -118,6 +118,12 @@ Pi の画面部品に依存せず PNG を配置したい
 - When Buffer の既成 PNG を公開 API で描く
 - Then 端末寸法に合わせた画像転送と配置が返る
 
+## Scenario: 危険域の画像 ID でも Pi の装飾追跡を汚さない
+
+- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 下線色はコロン形式になり背景色と dim は残らない
+
 ## Scenario: ファイルの既成 PNG を画像経路で描く
 
 - Given 画像経路を使う試験用の連携拡張がある
