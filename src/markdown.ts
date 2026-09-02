@@ -186,6 +186,12 @@ function hierarchyContinuation(source: string, openingIndex: number): string {
   return markdownHierarchy(source.slice(lineStart, openingIndex)).continuation;
 }
 
+function startsDisplayMathLine(source: string, openingIndex: number): boolean {
+  const lineStart = source.lastIndexOf("\n", openingIndex - 1) + 1;
+  const prefix = source.slice(lineStart, openingIndex);
+  return markdownHierarchy(prefix).consumed === prefix.length;
+}
+
 function isUrlDollar(source: string, openingIndex: number): boolean {
   const tokenStart =
     Math.max(
@@ -265,11 +271,9 @@ export function transformDisplayMath(
       opening === "$$" &&
       (isUrlDollar(source, index) || !looksLikeDollarDisplay(latex))
     ) {
-      const reachesLaterLine = source
-        .slice(contentStart, closing)
-        .includes("\n");
-      transformed += reachesLaterLine ? opening : original;
-      index = reachesLaterLine
+      const reconsiderClosing = startsDisplayMathLine(source, closing);
+      transformed += reconsiderClosing ? opening : original;
+      index = reconsiderClosing
         ? contentStart
         : closing + closingDelimiter.length;
       continue;

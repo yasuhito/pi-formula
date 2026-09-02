@@ -172,6 +172,10 @@ When("シェルの $$ と後続の表示数式を含む本文を変換する", f
   transform(this, "run echo $$; kill $$ after 2 seconds.\n\n$$x = 1$$");
 });
 
+When("改行を含むシェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$;\nkill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
 When("数式でない $$ を一万個含む本文を変換する", function () {
   const started = performance.now();
   transform(this, "$$本文".repeat(10_000));
@@ -296,6 +300,11 @@ Then("シェルに続く表示数式だけが画像になる", function () {
     },
     { imageCount: 1, formulaRemains: false },
   );
+});
+
+Then("改行を含むシェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$;\nkill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
 });
 
 Then("走査は一秒以内に終わる", function () {
