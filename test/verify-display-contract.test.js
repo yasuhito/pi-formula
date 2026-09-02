@@ -7,6 +7,20 @@ const harness = fs.readFileSync(
   path.resolve(__dirname, "../scripts/verify-display"),
   "utf8",
 );
+const promptExtension = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    "../scripts/verify-extensions/pi-formula-verify-prompt.ts",
+  ),
+  "utf8",
+);
+const targetExtension = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    "../scripts/verify-extensions/pi-formula-verify-target.ts",
+  ),
+  "utf8",
+);
 const runFunction = harness.slice(
   harness.indexOf("run()"),
   harness.indexOf("cleanup()"),
@@ -106,8 +120,208 @@ test("画像経路を確認してからキャプチャする", () => {
   );
 });
 
-test("応答一致を確認してからキャプチャする", () => {
-  assert.ok(markersAppearInOrder(harness, "verify-echo.js", "run_inside grim"));
+test("コーパスモードだけ応答一致を確認する", () => {
+  assert.match(
+    harness,
+    /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u,
+  );
+});
+
+test("探索モードは公開APIの補助拡張から自由なプロンプトを送る", () => {
+  assert.match(
+    harness,
+    /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == exploration \]\][\s\S]*pi "\$\{args\[@\]\}"/u,
+  );
+});
+
+test("対象式の印付け、pi-formula、画像経路確認を順に読み込む", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      '--extension "$PI_FORMULA_VERIFY_TARGET_EXTENSION"',
+      '--extension "$PI_FORMULA_VERIFY_EXTENSION"',
+      '--extension "$PI_FORMULA_VERIFY_PROMPT_EXTENSION"',
+    ),
+  );
+});
+
+test("探索モードは明示した追加拡張を読み込む", () => {
+  assert.match(
+    harness,
+    /PI_FORMULA_VERIFY_EXTRA_EXTENSIONS[\s\S]*args\+=\(--extension "\$extension"\)/u,
+  );
+});
+
+test("探索モードは明示したツールだけを有効にする", () => {
+  assert.match(
+    harness,
+    /PI_FORMULA_VERIFY_TOOLS[\s\S]*args\+=\(--tools "\$PI_FORMULA_VERIFY_TOOLS"\)/u,
+  );
+});
+
+test("探索で得た応答をキャプチャ前にコーパスへ保存する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "save-display-response.js",
+      '"$SESSION_FILE" "$RESPONSE_DESTINATION" "$STREAM_MARKER"',
+      "run_inside grim",
+    ),
+  );
+});
+
+test("探索応答の開始前に基準キャプチャの完了を待つ", () => {
+  assert.match(
+    promptExtension,
+    /pi\.on\("input", async[\s\S]*fs\.writeFileSync\(baselineMarker[\s\S]*await waitForMarker\([\s\S]*baselineAcknowledgement/u,
+  );
+});
+
+test("対象式前の安定画面を保存してから探索を開始する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "baseline_ready=false",
+      "baseline_capture_deadline=",
+      'run_inside grim "$BASELINE_CAPTURE_FILE"',
+      "check-baseline-rendered",
+      'run touch "$BASELINE_CAPTURE_ACK"',
+      "stream_ready=false",
+    ),
+  );
+});
+
+test("対象式の描画機会と画面変化を確認してからストリーミング画面を判定する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "stream_ready=false",
+      'run sleep "$CAPTURE_READY_INTERVAL"',
+      'run kill -STOP "$stream_process_pid"',
+      'check-display-session.js" "$SESSION_FILE"',
+      "stream_capture_deadline=",
+      '"--different-from=$BASELINE_CAPTURE_FILE"',
+      'run_inside grim "$STREAM_CAPTURE_FILE"',
+      "check-streaming-display-rendered",
+      "detect-streaming-display-bands",
+      'run kill -CONT "$stream_process_pid"',
+      'run touch "$STREAM_CAPTURE_ACK"',
+    ),
+  );
+});
+
+test("対象式をストリーミング描画へ渡してから撮影markerを書く", () => {
+  assert.ok(
+    markersAppearInOrder(
+      promptExtension,
+      "await waitForMarker(\n      renderedMarker",
+      "fs.writeFileSync(marker, next.formulaToCapture)",
+      "await waitForMarker(\n      acknowledgement",
+    ),
+  );
+});
+
+test("公開Markdown transformerが対象式のテキスト経路を記録する", () => {
+  assert.match(
+    promptExtension,
+    /context\.isStreaming[\s\S]*hasCompleteDisplayFormula\(markdown, readyFormula\)[\s\S]*fs\.writeFileSync\(renderedMarker, readyFormula\)/u,
+  );
+});
+
+test("確定描画の印はストリーミング描画で記録した対象式を使う", () => {
+  assert.match(targetExtension, /PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER/u);
+});
+
+test("対象messageの確定結果を後続messageで上書きしない", () => {
+  assert.match(
+    promptExtension,
+    /advanceDisplayFormulaGate\(readyFormula, event\.message\)\.hasReadyFormula[\s\S]*!fs\.existsSync\(finalMarker\)[\s\S]*result\.foundTarget && !fs\.existsSync\(finalMarker\)/u,
+  );
+});
+
+test("対象式から応答末尾が画面に収まらなければ検証不能を記録する", () => {
+  assert.match(
+    promptExtension,
+    /targetFitsViewport\([\s\S]*fitsViewport[\s\S]*"offscreen\\n"/u,
+  );
+});
+
+test("tool実行を対象式の確定キャプチャ完了まで待たせる", () => {
+  assert.ok(
+    markersAppearInOrder(
+      promptExtension,
+      'pi.on("tool_call"',
+      "await waitForMarker(\n      finalMarker",
+      'fs.writeFileSync(captureMarker, "ready\\n")',
+      "await waitForMarker(\n      acknowledgement",
+    ),
+  );
+});
+
+test("対象式の確定画面を判定してからtool実行を再開する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      '[[ -s "$FINAL_CAPTURE_MARKER" ]]',
+      'run sleep "$CAPTURE_READY_INTERVAL"',
+      'run kill -STOP "$stream_process_pid"',
+      '"--different-from=$STREAM_CAPTURE_FILE"',
+      'run_inside grim "$CAPTURE_FILE"',
+      "detector detect-display-bands",
+      'run kill -CONT "$stream_process_pid"',
+      'run touch "$FINAL_CAPTURE_ACK"',
+      "for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1))",
+    ),
+  );
+});
+
+test("探索モードはストリーミング画面の後で確定画面も判定する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "detect-streaming-display-bands",
+      'run touch "$STREAM_CAPTURE_ACK"',
+      "completed=false",
+      'run_inside grim "$CAPTURE_FILE"',
+      "detector detect-display-bands",
+    ),
+  );
+});
+
+test("二つの判定結果を検証不能優先の共通処理で統合する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "detector_status=0",
+      "combine-display-status.js",
+      'exit "$combined_status"',
+    ),
+  );
+});
+
+test("探索モードの寿命は全段階の期限と余裕を含む", () => {
+  const seconds = (name, source = harness) =>
+    Number(
+      new RegExp(`^${name}=(?:([0-9]+)|([0-9_]+))$`, "mu").exec(source)?.[1],
+    );
+  const milliseconds = Number(
+    /^const STREAM_GATE_TIMEOUT_MS = ([0-9_]+);$/mu
+      .exec(promptExtension)?.[1]
+      .replaceAll("_", ""),
+  );
+  const boundedStages =
+    seconds("SESSION_READY_TIMEOUT") +
+    seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("BASELINE_READY_TIMEOUT") +
+    seconds("BASELINE_CAPTURE_TIMEOUT") +
+    seconds("STREAM_CAPTURE_TIMEOUT") +
+    2 * (milliseconds / 1000) +
+    seconds("FINAL_FORMULA_TIMEOUT") +
+    seconds("SESSION_TIMEOUT") +
+    2 * seconds("CAPTURE_READY_TIMEOUT") +
+    2 * seconds("DETECTOR_TIMEOUT") +
+    seconds("COMMAND_TIMEOUT");
+  assert.ok(seconds("EXPLORATION_WINDOW_LIFETIME") > boundedStages);
 });
 
 test("描画完了をピクセル判定前に確認する", () => {

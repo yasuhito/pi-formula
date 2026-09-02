@@ -49,13 +49,22 @@ function isSameImage(image, other) {
   );
 }
 
-function checkDisplayRendered(image, previous, backgrounds) {
+function checkDisplayRendered(
+  image,
+  previous,
+  backgrounds,
+  baseline,
+  allowBlank = false,
+) {
   const { backgroundRatio, inkRatio } = measureInk(image, backgrounds);
   if (backgroundRatio < MINIMUM_BACKGROUND_RATIO) {
     throw new Error("検証ウィンドウの背景がキャプチャに写っていません");
   }
-  if (inkRatio < MINIMUM_INK_RATIO) {
+  if (!allowBlank && inkRatio < MINIMUM_INK_RATIO) {
     throw new Error("キャプチャに描画がありません");
+  }
+  if (baseline !== undefined && isSameImage(image, baseline)) {
+    throw new Error("対象式前のキャプチャから画面が変化していません");
   }
   if (previous === undefined) {
     throw new Error("比較対象の前回キャプチャがまだありません");
@@ -68,33 +77,50 @@ function checkDisplayRendered(image, previous, backgrounds) {
 function parseArguments(args) {
   const backgrounds = [];
   let previousFilename;
+  let baselineFilename;
+  let allowBlank = false;
   let filename;
   for (const argument of args) {
     if (argument.startsWith("--background="))
       backgrounds.push(parseColor(argument.slice(13)));
     else if (argument.startsWith("--previous="))
       previousFilename = argument.slice(11);
+    else if (argument.startsWith("--different-from="))
+      baselineFilename = argument.slice(17);
+    else if (argument === "--allow-blank") allowBlank = true;
     else if (!filename) filename = argument;
     else throw new Error(`不明な引数です: ${argument}`);
   }
   if (backgrounds.length === 0 || !filename) {
     throw new Error(
-      "Usage: check-display-rendered.js --background=R,G,B [--background=R,G,B] [--previous=<capture.png>] <capture.png>",
+      "Usage: check-display-rendered.js --background=R,G,B [--background=R,G,B] [--previous=<capture.png>] [--different-from=<baseline.png>] [--allow-blank] <capture.png>",
     );
   }
-  return { backgrounds, previousFilename, filename };
+  return {
+    allowBlank,
+    baselineFilename,
+    backgrounds,
+    previousFilename,
+    filename,
+  };
 }
 
 function main() {
   let image;
   let previous;
+  let baseline;
   let backgrounds;
+  let allowBlank;
   try {
     const parsed = parseArguments(process.argv.slice(2));
+    allowBlank = parsed.allowBlank;
     backgrounds = parsed.backgrounds;
     image = decodePng(fs.readFileSync(parsed.filename));
     if (parsed.previousFilename !== undefined) {
       previous = decodePng(fs.readFileSync(parsed.previousFilename));
+    }
+    if (parsed.baselineFilename !== undefined) {
+      baseline = decodePng(fs.readFileSync(parsed.baselineFilename));
     }
   } catch (error) {
     console.error(`描画完了の検査失敗: ${error.message}`);
@@ -102,7 +128,7 @@ function main() {
     return;
   }
   try {
-    checkDisplayRendered(image, previous, backgrounds);
+    checkDisplayRendered(image, previous, backgrounds, baseline, allowBlank);
     console.log("Ghostty の描画完了をキャプチャで確認しました");
   } catch (error) {
     console.error(`描画は未完了: ${error.message}`);
