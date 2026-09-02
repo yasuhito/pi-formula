@@ -36,6 +36,13 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function imageIdentities(markdown) {
+  return Array.from(
+    markdown.matchAll(/\x1b_Ga=T,f=100[^;]*\bi=(\d+)/gu),
+    ([, identity]) => identity,
+  );
+}
+
 function renderUnicode(markdown) {
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });
   return new Markdown(markdown, 0, 0, passthroughTheme)
@@ -444,6 +451,14 @@ When("$$ を含む金額を変換する", function () {
   transform(this, "価格は $$100 です。");
 });
 
+When("再走査される金額と後続の表示数式を含む本文を変換する", function () {
+  const source = "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$";
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaImages = imageIdentities(this.rendered);
+  transform(this, source);
+  this.actualFormulaImages = imageIdentities(this.rendered);
+});
+
 When("通常の表示数式を変換する", function () {
   transform(this, "$$a = b$$");
 });
@@ -572,6 +587,10 @@ Then("見送った本文は入力どおり一度だけ残る", function () {
 
 Then("金額は入力どおり残る", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then("画像経路で描かれる式は x = 1 だけになる", function () {
+  assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
 });
 
 Then("一つの表示数式が画像になる", function () {

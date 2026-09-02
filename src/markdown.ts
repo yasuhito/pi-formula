@@ -270,6 +270,7 @@ function looksLikeDollarDisplay(latex: string): boolean {
 function looksLikeReconsideredDollarDisplay(latex: string): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
+  if (/^\d+(?:[.,]\d+)*$/u.test(value)) return false;
   if (/[_^=+*/<>|&±≤≥≠≈∈→⇒∞∫∑√]/u.test(value)) return true;
   return !/\p{L}{2,}/u.test(value);
 }
