@@ -177,14 +177,10 @@ run mkdir -p "$CONFIG_HOME"
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
 if [[ "$MODE" == corpus ]]; then
-  PLAN=$(run node "$ROOT/scripts/plan-display.js" "$CORPUS") \
-    || fail "表示数式の画像行数を含む全履歴を 16000px 以下へ収められません"
+  if ! PLAN=$(run node "$ROOT/scripts/verify-display-plan.js" "$CORPUS"); then
+    exit 2
+  fi
   HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
-  IMAGE_ROWS=$(printf '%s' "$PLAN" | run jq -r '.imageRows')
-  [[ "$HEIGHT" =~ ^[0-9]+$ && "$HEIGHT" -le 16000 ]] \
-    || fail "表示計画の出力高が不正です"
-  [[ "$IMAGE_ROWS" =~ ^[1-9][0-9]*$ ]] \
-    || fail "コーパスに表示数式の画像行がありません"
 else
   # 応答は事前に分からないため、探索モードは検証上限の全履歴を用意する。
   HEIGHT=16000

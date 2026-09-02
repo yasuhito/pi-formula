@@ -27,17 +27,22 @@ function sourceRows(markdown) {
 function planDisplay(input, options = {}) {
   const markdown = options.source ? input : fs.readFileSync(input, "utf8");
   let displayFormulas = 0;
+  let failedFormulas = 0;
   let imageRows = 0;
   transformDisplayMath(markdown, (latex, original) => {
-    const image = typesetMath(
-      latex,
-      "#282823",
-      AVAILABLE_COLUMNS,
-      CELL,
-      VERIFY_DISPLAY_MACROS,
-    );
     displayFormulas += 1;
-    imageRows += image.rows;
+    try {
+      const image = typesetMath(
+        latex,
+        "#282823",
+        AVAILABLE_COLUMNS,
+        CELL,
+        VERIFY_DISPLAY_MACROS,
+      );
+      imageRows += image.rows;
+    } catch {
+      failedFormulas += 1;
+    }
     return original;
   });
   const textRows = sourceRows(markdown);
@@ -54,6 +59,7 @@ function planDisplay(input, options = {}) {
     height: Math.max(MIN_HEIGHT, Math.ceil(required)),
     imageRows,
     displayFormulas,
+    failedFormulas,
   };
 }
 
