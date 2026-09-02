@@ -90,14 +90,14 @@ pi-formula の worker として
 
 ## Scenario: 画像経路が確定するまで判定を繰り返す
 
-- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
-- When ハーネスの安全条件を調べる
-- Then 待機期限まで画像経路の判定を繰り返す
+- Given 開始時には画像経路の確認記録がない
+- When 確認記録が遅れて image になるまで画像経路を待つ
+- Then 複数回の判定後に画像経路を受理する
 
 ## Scenario Outline: 画像経路が確定しない理由を報告する
 
 - Given 画像経路の確認記録が `<selected>` である
-- When 画像経路の確認記録を検証する
+- When 画像経路の確認記録が確定するまで待つ
 - Then 検証不能として `<reported>` を報告する
 
 ### Examples:

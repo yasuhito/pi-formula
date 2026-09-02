@@ -122,7 +122,7 @@ test("表示数式の画像行数で出力高を決めてから検証セッシ�
 
 test("画像経路を確認してからキャプチャする", () => {
   assert.ok(
-    markersAppearInOrder(harness, "verify-image-path.js", "run_inside grim"),
+    markersAppearInOrder(harness, "wait-for-image-path.js", "run_inside grim"),
   );
 });
 

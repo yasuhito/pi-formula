@@ -15,6 +15,7 @@ const {
   extractQniCliAdditionalMacros,
   readQniCliAdditionalMacros,
 } = require("../../scripts/qni-cli-additional-macros");
+const { waitForImagePath } = require("../../scripts/wait-for-image-path");
 const root = path.resolve(__dirname, "../..");
 
 function normalDisplay(x, y) {
@@ -100,16 +101,12 @@ When("ハーネスの安全条件を調べる", function () {
         this.harness,
       ) &&
       /キャプチャを開いて表示を確認してください/u.test(this.harness),
-    imagePath: /verify-image-path\.js/u.test(this.harness),
+    imagePath: /wait-for-image-path\.js/u.test(this.harness),
     imagePathTimeout:
       Number(/^IMAGE_PATH_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]) >=
       Math.max(
         Number(/^SESSION_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
         Number(/^CAPTURE_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
-      ),
-    imagePathRetry:
-      /while \(\(SECONDS < image_path_deadline\)\)[\s\S]*verify-image-path\.js[\s\S]*image_path_ready=true/u.test(
-        this.harness,
       ),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
     exactEcho:
@@ -194,8 +191,25 @@ Then("画像経路の待機期限は他の準備待ちと同等以上である",
   assert.equal(this.safety.imagePathTimeout, true);
 });
 
-Then("待機期限まで画像経路の判定を繰り返す", function () {
-  assert.equal(this.safety.imagePathRetry, true);
+Given("開始時には画像経路の確認記録がない", function () {
+  this.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-image-path-"),
+  );
+  this.imagePathMarker = path.join(this.directory, "marker");
+});
+
+When("確認記録が遅れて image になるまで画像経路を待つ", async function () {
+  setTimeout(() => fs.writeFileSync(this.imagePathMarker, "image\n"), 120);
+  this.imagePathAttempts = await waitForImagePath(
+    this.imagePathMarker,
+    1_000,
+    30,
+  );
+  fs.rmSync(this.directory, { recursive: true, force: true });
+});
+
+Then("複数回の判定後に画像経路を受理する", function () {
+  assert.ok(this.imagePathAttempts > 1);
 });
 
 Given(/^画像経路の確認記録が `([^`]+)` である$/u, function (selected) {
@@ -208,12 +222,21 @@ Given(/^画像経路の確認記録が `([^`]+)` である$/u, function (selecte
   }
 });
 
-When("画像経路の確認記録を検証する", function () {
-  this.imagePathResult = spawnSync(
+function runImagePathWait(marker, timeoutMs, intervalMs) {
+  return spawnSync(
     process.execPath,
-    [path.join(root, "scripts/verify-image-path.js"), this.imagePathMarker],
+    [
+      path.join(root, "scripts/wait-for-image-path.js"),
+      marker,
+      String(timeoutMs),
+      String(intervalMs),
+    ],
     { encoding: "utf8", timeout: 5_000 },
   );
+}
+
+When("画像経路の確認記録が確定するまで待つ", function () {
+  this.imagePathResult = runImagePathWait(this.imagePathMarker, 90, 20);
   fs.rmSync(this.directory, { recursive: true, force: true });
 });
 
