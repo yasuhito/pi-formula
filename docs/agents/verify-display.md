@@ -18,14 +18,9 @@ scripts/verify-display docs/agents/verify-corpus/issue-21.md
 scripts/verify-display --prompt '表示数式を使ってフーリエ変換を説明してください。'
 ```
 
-qni-cli などと組み合わせる場合は、探索モードへ `--extension` を繰り返し渡し、使用を許可するツール名だけを `--tools` のカンマ区切りで渡す。拡張の自動探索と、指定していないツールは無効のままにする。
+探索モードへ tool 用の拡張を追加する場合は、`--extension` を繰り返し渡し、使用を許可するツール名だけを `--tools` のカンマ区切りで渡す。拡張の自動探索と、指定していないツールは無効のままにする。追加する拡張は Markdown transformer を登録せず、必要な追加マクロを pi-formula の公開 `registerFormula(pi, macros)` へ渡すものに限る。これにより、ストリーミング中のテキスト経路と確定後の画像経路を pi-formula 一つで描画する。
 
-```sh
-scripts/verify-display \
-  --prompt 'qni を使って量子フーリエ変換を説明してください。' \
-  --extension "$HOME/Work/qni-cli/dist/qni-math/index.js" \
-  --tools qni
-```
+現在の qni-cli 0.1.0 にある `dist/qni-math/index.js` は、`qni` tool と独自の Markdown transformer を一緒に登録するため互換性がない。ハーネスはこの entry point を拒否する。qni-cli と併用するには、qni-cli 側へ tool の登録と `registerFormula` による追加マクロ登録だけを行う互換 entry point を追加する必要がある。それが用意されるまで、qni-cli との併用は検証済みとして扱わない。
 
 異常を回帰検証へ昇格させる場合は、`--save-response` で完了した応答を一字一句そのままコーパスへ保存する。保存はピクセル判定より先に行うため、水平帯を検出して exit 1 になった応答も残る。
 
@@ -49,7 +44,7 @@ PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
   scripts/verify-display docs/agents/verify-corpus/issue-21.md
 ```
 
-どちらのモードも、既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` と検証補助拡張を読み込む。コーパスモードは追加の拡張を受け付けず、すべてのツールを無効にする。探索モードも、明示した追加拡張とツールだけを有効にする。
+どちらのモードも、既定ではプロジェクトの Pi 設定にあるモデルを使う。安価なモデルを指定する場合は `PI_FORMULA_VERIFY_MODEL` を使う。拡張は利用者・project の設定から探索しない。`--no-extensions` と `--extension` を併用し、実行中の checkout にある `src/extension.ts` と検証補助拡張を読み込む。コーパスモードは追加の拡張を受け付けず、すべてのツールを無効にする。探索モードも、明示した互換拡張とツールだけを有効にする。セッション記録は終了時に削除するため、tool の成否を後から検査できない。詳しい制約は[セッション記録のツール失敗検査](verify-session-record.md)を参照する。
 
 pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロも空に固定する。検証専用の追加マクロは qni-cli の `ket`、`bra`、`braket` と同じ定義を使う。CI は qni-cli の現在の `src/qni-math/typesetter.ts` を TypeScript の構文として読み、追加マクロの名前、展開値、引数数を照合する。ソースの書式だけが変わっても受理し、追加マクロが変わった場合は同期漏れとして失敗する。現在の checkout の公開 API で試験用 PNG を作り、8 byte の PNG 署名が完全に一致したことを補助拡張が記録する。保存済みの `path: "text"`、PNG 問い合わせ失敗、その他の理由で画像経路を選べない場合は exit 2 とし、キャプチャへ進まない。
 

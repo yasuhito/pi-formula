@@ -123,6 +123,13 @@ else
   [[ -n "$PROMPT" ]] || fail "$USAGE"
   [[ "$SAVE_RESPONSE" == false || -n "$RESPONSE_DESTINATION" ]] || fail "$USAGE"
   [[ "$TOOLS_SET" == false || -n "$TOOLS" ]] || fail "$USAGE"
+  for extension in "${EXTRA_EXTENSIONS[@]}"; do
+    case "$extension" in
+      */qni-math/index.js | */qni-math/index.ts)
+        fail "qni-math の描画 entry point は pi-formula と同時に読み込めません"
+        ;;
+    esac
+  done
 fi
 PROMPT_INPUT="pi-formula-verify-prompt:$PROMPT"
 for command in timeout cage wlr-randr ghostty grim pi jq node npm mktemp realpath rm sleep install setsid ps mkdir; do

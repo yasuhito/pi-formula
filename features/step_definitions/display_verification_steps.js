@@ -5,8 +5,13 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
-const { createPng } = require("../../test/support/png-fixture");
+const { registerFormula } = require("../../dist/api.js");
 const { planDisplay } = require("../../scripts/plan-display");
+const {
+  VERIFY_DISPLAY_MACROS,
+} = require("../../scripts/verify-display-macros");
+const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
+const { createPng } = require("../../test/support/png-fixture");
 const {
   extractQniCliAdditionalMacros,
   readQniCliAdditionalMacros,
@@ -200,6 +205,83 @@ Then(
 
 Then("探索モードでは明示した拡張とツールだけを追加できる", function () {
   assert.equal(this.safety.explicitResources, true);
+});
+
+Given("固定応答と互換ツール拡張を使う探索セッションがある", async function () {
+  this.harness = fs.readFileSync(
+    path.join(root, "scripts/verify-display"),
+    "utf8",
+  );
+  this.explorationPi = fakePi();
+  registerFormula(this.explorationPi.api);
+  registerFormula(this.explorationPi.api, VERIFY_DISPLAY_MACROS);
+  this.explorationPi.api.registerTool({ name: "qni" });
+  await startWithKitty(this.explorationPi);
+  this.fixedResponseFrames = ["途中\n\n$$x", "途中\n\n$$x$$"];
+});
+
+When("同じ探索セッションで応答をストリーミングして確定する", function () {
+  const transform = (markdown, isStreaming) =>
+    this.explorationPi.transformer()(markdown, {
+      messageType: "assistant",
+      isStreaming,
+      availableWidth: 80,
+    });
+  this.streamingFrames = this.fixedResponseFrames.map((frame) =>
+    transform(frame, true),
+  );
+  this.finalizedFrame = transform(this.fixedResponseFrames.at(-1), false);
+});
+
+Then(
+  "ストリーミング中は一つのテキスト経路を通り確定後は画像経路へ切り替わる",
+  function () {
+    assert.deepEqual(
+      {
+        interactiveSession:
+          /pi "\$\{args\[@\]\}" "\$PI_FORMULA_VERIFY_PROMPT_INPUT"/u.test(
+            this.harness,
+          ) && !/\bpi (?:-p|--print)\b/u.test(this.harness),
+        streamingFrames: this.streamingFrames,
+        finalizedUsesImage: this.finalizedFrame.includes("\x1b_Ga=T,f=100"),
+        transformerRegistrations:
+          this.explorationPi.registrationCounts().transformerRegistrations,
+        qniToolRegistered: this.explorationPi.tools.has("qni"),
+      },
+      {
+        interactiveSession: true,
+        streamingFrames: this.fixedResponseFrames,
+        finalizedUsesImage: true,
+        transformerRegistrations: 1,
+        qniToolRegistered: true,
+      },
+    );
+  },
+);
+
+Given("qni-math の描画 entry point を指定した探索コマンドがある", function () {
+  this.verifyDisplayArguments = [
+    "--prompt",
+    "表示数式を説明してください。",
+    "--extension",
+    "/opt/qni-cli/dist/qni-math/index.js",
+    "--tools",
+    "qni",
+  ];
+});
+
+Then("二つ目の数式描画を読み込む前に拒否する", function () {
+  assert.deepEqual(
+    {
+      status: this.verifyDisplayResult.status,
+      stderr: this.verifyDisplayResult.stderr,
+    },
+    {
+      status: 2,
+      stderr:
+        "verify-display: qni-math の描画 entry point は pi-formula と同時に読み込めません\n",
+    },
+  );
 });
 
 Given(/^`([^`]+)` という探索用プロンプトがある$/u, function (prompt) {
