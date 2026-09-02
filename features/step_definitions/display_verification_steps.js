@@ -8,6 +8,10 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 const { planDisplay } = require("../../scripts/plan-display");
 const { createPng } = require("../../test/support/png-fixture");
 const {
+  VERIFY_DISPLAY_MACROS,
+} = require("../../scripts/verify-display-macros");
+const { typesetMath } = require("../../dist/typesetter");
+const {
   extractQniCliAdditionalMacros,
   readQniCliAdditionalMacros,
 } = require("../../scripts/qni-cli-additional-macros");
@@ -239,6 +243,54 @@ Then("bra と braket を含む表示数式を組版できる", function () {
   assert.ok(planDisplay(this.corpus, { source: true }).imageRows > 0);
 });
 
+const formulaStyle = ["#282823", 220, { widthPx: 8, heightPx: 16 }];
+
+function renderedPng(latex, macros = {}) {
+  return typesetMath(latex, ...formulaStyle, macros).png;
+}
+
+Given("braket の直後に ket が続く表示数式がある", function () {
+  this.actualFormula = String.raw`\braket{s|\psi} - \ket{\psi}`;
+  this.expectedFormula = String.raw`\left\langle s|\psi\right\rangle - \left|\psi\right\rangle`;
+});
+
+Then("braket と直後の ket は別の項として描かれる", function () {
+  assert.equal(
+    renderedPng(this.actualFormula, VERIFY_DISPLAY_MACROS).equals(
+      renderedPng(this.expectedFormula),
+    ),
+    true,
+  );
+});
+
+Given("bra を使う表示数式がある", function () {
+  this.actualFormula = String.raw`\bra{\psi}`;
+  this.expectedFormula = String.raw`\left\langle\psi\right|`;
+});
+
+Then("bra は山括弧と縦線で描かれる", function () {
+  assert.equal(
+    renderedPng(this.actualFormula, VERIFY_DISPLAY_MACROS).equals(
+      renderedPng(this.expectedFormula),
+    ),
+    true,
+  );
+});
+
+Given("ket を使う表示数式がある", function () {
+  this.actualFormula = String.raw`\ket{\psi}`;
+  this.expectedFormula = String.raw`\left|\psi\right\rangle`;
+});
+
+Then("ket は縦線と山括弧で描かれる", function () {
+  assert.equal(
+    renderedPng(this.actualFormula, VERIFY_DISPLAY_MACROS).equals(
+      renderedPng(this.expectedFormula),
+    ),
+    true,
+  );
+});
+
 function setMacroDefinitions(world, qniCliSource) {
   world.verifyDisplayMacros =
     require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
@@ -266,7 +318,7 @@ Given("検証ハーネスと値が異なる qni-cli の追加マクロ定義が�
       path.join(root, "features/fixtures/qni-cli-typesetter.txt"),
       "utf8",
     )
-    .replace("      2,", "      1,");
+    .replace("      1,", "      2,");
   setMacroDefinitions(this, source);
 });
 
