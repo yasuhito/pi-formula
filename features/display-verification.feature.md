@@ -130,6 +130,11 @@ pi-formula の worker として
 - Given ket を使う表示数式がある
 - Then ket は縦線と山括弧で描かれる
 
+## Scenario: Issue 52 の幅掃引コーパスを組版する
+
+- Given Issue 52 の幅掃引コーパスがある
+- Then 項数3から15までの7つの表示数式を組版できる
+
 ## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
 
 - Given 検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある
