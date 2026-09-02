@@ -115,6 +115,48 @@ When("ket 追加マクロを含むドル区切りのインライン数式を描�
   this.unicode = renderUnicode(this.rendered);
 });
 
+When("コロン直後の表示数式を変換する", function () {
+  transform(this, "Result:$$x = 1$$");
+});
+
+When("コロン直後の ket 追加マクロを描く", function () {
+  transform(this, String.raw`State:$\ket{s}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("URL 内のシェル変数と後続の ket 追加マクロを描く", function () {
+  transform(this, String.raw`https://example.com/$HOME の後は $\ket{s}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "スキーム付き URL と www URL の ket 追加マクロ風文字列を変換する",
+  function () {
+    transform(
+      this,
+      [
+        String.raw`https://example.com/$\ket{s}$`,
+        String.raw`www.example.com/$\ket{t}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+When(
+  "スラッシュなしスキーム URL の ket 追加マクロ風文字列を変換する",
+  function () {
+    transform(
+      this,
+      [
+        String.raw`mailto:user+$\ket{s}$@example.com`,
+        String.raw`tel:+81-$\ket{t}$`,
+        String.raw`urn:example:$\ket{u}$`,
+        String.raw`data:text/plain,$\ket{v}$`,
+      ].join("\n"),
+    );
+  },
+);
+
 When("braket 追加マクロを含む丸括弧区切りのインライン数式を描く", function () {
   transform(this, String.raw`\(\braket{s|\psi}\)`);
   this.unicode = renderUnicode(this.rendered);
@@ -255,6 +297,29 @@ When(
 
 Then("ket 追加マクロが Unicode で描かれる", function () {
   assert.equal(this.unicode, "|s⟩");
+});
+
+Then("コロン直後の表示数式が画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+});
+
+Then("コロン直後の ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "State:|s⟩");
+});
+
+Then(
+  "URL 内のシェル変数は残り後続の ket 追加マクロが Unicode で描かれる",
+  function () {
+    assert.equal(this.unicode, "https://example.com/$HOME の後は |s⟩");
+  },
+);
+
+Then("スキーム付き URL と www URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("スラッシュなしスキーム URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 Then("braket 追加マクロが Unicode で描かれる", function () {

@@ -246,14 +246,33 @@ function hierarchyContinuation(source: string, openingIndex: number): string {
   return markdownHierarchy(source.slice(lineStart, openingIndex)).continuation;
 }
 
-function isBareUrlInline(source: string, openingIndex: number): boolean {
-  const tokenStart =
+function urlTokenStart(source: string, openingIndex: number): number {
+  return (
     Math.max(
       source.lastIndexOf(" ", openingIndex - 1),
       source.lastIndexOf("\n", openingIndex - 1),
       source.lastIndexOf("\t", openingIndex - 1),
-    ) + 1;
-  return /(?:[a-z][a-z0-9+.-]*:|www\.|\/\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#]|$))\S*$/iu.test(
+    ) + 1
+  );
+}
+
+function bareUrlEnd(source: string, openingIndex: number): number | undefined {
+  const tokenStart = urlTokenStart(source, openingIndex);
+  if (
+    !/(?:[a-z][a-z0-9+.-]*:\S+|www\.|\/\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#]|$))\S*$/iu.test(
+      source.slice(tokenStart, openingIndex),
+    )
+  ) {
+    return undefined;
+  }
+  let end = openingIndex;
+  while (end < source.length && !/\s/u.test(source[end])) end += 1;
+  return end;
+}
+
+function isDisplayUrlDollar(source: string, openingIndex: number): boolean {
+  const tokenStart = urlTokenStart(source, openingIndex);
+  return /(?:[a-z][a-z0-9+.-]*:\/\/|www\.)\S*$/iu.test(
     source.slice(tokenStart, openingIndex),
   );
 }
@@ -404,6 +423,13 @@ export function transformInlineMath(
       continue;
     }
 
+    const urlEnd = bareUrlEnd(source, index);
+    if (urlEnd !== undefined) {
+      transformed += source.slice(index, urlEnd);
+      index = urlEnd;
+      continue;
+    }
+
     const closingDelimiter = opening === "$" ? "$" : "\\)";
     const contentStart = index + opening.length;
     const closing = closingIndex(source, closingDelimiter, contentStart);
@@ -419,11 +445,6 @@ export function transformInlineMath(
     if (!content || content.includes("\n")) {
       transformed += opening === "$" ? opening : original;
       index = opening === "$" ? contentStart : end;
-      continue;
-    }
-    if (isBareUrlInline(source, index)) {
-      transformed += original;
-      index = end;
       continue;
     }
     if (
@@ -488,7 +509,7 @@ export function transformDisplayMath(
     const latex = removeContinuation(rawLatex, continuation);
     if (
       opening === "$$" &&
-      (isBareUrlInline(source, index) ||
+      (isDisplayUrlDollar(source, index) ||
         !looksLikeDollarDisplay(latex) ||
         (reconsidered &&
           !looksLikeReconsideredDollarDisplay(latex, reachesLaterLine)))

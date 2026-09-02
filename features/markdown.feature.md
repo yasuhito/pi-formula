@@ -17,6 +17,40 @@ Formula for Pi の利用者として
 - When ket 追加マクロを含むドル区切りのインライン数式を描く
 - Then ket 追加マクロが Unicode で描かれる
 
+## Scenario: コロン直後の表示数式を描く
+
+- Given 画像経路で数式を描ける Pi がある
+- When コロン直後の表示数式を変換する
+- Then コロン直後の表示数式が画像になる
+
+## Scenario: コロン直後のインライン数式を描く
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When コロン直後の ket 追加マクロを描く
+- Then コロン直後の ket 追加マクロが Unicode で描かれる
+
+## Scenario: URL 内のシェル変数の後にあるインライン数式を描く
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When URL 内のシェル変数と後続の ket 追加マクロを描く
+- Then URL 内のシェル変数は残り後続の ket 追加マクロが Unicode で描かれる
+
+## Scenario: スキーム付き URL と www URL のインライン数式を保護する
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When スキーム付き URL と www URL の ket 追加マクロ風文字列を変換する
+- Then スキーム付き URL と www URL は変更されない
+
+## Scenario: スラッシュなしスキーム URL のインライン数式を保護する
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When スラッシュなしスキーム URL の ket 追加マクロ風文字列を変換する
+- Then スラッシュなしスキーム URL は変更されない
+
 ## Scenario: braket 追加マクロを丸括弧区切りのインライン数式で使う
 
 - Given 画像経路で数式を描ける Pi がある

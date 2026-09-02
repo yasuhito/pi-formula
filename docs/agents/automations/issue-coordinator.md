@@ -300,6 +300,7 @@ Issue #<N> を実装してください。
 - `CONTEXT.md` のユビキタス言語を、コード、テスト、commit message で使ってください。
 - 既存の実装とテストを探索してから編集してください。
 - 可能なら red-green-refactor で進めてください。バグ修正では回帰テストを追加してください。
+- ハーネスのテストは動作の結果を観察してください。`scripts/verify-display` と `scripts/verify-extensions/` を検査するときは、実行した結果（終了コード、出力、キャプチャ）を確かめてください。ソースを `readFileSync` で読んで文字列の出現や順序を検査する新しいテストは追加しないでください。
 - Pi の公開 API だけを使い、内部 API や private な import に依存しないでください（`docs/adr/0001`）。
 - 受け入れ基準の検証には `features/` の Cucumber シナリオを使い、各シナリオは検証目的の `Then` を一つだけ持たせてください。
 - `npm run check` を成功させてください。
