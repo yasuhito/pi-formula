@@ -11,6 +11,7 @@
     "scripts/verify-display-plan.js",
     "scripts/verify-echo.js",
     "scripts/verify-image-path.js",
+    "scripts/wait-for-image-path.js",
     "src/extension.ts"
   ],
   "project": [
