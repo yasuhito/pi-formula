@@ -168,6 +168,10 @@ When("$$ を含む URL を変換する", function () {
   transform(this, "https://example.com/a$$b$$c");
 });
 
+When("シェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$; kill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
 When("数式でない $$ を一万個含む本文を変換する", function () {
   const started = performance.now();
   transform(this, "$$本文".repeat(10_000));
@@ -277,6 +281,21 @@ Then("一つの表示数式が画像になる", function () {
 
 Then("URL は入力どおり残る", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then("シェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$; kill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("シェルに続く表示数式だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
 });
 
 Then("走査は一秒以内に終わる", function () {
