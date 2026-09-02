@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process");
 const { createPng } = require("./support/png-fixture");
 const checker = path.resolve(__dirname, "../scripts/check-display-rendered.js");
 
-function check({ capture, previous }) {
+function check({ allowBlank = false, baseline, capture, previous }) {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-rendered-"),
   );
@@ -18,10 +18,16 @@ function check({ capture, previous }) {
     Buffer.isBuffer(capture) ? capture : createPng(120, 80, capture),
   );
   const args = ["--background=250,248,240", "--background=238,235,224"];
+  if (allowBlank) args.push("--allow-blank");
   if (previous) {
     const previousPath = path.join(directory, "previous.png");
     fs.writeFileSync(previousPath, createPng(120, 80, previous));
     args.push(`--previous=${previousPath}`);
+  }
+  if (baseline) {
+    const baselinePath = path.join(directory, "baseline.png");
+    fs.writeFileSync(baselinePath, createPng(120, 80, baseline));
+    args.push(`--different-from=${baselinePath}`);
   }
   const result = spawnSync(process.execPath, [checker, ...args, capturePath], {
     encoding: "utf8",
@@ -61,6 +67,17 @@ test("引用ブロック背景の上の描画も背景として数えて受理�
   );
 });
 
+test("対象式前と同じ安定キャプチャは再試行を求める", () => {
+  assert.equal(
+    check({
+      baseline: terminalCapture(6),
+      capture: terminalCapture(6),
+      previous: terminalCapture(6),
+    }).status,
+    1,
+  );
+});
+
 test("前回のキャプチャと異なるなら描画中として再試行を求める", () => {
   assert.equal(
     check({ capture: terminalCapture(6), previous: terminalCapture(3) }).status,
@@ -70,6 +87,17 @@ test("前回のキャプチャと異なるなら描画中として再試行を�
 
 test("前回のキャプチャがなければ比較できないので再試行を求める", () => {
   assert.equal(check({ capture: terminalCapture(6) }).status, 1);
+});
+
+test("対象式前は空の安定キャプチャも受理する", () => {
+  assert.equal(
+    check({
+      allowBlank: true,
+      capture: blankCapture,
+      previous: blankCapture,
+    }).status,
+    0,
+  );
 });
 
 test("描画がまったくないキャプチャは再試行を求める", () => {

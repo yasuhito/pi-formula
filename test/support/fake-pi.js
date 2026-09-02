@@ -8,6 +8,7 @@ function fakePi(options = {}) {
   const shared = options.shared ?? {};
   shared.handlers ??= new Map();
   shared.commands ??= new Map();
+  shared.tools ??= new Map();
   shared.entries ??= [];
   shared.transformerRegistrations ??= 0;
   shared.commandRegistrations ??= 0;
@@ -28,10 +29,14 @@ function fakePi(options = {}) {
         shared.commands.set(name, command);
         shared.commandRegistrations += 1;
       },
+      registerTool(tool) {
+        shared.tools.set(tool.name, tool);
+      },
     },
     entries: shared.entries,
     handlers: shared.handlers,
     commands: shared.commands,
+    tools: shared.tools,
     sessionEntries: shared.sessionEntries,
     registrationCounts: () => ({
       transformerRegistrations: shared.transformerRegistrations,

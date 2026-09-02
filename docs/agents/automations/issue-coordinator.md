@@ -170,6 +170,22 @@ gh issue view <N> -R yasuhito/pi-formula --comments --json number,title,body,lab
 # 併せて GraphQL で parent / subIssues / blockedBy / blocking を確認する
 ```
 
+Relationships の確認には次のクエリをそのまま使う。フィールド名を推測しない（`blockedByIssues` などは存在しない）。
+
+```bash
+gh api graphql -f owner=yasuhito -f name=pi-formula -F number=<N> -f query='
+query($owner:String!,$name:String!,$number:Int!){
+  repository(owner:$owner,name:$name){
+    issue(number:$number){
+      parent{number}
+      subIssues(first:50){nodes{number state}}
+      blockedBy(first:20){nodes{number state}}
+      blocking(first:20){nodes{number state}}
+    }
+  }
+}'
+```
+
 実装に進める条件:
 
 - `## What to build` または `## 実装内容` または `## Agent Brief` がある
@@ -397,7 +413,7 @@ gh pr create -R yasuhito/pi-formula --base main --head "$branch" \
   --attach '/tmp/after.png#修正後: 数式本体と同じ字面・同じ行に揃う'
 ```
 
-本文が `![alt](./before.png)` のように添付ファイルを参照していれば、その参照はアップロード先へ書き換えられる。参照が無い添付は本文末尾へ追加される。
+- 本文で `![alt](./file.png)` のように添付ファイルを参照する場合、その参照は**アップロード先の URL へ書き換えられる**。参照と `--attach` の両方を書いても画像は 1 枚だけになる。参照を書かずに `--attach` だけを使うと本文末尾へ追加される。どちらか一方にし、同じ画像が二重に表示されないようにする。
 
 pi-formula では、`dist/typesetter.js` の `typesetMath(latex, color, availableWidth, cell, macros)` を直接呼べば数式 1 つの PNG を作れる。マクロ定義や色を変えた前後を同じ引数で描けば、修正前後の比較画像になる。端末全体の見た目が変わる修正では `scripts/verify-display` のキャプチャを使い、変化した箇所だけを切り出す。
 
