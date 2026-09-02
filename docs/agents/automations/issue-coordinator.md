@@ -30,6 +30,7 @@
 - PR タイトルと本文は、issue 番号だけの汎用文にしない。worker の実際の差分と commit から、変更内容が分かる題名と概要を書く。タイトルは「何が起きているか」が分かる具体的な一文にし、「issue 対応」「レビュー指摘を修正」のような中身を読まないと分からない題名は禁止。本文は「問題 → 原因 → 修正」の順で書く。
 - PR は最初からレビュー可能な状態で作る。`gh pr create --draft` は使わない。人間のマージ待ちは `agent:review` / `ready-for-human` label で表す。
 - merged / closed PR に対応する worker terminal は停止し、不要な worker worktree は安全確認後に削除する。
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。GraphQL でしか取れない Relationships（`parent` / `subIssues` / `blockedBy` / `blocking`）が取れなかった場合は、本文・コメントの依存記述だけで判断し、確認できなかったことを最後の要約に明記する。
 - どの経路でも、最後に短い日本語要約を出す。
 
 ## ループ
@@ -149,6 +150,12 @@ candidates_json=$(printf '%s' "$issues_json" | jq '[.[] | {number,title,url,labe
 ```
 
 - `agent:in-progress` を持つ open issue が1件でもあれば、worker が動作中なので候補を選ばず終了する（同時実行は1件だけ）。
+- レビュー待ちが溜まっているときは新しい worker を起動しない。`agent:review` を持ち `ready-for-human` と `agent:blocked` を持たない open PR が3件以上あれば、候補を選ばず終了する。理由は、同じファイルを触る PR が並ぶと、先にマージされた側へ合わせる作り直しが必ず発生するため（2026-09-02 に `features/` の同じ2ファイルを触る PR が3本同時に並んだ）。要約にレビュー待ち件数を書く。
+
+```bash
+review_backlog=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review --limit 100 --json number,labels | jq '[.[] | select(([.labels[].name] | index("ready-for-human")) | not) | select(([.labels[].name] | index("agent:blocked")) | not)] | length')
+```
+
 - 候補が0件なら、GitHub へ書き込まず終了する。
 - 候補が複数あっても、番号が最小の1件だけ扱う。
 

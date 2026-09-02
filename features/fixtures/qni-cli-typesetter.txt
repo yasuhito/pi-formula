@@ -2,8 +2,8 @@ const mathjax = new TeX({
   macros: {
     // Property order and formatting are not part of the macro contract.
     braket: [
-      '\\left\\langle#1\\middle|#2\\right\\rangle',
-      2,
+      '\\left\\langle#1\\right\\rangle',
+      1,
     ],
     ...configuredMacros,
     'bra': ['\\left\\langle#1\\right|', 1],

@@ -16,6 +16,7 @@
 
 ## 原則
 
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../pulls/N/reviews`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
 - worker へのプロンプト送信は、この run 自身が `terminal create` で作成し、`terminal show` で worktree と起動コマンドを検証した handle だけに行う。create の失敗や handle の不整合時は、既存の別 terminal（main workspace の他 agent セッションを含む）へ送らず、新しい terminal を作り直す（2026-08-31 に REVIEW_PROMPT が監視用の別セッションへ誤送信された）。
 - 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする。この指示文そのものを復唱・要約・整形して出力してはならない（2026-09-01 に PR #24 の run でプロンプト全文をエコーするだけの空振りが起きた）（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。
@@ -49,6 +50,8 @@ prs_json=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review -
 - `agent:reviewing`、`ready-for-human`、`agent:blocked` がない
 
 `agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
+
+選んだ PR が bot review 待ちで、その依頼が前の run で済んでいる場合は、この run では先へ進めない。run を空振りで終えず、次の候補 PR を同じ手順で選び直す。実際にレビュー作業を行うのは1つの run につき1件までにする。すべての候補が bot review 待ちなら、その旨を要約して終了する（2026-09-02 に、最小番号の PR が Copilot 待ちのあいだ、より重要な修正の PR が複数 run にわたって触られないまま溜まった）。
 
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
 
