@@ -23,6 +23,7 @@ import {
 } from "./macros";
 import { transformDisplayMath } from "./markdown";
 import type { PngSource } from "./png-source";
+import { formulaSerifStatus } from "./system-font";
 import {
   multiplexerProbeResult,
   probePngSupport,
@@ -343,6 +344,7 @@ export function registerFormula(
           `path: ${state.path}`,
           `reason: ${state.selectionReason}`,
           `terminal: ${state.terminal}`,
+          `serif: ${formulaSerifStatus()}`,
           `macros: ${Object.keys(effectiveMacros(state)).length}`,
           `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
           `last failure: ${stats.lastFailure ?? "none"}`,
