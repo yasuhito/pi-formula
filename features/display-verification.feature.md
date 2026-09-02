@@ -115,6 +115,21 @@ pi-formula の worker として
 - Given Issue 48 の Grover コーパスがある
 - Then bra と braket を含む表示数式を組版できる
 
+## Scenario: braket の直後の項を分けて描く
+
+- Given braket の直後に ket が続く表示数式がある
+- Then braket と直後の ket は別の項として描かれる
+
+## Scenario: bra の描画を保つ
+
+- Given bra を使う表示数式がある
+- Then bra は山括弧と縦線で描かれる
+
+## Scenario: ket の描画を保つ
+
+- Given ket を使う表示数式がある
+- Then ket は縦線と山括弧で描かれる
+
 ## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
 
 - Given 検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある
