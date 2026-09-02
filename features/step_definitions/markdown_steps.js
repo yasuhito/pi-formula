@@ -79,6 +79,16 @@ Given("braket の利用者マクロを設定した画像経路の Pi がある",
 });
 
 Given(
+  "空文字列の利用者マクロを設定した画像経路の Pi がある",
+  async function () {
+    process.env.PI_FORMULA_MACROS = JSON.stringify({ empty: "" });
+    this.pi = fakePi();
+    registerFormula(this.pi.api);
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
+Given(
   "置換境界を確認する追加マクロを登録した画像経路の Pi がある",
   async function () {
     this.pi = fakePi();
@@ -87,6 +97,7 @@ Given(
       sq: ["#1^2", 1],
       groupedSq: ["{#1}^2", 1],
       alpha: String.raw`\alpha`,
+      loop: String.raw`\loop`,
     });
     this.started = await startWithKitty(this.pi);
   },
@@ -177,6 +188,37 @@ When(
   },
 );
 
+When("ket 追加マクロを含む Markdown 表を描く", function () {
+  transform(
+    this,
+    ["| 状態 |", "| --- |", String.raw`| $\ket{s}$ |`].join("\n"),
+  );
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  this.tableLines = new Markdown(this.rendered, 0, 0, passthroughTheme).render(
+    80,
+  );
+});
+
+When("入れ子の ket 追加マクロを含むインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{\ket{x}}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("自分自身を呼ぶ追加マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\loop$`);
+});
+
+When("空文字列の利用者マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\empty$`);
+});
+
+When(
+  "丸括弧区切りの ket 追加マクロ風文字列を含む bare URL を変換する",
+  function () {
+    transform(this, String.raw`https://example.com/\(\ket{s}\)`);
+  },
+);
+
 When("未登録の ket を含むインライン数式を変換する", function () {
   transform(this, String.raw`$\ket{s}$`);
 });
@@ -219,7 +261,7 @@ Then("braket 利用者マクロが Unicode で描かれる", function () {
 Then("Object prototype 名は残り ket 追加マクロだけが展開される", function () {
   assert.equal(
     this.rendered,
-    String.raw`$\constructor{x}$ and $\left|s\right\rangle$`,
+    String.raw`$\constructor{x}$ and $\left\vert{}s\right\rangle$`,
   );
 });
 
@@ -259,6 +301,27 @@ Then("参照リンク定義は変更されない", function () {
 });
 
 Then("丸括弧を含む相対 Markdown URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("表の列を保ったまま ket 追加マクロが Unicode で描かれる", function () {
+  const row = this.tableLines.find((line) => line.includes("|s⟩"));
+  assert.equal((row?.match(/│/gu) ?? []).length, 2);
+});
+
+Then("入れ子の ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "||x⟩⟩");
+});
+
+Then("再帰する追加マクロは原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("空のインライン数式にせず原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧区切りを含む bare URL は変更されない", function () {
   assert.equal(this.rendered, this.source);
 });
 

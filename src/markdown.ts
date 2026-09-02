@@ -246,7 +246,7 @@ function hierarchyContinuation(source: string, openingIndex: number): string {
   return markdownHierarchy(source.slice(lineStart, openingIndex)).continuation;
 }
 
-function isUrlDollar(source: string, openingIndex: number): boolean {
+function isBareUrlInline(source: string, openingIndex: number): boolean {
   const tokenStart =
     Math.max(
       source.lastIndexOf(" ", openingIndex - 1),
@@ -294,18 +294,34 @@ function keepHierarchy(rendered: string, continuation: string): string {
     .join("\n");
 }
 
-function piRejectsDollarInline(
-  source: string,
-  content: string,
-  closing: number,
-): boolean {
+function piRejectsDollarInline(content: string, following: string): boolean {
   return (
     /\s$/u.test(content) ||
-    /^\d/u.test(source.slice(closing + 1)) ||
+    /^\d/u.test(following) ||
     (/^[A-Z_][A-Z0-9_]*(?:[^A-Za-z0-9_\s])?$/u.test(content) &&
-      /^[A-Za-z_][A-Za-z0-9_]*/u.test(source.slice(closing + 1))) ||
+      /^[A-Za-z_][A-Za-z0-9_]*/u.test(following)) ||
     content.includes("`")
   );
+}
+
+function piAcceptsInline(
+  opening: "$" | "\\(",
+  content: string,
+  following: string,
+): boolean {
+  if (!content || content.includes("\n")) return false;
+  return opening !== "$" || !piRejectsDollarInline(content, following);
+}
+
+function markdownSafeInlineLatex(latex: string): string {
+  let safe = "";
+  for (let index = 0; index < latex.length; index += 1) {
+    safe +=
+      latex[index] === "|" && !isEscaped(latex, index)
+        ? "\\vert{}"
+        : latex[index];
+  }
+  return safe;
 }
 
 function displayFormulaEnd(source: string, index: number): number | undefined {
@@ -342,13 +358,16 @@ function expandedInline(
   original: string,
   opening: "$" | "\\(",
   content: string,
+  following: string,
   macros: FormulaMacros,
 ): string {
   const expanded = expandFormulaMacros(content, macros);
-  if (expanded === content || renderLatex(expanded) === undefined) {
+  if (expanded === content || !piAcceptsInline(opening, expanded, following)) {
     return original;
   }
-  return `${opening}${expanded}${opening === "$" ? "$" : "\\)"}`;
+  const safe = markdownSafeInlineLatex(expanded);
+  if (renderLatex(safe) === undefined) return original;
+  return `${opening}${safe}${opening === "$" ? "$" : "\\)"}`;
 }
 
 export function transformInlineMath(
@@ -393,18 +412,27 @@ export function transformInlineMath(
       index = opening === "$" ? contentStart : end;
       continue;
     }
-    if (opening === "$" && isUrlDollar(source, index)) {
+    if (isBareUrlInline(source, index)) {
       transformed += original;
       index = end;
       continue;
     }
-    if (opening === "$" && piRejectsDollarInline(source, content, closing)) {
+    if (
+      opening === "$" &&
+      piRejectsDollarInline(content, source.slice(closing + 1))
+    ) {
       transformed += opening;
       index = contentStart;
       continue;
     }
 
-    transformed += expandedInline(original, opening, content, macros);
+    transformed += expandedInline(
+      original,
+      opening,
+      content,
+      source.slice(end),
+      macros,
+    );
     index = end;
   }
 
@@ -452,7 +480,7 @@ export function transformDisplayMath(
     );
     if (
       opening === "$$" &&
-      (isUrlDollar(source, index) ||
+      (isBareUrlInline(source, index) ||
         !looksLikeDollarDisplay(latex) ||
         (reconsidered && !looksLikeReconsideredDollarDisplay(latex)))
     ) {

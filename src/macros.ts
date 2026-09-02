@@ -111,6 +111,21 @@ function substituteArguments(
   return appendTex(substituted, replacement.slice(literalStart));
 }
 
+function replacementUsesArgument(
+  replacement: string,
+  argumentNumber: number,
+): boolean {
+  for (let index = 0; index < replacement.length - 1; index += 1) {
+    if (replacement[index] !== "#" || escapedAt(replacement, index)) continue;
+    if (replacement[index + 1] === "#") {
+      index += 1;
+      continue;
+    }
+    if (replacement[index + 1] === String(argumentNumber)) return true;
+  }
+  return false;
+}
+
 function expandMacros(
   source: string,
   macros: FormulaMacros,
@@ -162,8 +177,24 @@ function expandMacros(
 
     budget.remaining -= 1;
     if (budget.remaining < 0) return undefined;
+    const expandedArguments: string[] = [];
+    for (let argument = 0; argument < arguments_.length; argument += 1) {
+      if (!replacementUsesArgument(replacement, argument + 1)) {
+        expandedArguments.push(arguments_[argument]);
+        continue;
+      }
+      const expandedArgument = expandMacros(
+        arguments_[argument],
+        macros,
+        active,
+        budget,
+        false,
+      );
+      if (expandedArgument === undefined) return undefined;
+      expandedArguments.push(expandedArgument);
+    }
     const nested = expandMacros(
-      substituteArguments(replacement, arguments_),
+      substituteArguments(replacement, expandedArguments),
       macros,
       new Set([...active, name]),
       budget,
