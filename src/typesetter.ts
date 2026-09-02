@@ -1,5 +1,6 @@
 import type { CellDimensions, RasterLayout } from "./layout";
 import type { FormulaMacros } from "./macros";
+import { formulaSerifFamily } from "./system-font";
 
 const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
@@ -66,6 +67,11 @@ function prepareTypesetter(): PreparedTypesetter {
       options: {
         shapeRendering: number;
         textRendering: number;
+        font: {
+          loadSystemFonts: boolean;
+          defaultFontFamily?: string;
+          serifFamily?: string;
+        };
       },
     ) => { render(): { asPng(): Uint8Array } };
   };
@@ -95,6 +101,14 @@ function prepareTypesetter(): PreparedTypesetter {
 
   const adaptor = liteAdaptor({ fontSize: 16 });
   RegisterHTMLHandler(adaptor);
+  const serifFamily = formulaSerifFamily();
+  const font = serifFamily
+    ? {
+        loadSystemFonts: true,
+        defaultFontFamily: serifFamily,
+        serifFamily,
+      }
+    : { loadSystemFonts: true };
   prepared = {
     adaptor,
     createDocument: (macros) => {
@@ -116,6 +130,7 @@ function prepareTypesetter(): PreparedTypesetter {
         new Resvg(svg, {
           shapeRendering: 2,
           textRendering: 2,
+          font,
         })
           .render()
           .asPng(),
