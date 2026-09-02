@@ -115,7 +115,9 @@ test("計画した出力寸法を確認してから応答を待つ", () => {
 });
 
 test("表示数式の画像行数で出力高を決めてから検証セッションを起動する", () => {
-  assert.ok(markersAppearInOrder(harness, "plan-display.js", "setsid cage"));
+  assert.ok(
+    markersAppearInOrder(harness, "verify-display-plan.js", "setsid cage"),
+  );
 });
 
 test("画像経路を確認してからキャプチャする", () => {

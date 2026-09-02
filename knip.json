@@ -8,6 +8,7 @@
     "scripts/plan-display.js",
     "scripts/save-display-response.js",
     "scripts/verify-display-dimensions.js",
+    "scripts/verify-display-plan.js",
     "scripts/verify-echo.js",
     "scripts/verify-image-path.js",
     "src/extension.ts"

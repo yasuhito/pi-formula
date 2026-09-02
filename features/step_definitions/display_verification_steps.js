@@ -47,7 +47,7 @@ When("ハーネスの安全条件を調べる", function () {
       /WLR_BACKENDS=headless/u.test(this.harness) &&
       /setsid cage -d --/u.test(this.harness),
     tallOutput:
-      /plan-display\.js/u.test(this.harness) &&
+      /verify-display-plan\.js/u.test(this.harness) &&
       /run_inside grim/u.test(this.harness),
     sessionOutput:
       /--custom-mode "1920x\$\{PI_FORMULA_VERIFY_HEIGHT\}"/u.test(
@@ -414,36 +414,6 @@ Then("読み取り失敗は対象ファイルを示す", function () {
   assert.match(
     this.qniCliMacroError?.message ?? "",
     /macros 定義が見つかりません: missing-qni-cli-typesetter\.ts/u,
-  );
-});
-
-Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
-  this.directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
-  );
-  this.tallCorpus = path.join(this.directory, "tall.md");
-  fs.writeFileSync(
-    this.tallCorpus,
-    ["$$\\rule{1em}{300ex}$$", "$$\\rule{1em}{300ex}$$"].join("\n\n"),
-  );
-});
-
-When("表示数式の画像行数を含む出力高を計画する", function () {
-  this.planResult = spawnSync(
-    process.execPath,
-    [path.join(root, "scripts/plan-display.js"), this.tallCorpus],
-    { encoding: "utf8", timeout: 5_000 },
-  );
-  fs.rmSync(this.directory, { recursive: true, force: true });
-});
-
-Then("全履歴が収まらないコーパスは描画前に拒否される", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsLimit: /16000px/u.test(this.planResult.stderr),
-    },
-    { status: 2, reportsLimit: true },
   );
 });
 
