@@ -301,10 +301,19 @@ test -z "$(git status --short)"
 
 ### 6.2. Convergence: 繰り返しレビューを打ち切る
 
-同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次の両方を満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
+同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次をすべて満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
 
 - この PR に、自分が投稿した `<!-- pi-formula-auto-review:` marker 付きコメントが既に 3 件以上ある（HEAD ごとに 1 件なので、修正を 3 回以上返した状態）
 - 今回の `VERDICT: CHANGES_REQUIRED` の finding に severity `high` 以上が 1 件も無い（medium / low だけ）
+- 今回の finding に**退行**が 1 件も無い
+
+**退行**とは、この PR の前は期待どおりだった入力が壊れることを指す。次のいずれかで保護されていた挙動が破れていれば退行である。
+
+- 既存のテストまたは Cucumber シナリオ
+- 対象 issue の受け入れ基準
+- 対象 issue の `Out of scope`（「この経路は変更しない」と書いたもの）
+
+退行は severity によらず打ち切りの対象外とし、7 の Fix へ返す。判定は「その入力は main で期待どおりに動くか」を実際に確かめて行う（2026-09-03 に pi-formula #68 と #72 が medium の退行のまま打ち切られ、利用者に見える表示バグとして main へ入った）。
 
 ```bash
 viewer=$(gh api user --jq '.login')
