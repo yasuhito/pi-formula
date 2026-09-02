@@ -12,3 +12,4 @@
 - Delay MathJax and Resvg until the first display formula and follow the current exact theme RGB and display width.
 - Add English and Japanese installation guides, a Ghostty preview, support and coexistence notes, dependency audit details, and an intentionally limited npm tarball.
 - Let an explicit session `auto` preference bypass the saved global default and return display-path selection to the terminal probe.
+- Select an installed CJK serif for Japanese `\\text{}` in display formulas and report the choice in `/formula status`.

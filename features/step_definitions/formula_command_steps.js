@@ -237,7 +237,7 @@ When("formula status を実行する", async function () {
 });
 
 Then(
-  "版、経路、理由、端末、マクロ数、一時保存、直近の失敗だけを英語表示する",
+  "版、経路、理由、端末、セリフ体、マクロ数、一時保存、直近の失敗だけを英語表示する",
   function () {
     assert.deepEqual(
       {
@@ -252,6 +252,7 @@ Then(
           "path",
           "reason",
           "terminal",
+          "serif",
           "macros",
           "cache",
           "last failure",

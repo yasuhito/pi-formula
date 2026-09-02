@@ -35,7 +35,7 @@ If one display formula is invalid, exceeds a safety limit, lacks an exact theme 
 
 | Command | Effect |
 | --- | --- |
-| `/formula status` | Show the version, active path, selection reason, terminal, macro count, in-memory cache size, and latest failure. |
+| `/formula status` | Show the version, active path, selection reason, terminal, selected display-formula serif, macro count, in-memory cache size, and latest failure. |
 | `/formula image` | Select the image path for this Pi session. |
 | `/formula text` | Select the text path for this Pi session. |
 | `/formula auto` | Return this Pi session to automatic selection. |
@@ -92,7 +92,7 @@ Do not enable Formula for Pi with other math rendering extensions that transform
 
 ## Image safety
 
-MathJax and Resvg load only when the first display formula enters the image path. SVG and PNG data stay in a bounded in-memory cache and are never written to disk. Rendering does not use a network connection, browser, or child process.
+MathJax and Resvg load only when the first display formula enters the image path. For `\\text{}` glyphs, Formula for Pi selects the first installed serif from Noto Serif CJK JP, Source Han Serif JP, Source Han Serif, and IPAexMincho. If none is installed, Resvg keeps using the system serif fallback. SVG and PNG data stay in a bounded in-memory cache and are never written to disk. Rendering does not use a network connection, browser, or child process.
 
 The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows, 64 cache entries, and 32 MiB of cached data. Each existing PNG is limited to 32 MiB and 4,194,304 expanded pixels. Failed formulas are cached, so repeated invalid input is not typeset again.
 
