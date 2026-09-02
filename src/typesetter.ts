@@ -37,6 +37,12 @@ interface MathDocument {
   ): unknown;
 }
 
+interface SvgOutput {
+  font: {
+    loadDynamicFilesSync(): void;
+  };
+}
+
 interface PreparedTypesetter {
   adaptor: MathAdaptor;
   createDocument(macros: FormulaMacros): MathDocument;
@@ -95,12 +101,18 @@ function prepareTypesetter(): PreparedTypesetter {
       document(source: string, options: Record<string, unknown>): MathDocument;
     };
   };
+  require("@mathjax/src/js/util/asyncLoad/node.js");
   const { SVG } = require("@mathjax/src/js/output/svg.js") as {
-    SVG: new (options: Record<string, unknown>) => unknown;
+    SVG: new (options: Record<string, unknown>) => SvgOutput;
   };
 
   const adaptor = liteAdaptor({ fontSize: 16 });
   RegisterHTMLHandler(adaptor);
+  const svgOutput = new SVG({
+    fontCache: "local",
+    linebreaks: { inline: false },
+  });
+  svgOutput.font.loadDynamicFilesSync();
   const serifFamily = formulaSerifFamily();
   const font = serifFamily
     ? {
@@ -118,10 +130,6 @@ function prepareTypesetter(): PreparedTypesetter {
         formatError: (_jax: unknown, error: unknown) => {
           throw error;
         },
-      });
-      const svgOutput = new SVG({
-        fontCache: "local",
-        linebreaks: { inline: false },
       });
       return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
     },

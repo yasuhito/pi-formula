@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
-const { mkdirSync, rmSync, writeFileSync } = require("node:fs");
-const { mkdtempSync } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
-const { join } = require("node:path");
+const { join, resolve } = require("node:path");
 const { After, Before, Given, Then, When } = require("@cucumber/cucumber");
 
 const { createPngFromScanlines } = require("../../test/support/png-fixture.js");
@@ -309,6 +309,48 @@ Given("テキスト経路を使う試験用の連携拡張がある", async func
   this.pi = fakePi();
   this.integration = registerIntegrationExtension(this.pi.api);
   await startWithText(this.pi);
+});
+
+When("{string} を含む表示数式の PNG を公開 API で作る", function (latex) {
+  this.image = this.integration.createPng(latex);
+});
+
+Then("動的字形を含む表示数式の PNG が返る", function () {
+  assert.equal(Buffer.isBuffer(this.image?.data), true);
+});
+
+Then("既存の字形を含む表示数式の PNG が返る", function () {
+  assert.equal(Buffer.isBuffer(this.image?.data), true);
+});
+
+When("動的字形を含む表示数式の PNG を公開 API で作る", function () {
+  this.image = this.integration.createPng("\\mathcal{L}");
+});
+
+Then("公開 API は同期的に PNG を返す", function () {
+  assert.equal(Object.prototype.toString.call(this.image), "[object Object]");
+});
+
+Given("動的字形を読み込めない画像経路がある", function () {
+  this.dynamicFontProbe = resolve(
+    __dirname,
+    "../../test/support/dynamic-font-probe.js",
+  );
+});
+
+When("動的字形を含む表示数式を描く", function () {
+  const result = spawnSync(process.execPath, [this.dynamicFontProbe], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(result.stderr);
+  this.dynamicFontResult = JSON.parse(result.stdout);
+});
+
+Then("例外を出さずその表示数式だけテキストへ戻る", function () {
+  assert.deepEqual(this.dynamicFontResult, {
+    dynamic: "$$\\mathcal{L}$$",
+    ordinaryImage: true,
+  });
 });
 
 Then("公開 API は画像を返さない", function () {
