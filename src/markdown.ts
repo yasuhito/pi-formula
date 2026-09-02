@@ -207,6 +207,13 @@ function looksLikeDollarDisplay(latex: string): boolean {
   return /[\d_^=+*/<>()[\]|&±≤≥≠≈∈→⇒∞∫∑√-]/u.test(value);
 }
 
+function looksLikeReconsideredDollarDisplay(latex: string): boolean {
+  const value = latex.trim();
+  if (/\\[A-Za-z]/u.test(value)) return true;
+  if (/[_^=+*/<>|&±≤≥≠≈∈→⇒∞∫∑√]/u.test(value)) return true;
+  return !/\p{L}{2,}/u.test(value);
+}
+
 function removeContinuation(latex: string, continuation: string): string {
   if (!continuation) return latex;
   return latex
@@ -234,6 +241,7 @@ export function transformDisplayMath(
   const protectedMarkdown = protectCode(markdown);
   const source = protectedMarkdown.markdown;
   let transformed = "";
+  let reconsideredOpening = -1;
 
   for (let index = 0; index < source.length; ) {
     const opening =
@@ -246,6 +254,10 @@ export function transformDisplayMath(
       transformed += source[index];
       index += 1;
       continue;
+    }
+    const reconsidered = index === reconsideredOpening;
+    if (reconsideredOpening >= 0 && index >= reconsideredOpening) {
+      reconsideredOpening = -1;
     }
     const closingDelimiter = opening === "$$" ? "$$" : "\\]";
     const contentStart = index + opening.length;
@@ -263,10 +275,18 @@ export function transformDisplayMath(
     );
     if (
       opening === "$$" &&
-      (isUrlDollar(source, index) || !looksLikeDollarDisplay(latex))
+      (isUrlDollar(source, index) ||
+        !looksLikeDollarDisplay(latex) ||
+        (reconsidered && !looksLikeReconsideredDollarDisplay(latex)))
     ) {
-      transformed += original;
-      index = closing + closingDelimiter.length;
+      const reachesLaterLine = source
+        .slice(contentStart, closing)
+        .includes("\n");
+      transformed += reachesLaterLine ? opening : original;
+      index = reachesLaterLine
+        ? contentStart
+        : closing + closingDelimiter.length;
+      reconsideredOpening = reachesLaterLine ? closing : -1;
       continue;
     }
     const rendered = render(latex, original);
