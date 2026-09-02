@@ -7,6 +7,7 @@ const net = require("node:net");
 const { resolve } = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { Given, Then, When } = require("@cucumber/cucumber");
+const { Markdown } = require("@earendil-works/pi-tui");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
@@ -35,6 +36,14 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function renderUnicode(markdown) {
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  return new Markdown(markdown, 0, 0, passthroughTheme)
+    .render(80)
+    .map((line) => line.trimEnd())
+    .join("\n");
+}
+
 function cacheImage(bytes) {
   return {
     svg: "s".repeat(bytes),
@@ -51,6 +60,281 @@ Given("画像経路で数式を描ける Pi がある", async function () {
   this.pi = fakePi();
   registerFormula(this.pi.api);
   this.started = await startWithKitty(this.pi);
+});
+
+Given("ket と braket の追加マクロを登録する", function () {
+  require("../../dist/api.js").registerFormula(this.pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+});
+
+Given("braket の利用者マクロを設定した画像経路の Pi がある", async function () {
+  process.env.PI_FORMULA_MACROS = JSON.stringify({
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+  this.pi = fakePi();
+  registerFormula(this.pi.api);
+  this.started = await startWithKitty(this.pi);
+});
+
+Given(
+  "空文字列の利用者マクロを設定した画像経路の Pi がある",
+  async function () {
+    process.env.PI_FORMULA_MACROS = JSON.stringify({ empty: "" });
+    this.pi = fakePi();
+    registerFormula(this.pi.api);
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
+Given(
+  "置換境界を確認する追加マクロを登録した画像経路の Pi がある",
+  async function () {
+    this.pi = fakePi();
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+      sq: ["#1^2", 1],
+      groupedSq: ["{#1}^2", 1],
+      alpha: String.raw`\alpha`,
+      loop: String.raw`\loop`,
+    });
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
+When("ket 追加マクロを含むドル区切りのインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{s}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("braket 追加マクロを含む丸括弧区切りのインライン数式を描く", function () {
+  transform(this, String.raw`\(\braket{s|\psi}\)`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("braket 利用者マクロを含むドル区切りのインライン数式を描く", function () {
+  transform(this, String.raw`$\braket{s|\psi}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("Object prototype 名と ket 追加マクロを含む本文を変換する", function () {
+  transform(this, String.raw`$\constructor{x}$ and $\ket{s}$`);
+});
+
+When("金額とシェル変数の後に ket 追加マクロがある本文を描く", function () {
+  transform(
+    this,
+    [
+      String.raw`価格は $5、状態は $\ket{s}$。`,
+      String.raw`$HOME の後は $\ket{t}$。`,
+    ].join("\n"),
+  );
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[doc](/guide/$\ket{s}$)`);
+  },
+);
+
+When(
+  "スキームなし URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(
+      this,
+      [
+        String.raw`//example.com/$\ket{s}$`,
+        String.raw`example.com/$\ket{t}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+When("ket 追加マクロの直後に英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{x}y$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("グループを持たない二乗追加マクロを変換する", function () {
+  transform(this, String.raw`$\sq{a+b}$ / $\groupedSq{a+b}$`);
+});
+
+When("0 引数追加マクロの後に空白と英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\alpha x$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "バックスラッシュ制御記号の後に ket と同じ英字がある本文を変換する",
+  function () {
+    transform(this, String.raw`$\\ket{x}$`);
+  },
+);
+
+When(
+  "参照リンク定義に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[ket]: /guide/$\ket{s}$`);
+  },
+);
+
+When(
+  "丸括弧を含む相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[doc](/guide/(v1)/$\ket{s}$)`);
+  },
+);
+
+When("ket 追加マクロを含む Markdown 表を描く", function () {
+  transform(
+    this,
+    ["| 状態 |", "| --- |", String.raw`| $\ket{s}$ |`].join("\n"),
+  );
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  this.tableLines = new Markdown(this.rendered, 0, 0, passthroughTheme).render(
+    80,
+  );
+});
+
+When("入れ子の ket 追加マクロを含むインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{\ket{x}}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("自分自身を呼ぶ追加マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\loop$`);
+});
+
+When("空文字列の利用者マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\empty$`);
+});
+
+When(
+  "丸括弧区切りの ket 追加マクロ風文字列を含む bare URL を変換する",
+  function () {
+    transform(this, String.raw`https://example.com/\(\ket{s}\)`);
+  },
+);
+
+When("未登録の ket を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{s}$`);
+});
+
+When("展開後も描けない命令を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{\notacommand{x}}$`);
+});
+
+When(
+  "コードと金額と URL とシェル変数に追加マクロがある本文を変換する",
+  function () {
+    transform(
+      this,
+      [
+        "```text",
+        String.raw`$\ket{s}$`,
+        "```",
+        "inline: `$\\ket{s}$`",
+        "$5 and $10",
+        String.raw`https://example.com/$\ket{s}$`,
+        "$HOME and $" + "{PATH}",
+        String.raw`escaped: \$\ket{s}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+Then("ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|s⟩");
+});
+
+Then("braket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "⟨s|ψ⟩");
+});
+
+Then("braket 利用者マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "⟨s|ψ⟩");
+});
+
+Then("Object prototype 名は残り ket 追加マクロだけが展開される", function () {
+  assert.equal(
+    this.rendered,
+    String.raw`$\constructor{x}$ and $\left\vert{}s\right\rangle$`,
+  );
+});
+
+Then(
+  "金額とシェル変数は残り後続の ket 追加マクロが Unicode で描かれる",
+  function () {
+    assert.equal(this.unicode, "価格は $5、状態は |s⟩。\n$HOME の後は |t⟩。");
+  },
+);
+
+Then("相対 Markdown URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("スキームなし URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("ket 追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|x⟩y");
+});
+
+Then("二乗追加マクロの引数は自動でグループ化されない", function () {
+  assert.equal(this.rendered, "$a+b^2$ / $" + "{a+b}^2$");
+});
+
+Then("0 引数追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "αx");
+});
+
+Then("バックスラッシュ制御記号の後は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("参照リンク定義は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧を含む相対 Markdown URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("表の列を保ったまま ket 追加マクロが Unicode で描かれる", function () {
+  const row = this.tableLines.find((line) => line.includes("|s⟩"));
+  assert.equal((row?.match(/│/gu) ?? []).length, 2);
+});
+
+Then("入れ子の ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "||x⟩⟩");
+});
+
+Then("再帰する追加マクロは原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("空のインライン数式にせず原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧区切りを含む bare URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("未登録の ket は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("描けないインライン数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("追加マクロがある保護対象は変更されない", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 When("4 種類の数式区切りを含む本文を変換する", function () {
