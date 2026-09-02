@@ -51,6 +51,8 @@ prs_json=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review -
 
 `agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
 
+選んだ PR が bot review 待ちで、その依頼が前の run で済んでいる場合は、この run では先へ進めない。run を空振りで終えず、次の候補 PR を同じ手順で選び直す。実際にレビュー作業を行うのは1つの run につき1件までにする。すべての候補が bot review 待ちなら、その旨を要約して終了する（2026-09-02 に、最小番号の PR が Copilot 待ちのあいだ、より重要な修正の PR が複数 run にわたって触られないまま溜まった）。
+
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
 
 ### 2. Draft gate: draft PR なら ready にする
