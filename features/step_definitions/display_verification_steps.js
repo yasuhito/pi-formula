@@ -292,6 +292,25 @@ Then("ket は縦線と山括弧で描かれる", function () {
   );
 });
 
+Given("Issue 52 の幅掃引コーパスがある", function () {
+  this.corpus = fs.readFileSync(
+    path.join(root, "docs/agents/verify-corpus/issue-52.md"),
+    "utf8",
+  );
+});
+
+Then("項数3から15までの7つの表示数式を組版できる", function () {
+  const plan = planDisplay(this.corpus, { source: true });
+  assert.deepEqual(
+    {
+      displayFormulas: plan.displayFormulas,
+      startsAtThree: this.corpus.includes("x_1 + x_2 + x_3 = 0"),
+      endsAtFifteen: this.corpus.includes("x_{14} + x_{15} = 0"),
+    },
+    { displayFormulas: 7, startsAtThree: true, endsAtFifteen: true },
+  );
+});
+
 function setMacroDefinitions(world, qniCliSource) {
   world.verifyDisplayMacros =
     require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
