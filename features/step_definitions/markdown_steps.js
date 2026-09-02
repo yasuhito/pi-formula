@@ -459,6 +459,16 @@ When("再走査される金額と後続の表示数式を含む本文を変換�
   this.actualFormulaImages = imageIdentities(this.rendered);
 });
 
+When(
+  "数式でない $$ と後続の数値だけの表示数式を含む本文を変換する",
+  function () {
+    transform(this, "$$100$$");
+    this.expectedNumericFormulaImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100$$");
+    this.actualNumericFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
 When("通常の表示数式を変換する", function () {
   transform(this, "$$a = b$$");
 });
@@ -591,6 +601,13 @@ Then("金額は入力どおり残る", function () {
 
 Then("画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
+});
+
+Then("画像経路で描かれる式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualNumericFormulaImages,
+    this.expectedNumericFormulaImages,
+  );
 });
 
 Then("一つの表示数式が画像になる", function () {
