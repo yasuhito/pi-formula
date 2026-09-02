@@ -51,7 +51,33 @@ prs_json=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review -
 
 `agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
 
+選んだ PR が bot review 待ちで、その依頼が前の run で済んでいる場合は、この run では先へ進めない。run を空振りで終えず、次の候補 PR を同じ手順で選び直す。実際にレビュー作業を行うのは1つの run につき1件までにする。すべての候補が bot review 待ちなら、その旨を要約して終了する（2026-09-02 に、最小番号の PR が Copilot 待ちのあいだ、より重要な修正の PR が複数 run にわたって触られないまま溜まった）。
+
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
+
+### 1.7. Conflict gate: main と衝突している PR を解消する
+
+対象 PR の `mergeableState` を確認する。`DIRTY`（main と衝突）なら、レビューへ進む前に解消する。
+
+```bash
+gh pr view <PR> -R yasuhito/pi-formula --json mergeable,mergeStateStatus,headRefName
+```
+
+`DIRTY` のときは worker worktree で main を取り込み、衝突を解消させる。coordinator と同じ手順で worker terminal を作り、次を送る。
+
+```text
+PR #<PR> のブランチ <headRefName> が main と衝突しています。解消してください。
+
+- `git fetch origin main` のあと `git merge origin/main` で取り込む
+- 衝突は内容を読んで解消する。どちらかを機械的に捨てない。両側が別々の追記なら両方残す
+- 解消後に `npm run check` を成功させる
+- commit まで行う。push はしない
+- 完了したら `<promise>COMPLETE</promise>`、解消できなければ理由とともに `<promise>BLOCKED: 理由</promise>`
+```
+
+worker の完了後、reviewer が `npm run check` を実行してから push する。解消できない場合は `agent:blocked` を付け、衝突の内容を PR へ書いて終了する。
+
+完了条件: 対象 PR が main と衝突していない、または衝突を解消できない理由が PR に記録されている。
 
 ### 2. Draft gate: draft PR なら ready にする
 
