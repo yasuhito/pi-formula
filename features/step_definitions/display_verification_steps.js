@@ -5,8 +5,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
-const { createPng } = require("../../test/support/png-fixture");
 const { planDisplay } = require("../../scripts/plan-display");
+const { createPng } = require("../../test/support/png-fixture");
 const {
   VERIFY_DISPLAY_MACROS,
 } = require("../../scripts/verify-display-macros");
@@ -102,7 +102,30 @@ When("ハーネスの安全条件を調べる", function () {
       /キャプチャを開いて表示を確認してください/u.test(this.harness),
     imagePath: /verify-image-path\.js/u.test(this.harness),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
-    exactEcho: /verify-echo\.js/u.test(this.harness),
+    exactEcho:
+      /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u.test(
+        this.harness,
+      ),
+    promptExploration:
+      /--prompt/u.test(this.harness) &&
+      /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == exploration \]\]/u.test(
+        this.harness,
+      ) &&
+      /pi "\$\{args\[@\]\}"/u.test(this.harness) &&
+      /pi-formula-verify-prompt\.ts/u.test(this.harness),
+    explicitResources:
+      /--extension/u.test(this.harness) &&
+      /--tools/u.test(this.harness) &&
+      /PI_FORMULA_VERIFY_EXTRA_EXTENSIONS/u.test(this.harness) &&
+      /args\+=\(--tools "\$PI_FORMULA_VERIFY_TOOLS"\)/u.test(this.harness) &&
+      /--no-extensions/u.test(this.harness),
+    exitStatuses:
+      /run-display-command" detector detect-display-bands/u.test(
+        this.harness,
+      ) &&
+      /combine-display-status\.js/u.test(this.harness) &&
+      /exit "\$combined_status"/u.test(this.harness) &&
+      /fail\(\)[\s\S]*exit 2/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
       /kill -- "-\$CAGE_PID"/u.test(this.harness),
@@ -165,9 +188,27 @@ Then("ピクセル判定前に描画完了を確認する", function () {
   assert.equal(this.safety.capturedImage, true);
 });
 
-Then("キャプチャ前に応答一致を確認する", function () {
+Then("コーパスモードではキャプチャ前に応答一致を確認する", function () {
   assert.equal(this.safety.exactEcho, true);
 });
+
+Then(
+  "探索モードでは自由なプロンプトの応答を一致検証せずに描画する",
+  function () {
+    assert.equal(this.safety.promptExploration, true);
+  },
+);
+
+Then("探索モードでは明示した拡張とツールだけを追加できる", function () {
+  assert.equal(this.safety.explicitResources, true);
+});
+
+Then(
+  "探索モードでも正常は0、異常な水平帯は1、検証作業の失敗は2にする",
+  function () {
+    assert.equal(this.safety.exitStatuses, true);
+  },
+);
 
 Then("失敗時も検証セッションの process group を止める", function () {
   assert.equal(this.safety.cleanup, true);
