@@ -462,7 +462,7 @@ Given("探索で得た完了済みの応答がある", function () {
     path.join(os.tmpdir(), "pi-formula-cucumber-response-"),
   );
   this.savedResponse = path.join(this.directory, "response.md");
-  this.explorationResponse = "説明です。\n\n$$\\frac{1}{2}$$";
+  this.explorationResponse = "説明です。\n\n$$\\frac{1}{2}$$\n";
   this.explorationSession = path.join(this.directory, "session.jsonl");
   fs.writeFileSync(
     this.explorationSession,
@@ -489,11 +489,13 @@ When("応答をコーパスファイルへ保存する", function () {
   );
 });
 
-Then("保存したコーパスは応答と一字一句一致する", function () {
-  const actual =
-    this.saveResponseResult.status === 0
-      ? fs.readFileSync(this.savedResponse, "utf8")
-      : this.saveResponseResult.stderr;
+Then("保存したコーパスは末尾改行を持たない", function () {
+  const saved = fs.existsSync(this.savedResponse)
+    ? fs.readFileSync(this.savedResponse, "utf8")
+    : null;
   fs.rmSync(this.directory, { recursive: true, force: true });
-  assert.equal(actual, this.explorationResponse);
+  assert.deepEqual(
+    { status: this.saveResponseResult.status, saved },
+    { status: 0, saved: this.explorationResponse.slice(0, -1) },
+  );
 });

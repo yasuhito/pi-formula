@@ -370,14 +370,61 @@ Then("読み取り失敗は対象ファイルを示す", function () {
   );
 });
 
+function givenEchoSession(world, corpus, response) {
+  world.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-echo-"),
+  );
+  world.echoCorpus = path.join(world.directory, "corpus.md");
+  world.echoSession = path.join(world.directory, "session.jsonl");
+  fs.writeFileSync(world.echoCorpus, corpus);
+  fs.writeFileSync(
+    world.echoSession,
+    `${JSON.stringify({
+      type: "message",
+      message: {
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: response }],
+      },
+    })}\n`,
+  );
+}
+
+Given(
+  /^`(コーパス|応答)` だけが末尾改行を持つコーパスモードのセッション記録がある$/u,
+  function (side) {
+    const corpus = "本文 $x$。";
+    givenEchoSession(
+      this,
+      side === "コーパス" ? `${corpus}\n` : corpus,
+      side === "応答" ? `${corpus}\n` : corpus,
+    );
+  },
+);
+
+Given(
+  "末尾改行以外に一文字差があるコーパスモードのセッション記録がある",
+  function () {
+    givenEchoSession(this, "abc\n", "abcx\n");
+  },
+);
+
+Given(
+  /^コーパスへ `(行頭|行中|末尾)` の空白を加えた assistant のセッション記録がある$/u,
+  function (position) {
+    const corpus = "本文 $x$。";
+    const changed = {
+      行頭: ` ${corpus}`,
+      行中: corpus.replace("本文", "本 文"),
+      末尾: `${corpus} `,
+    }[position];
+    givenEchoSession(this, corpus, changed);
+  },
+);
+
 Given(
   /^コーパスへ `([^`]+)` を加えた assistant のセッション記録がある$/u,
   function (change) {
-    this.directory = fs.mkdtempSync(
-      path.join(os.tmpdir(), "pi-formula-cucumber-echo-"),
-    );
-    this.echoCorpus = path.join(this.directory, "corpus.md");
-    this.echoSession = path.join(this.directory, "session.jsonl");
     const corpus = "本文 $x$。\n\n$$\n\\frac{1}{2}\n$$";
     const changed = {
       コードフェンス: `\`\`\`markdown\n${corpus}\n\`\`\``,
@@ -385,18 +432,7 @@ Given(
       前置き: `原文です。\n${corpus}`,
       欠落: corpus.replace("本文 $x$。\n\n", ""),
     }[change];
-    fs.writeFileSync(this.echoCorpus, corpus);
-    fs.writeFileSync(
-      this.echoSession,
-      `${JSON.stringify({
-        type: "message",
-        message: {
-          role: "assistant",
-          stopReason: "stop",
-          content: [{ type: "text", text: changed }],
-        },
-      })}\n`,
-    );
+    givenEchoSession(this, corpus, changed);
   },
 );
 
@@ -411,6 +447,21 @@ When("応答とコーパスの一致を検証する", function () {
     { encoding: "utf8", timeout: 5_000 },
   );
   fs.rmSync(this.directory, { recursive: true, force: true });
+});
+
+Then("末尾改行だけが異なる応答は受理される", function () {
+  assert.equal(this.echoResult.status, 0);
+});
+
+Then("不一致の位置と正規化後の文字数が報告される", function () {
+  assert.match(
+    this.echoResult.stderr,
+    /位置 3, expected 3 文字, actual 4 文字/u,
+  );
+});
+
+Then("空白が異なる応答はキャプチャ前に拒否される", function () {
+  assert.equal(this.echoResult.status, 2);
 });
 
 Then("改変された応答はキャプチャ前に拒否される", function () {

@@ -21,9 +21,15 @@ function assistantText(session) {
     .join("");
 }
 
+function withoutTrailingNewlines(text) {
+  return text.replace(/(?:\r\n|\n|\r)+$/u, "");
+}
+
 function verifyEcho(corpus, session) {
-  const expected = fs.readFileSync(corpus, "utf8");
-  const actual = assistantText(fs.readFileSync(session, "utf8"));
+  const expected = withoutTrailingNewlines(fs.readFileSync(corpus, "utf8"));
+  const actual = withoutTrailingNewlines(
+    assistantText(fs.readFileSync(session, "utf8")),
+  );
   if (actual !== expected) {
     let mismatch = 0;
     while (
@@ -33,7 +39,7 @@ function verifyEcho(corpus, session) {
     )
       mismatch += 1;
     throw new Error(
-      `assistant の応答がコーパスと一字一句一致しません (位置 ${mismatch}, expected ${expected.length} 文字, actual ${actual.length} 文字)`,
+      `assistant の応答がコーパスと一字一句一致しません (末尾改行を除く; 位置 ${mismatch}, expected ${expected.length} 文字, actual ${actual.length} 文字)`,
     );
   }
 }
@@ -54,4 +60,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { assistantText, verifyEcho };
+module.exports = { assistantText, verifyEcho, withoutTrailingNewlines };
