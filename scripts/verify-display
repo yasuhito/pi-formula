@@ -8,6 +8,7 @@ SESSION_TIMEOUT=150
 CAPTURE_READY_TIMEOUT=30
 CAPTURE_READY_INTERVAL=2
 STREAM_CAPTURE_TIMEOUT=30
+FINAL_FORMULA_TIMEOUT=15
 IMAGE_PATH_TIMEOUT=15
 WINDOW_LIFETIME=240
 EXPLORATION_WINDOW_LIFETIME=420
@@ -157,6 +158,7 @@ IMAGE_MARKER="$TEMP_DIR/image-path"
 STREAM_MARKER="$TEMP_DIR/assistant-streaming"
 STREAM_CAPTURE_ACK="$TEMP_DIR/assistant-streaming-captured"
 STREAM_CAPTURE_FILE="$TEMP_DIR/streaming.png"
+FINAL_FORMULA_MARKER="$TEMP_DIR/final-formula-path"
 DISPLAY_FILE="$TEMP_DIR/wayland-display"
 CAGE_LOG="$TEMP_DIR/cage.log"
 run mkdir -p "$CONFIG_HOME"
@@ -187,14 +189,15 @@ background-opacity = 1
 scrollbar = never
 CONFIG
 
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_MODE=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_PROMPT_INPUT=%q\nPI_FORMULA_VERIFY_TOOLS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_PROMPT_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_ACK=%q\nPI_FORMULA_VERIFY_EXTRA_EXTENSIONS=()\n' \
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_SESSION=%q\nPI_FORMULA_VERIFY_MODE=%q\nPI_FORMULA_VERIFY_CORPUS=%q\nPI_FORMULA_VERIFY_PROMPT_INPUT=%q\nPI_FORMULA_VERIFY_TOOLS=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\nPI_FORMULA_VERIFY_MODEL=%q\nPI_FORMULA_VERIFY_TARGET_EXTENSION=%q\nPI_FORMULA_VERIFY_EXTENSION=%q\nPI_FORMULA_VERIFY_MACROS_EXTENSION=%q\nPI_FORMULA_VERIFY_PATH_EXTENSION=%q\nPI_FORMULA_VERIFY_PROMPT_EXTENSION=%q\nPI_FORMULA_VERIFY_THEME=%q\nPI_FORMULA_VERIFY_CONFIG_HOME=%q\nPI_FORMULA_VERIFY_IMAGE_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_MARKER=%q\nPI_FORMULA_VERIFY_STREAM_ACK=%q\nPI_FORMULA_VERIFY_FINAL_FORMULA_MARKER=%q\nPI_FORMULA_VERIFY_EXTRA_EXTENSIONS=()\n' \
   "$WINDOW_TITLE" "$SESSION_FILE" "$MODE" "$CORPUS" "$PROMPT_INPUT" "$TOOLS" \
-  "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" "$ROOT/src/extension.ts" \
+  "$WINDOW_LIFETIME" "${PI_FORMULA_VERIFY_MODEL:-}" \
+  "$ROOT/scripts/verify-extensions/pi-formula-verify-target.ts" "$ROOT/src/extension.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-macros.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-image-path.ts" \
   "$ROOT/scripts/verify-extensions/pi-formula-verify-prompt.ts" \
   "$ROOT/scripts/verify-display-theme.json" "$CONFIG_HOME" "$IMAGE_MARKER" \
-  "$STREAM_MARKER" "$STREAM_CAPTURE_ACK" >"$RUNNER"
+  "$STREAM_MARKER" "$STREAM_CAPTURE_ACK" "$FINAL_FORMULA_MARKER" >"$RUNNER"
 for extension in "${EXTRA_EXTENSIONS[@]}"; do
   printf 'PI_FORMULA_VERIFY_EXTRA_EXTENSIONS+=(%q)\n' "$extension" >>"$RUNNER"
 done
@@ -205,11 +208,13 @@ export PI_FORMULA_VERIFY_MODE
 export PI_FORMULA_VERIFY_IMAGE_MARKER
 export PI_FORMULA_VERIFY_STREAM_MARKER
 export PI_FORMULA_VERIFY_STREAM_ACK
+export PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER
 unset TMUX STY
 args=(
   --name "$PI_FORMULA_VERIFY_TITLE"
   --session "$PI_FORMULA_VERIFY_SESSION"
   --no-extensions
+  --extension "$PI_FORMULA_VERIFY_TARGET_EXTENSION"
   --extension "$PI_FORMULA_VERIFY_EXTENSION"
   --extension "$PI_FORMULA_VERIFY_MACROS_EXTENSION"
   --extension "$PI_FORMULA_VERIFY_PATH_EXTENSION"
@@ -372,8 +377,13 @@ for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
 done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
 if [[ "$MODE" == exploration ]]; then
-  run node "$ROOT/scripts/verify-streamed-formula.js" "$SESSION_FILE" "$STREAM_MARKER" \
-    || fail "未完了時と確定後で同じ表示数式を確認できませんでした"
+  for ((elapsed = 0; elapsed < FINAL_FORMULA_TIMEOUT; elapsed += 1)); do
+    [[ -s "$FINAL_FORMULA_MARKER" ]] && break
+    run sleep 1
+  done
+  run node "$ROOT/scripts/verify-streamed-formula.js" \
+    "$SESSION_FILE" "$STREAM_MARKER" "$FINAL_FORMULA_MARKER" \
+    || fail "未完了時と確定後で同じ表示数式の画像経路を確認できませんでした"
 fi
 if [[ "$MODE" == corpus ]]; then
   run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \

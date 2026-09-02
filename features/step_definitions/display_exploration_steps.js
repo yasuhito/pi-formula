@@ -8,6 +8,9 @@ const { Given, Then, When } = require("@cucumber/cucumber");
 const { registerFormula } = require("../../dist/api.js");
 const {
   advanceDisplayFormulaGate,
+  findCompleteDisplayFormula,
+  inspectTargetFormulaRendering,
+  markTargetFormula,
 } = require("../../scripts/display-stream-formula");
 const {
   DISPLAY_PROMPT_PREFIX,
@@ -64,6 +67,13 @@ When("同じ表示数式の探索中と確定後の描画経路を調べる", fu
     });
   this.streamingFrame = transform(this.partialResponses.at(-2), true);
   this.finalizedFrame = transform(this.partialResponses.at(-1), false);
+  const markedFinal = markTargetFormula(
+    this.partialResponses.at(-1),
+    this.displayFormula,
+  );
+  this.finalTargetUsesImage = inspectTargetFormulaRendering(
+    transform(markedFinal, false),
+  ).renderedAsImage;
   this.harnessSequence = markersAppearInOrder(
     this.harness,
     "stream_ready=false",
@@ -89,6 +99,7 @@ Then(
         ),
         streamingUsesImage: this.streamingFrame.includes("\x1b_Ga=T,f=100"),
         finalizedUsesImage: this.finalizedFrame.includes("\x1b_Ga=T,f=100"),
+        finalTargetUsesImage: this.finalTargetUsesImage,
         harnessSequence: this.harnessSequence,
       },
       {
@@ -97,11 +108,50 @@ Then(
         streamingContainsFormula: true,
         streamingUsesImage: false,
         finalizedUsesImage: true,
+        finalTargetUsesImage: true,
         harnessSequence: true,
       },
     );
   },
 );
+
+Given(/^対象式が `([^`]+)` になる探索応答がある$/u, function (example) {
+  if (example === "上限超過") {
+    this.targetFormula = "$$\\rule{1em}{500ex}$$";
+    this.streamingMarkdown = `説明です。\n\n${this.targetFormula}`;
+    this.finalMarkdown = `${this.streamingMarkdown}\n\n$$y^2$$`;
+  } else {
+    this.targetFormula = "$$x^2$$";
+    this.streamingMarkdown = `説明です。\n\n\`途中 ${this.targetFormula}`;
+    this.finalMarkdown = `説明です。\n\n\`${this.targetFormula}\`\n\n$$y^2$$`;
+  }
+});
+
+When("対象式の確定後の画像経路を調べる", async function () {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+  const marked = markTargetFormula(this.finalMarkdown, this.targetFormula);
+  const rendered = pi.transformer()(marked, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+  this.targetInspection = {
+    detectedWhileStreaming:
+      findCompleteDisplayFormula(this.streamingMarkdown) === this.targetFormula,
+    anotherFormulaUsesImage: rendered.includes("\x1b_Ga=T,f=100"),
+    targetUsesImage: inspectTargetFormulaRendering(rendered).renderedAsImage,
+  };
+});
+
+Then("対象式が画像経路を通らない確定応答は検証不能にする", function () {
+  assert.deepEqual(this.targetInspection, {
+    detectedWhileStreaming: true,
+    anotherFormulaUsesImage: true,
+    targetUsesImage: false,
+  });
+});
 
 Given("qni-math の描画 entry point を指定した探索コマンドがある", function () {
   this.verifyDisplayArguments = [

@@ -127,6 +127,17 @@ test("探索モードは公開APIの補助拡張から自由なプロンプト�
   );
 });
 
+test("対象式の印付け、pi-formula、画像経路確認を順に読み込む", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      '--extension "$PI_FORMULA_VERIFY_TARGET_EXTENSION"',
+      '--extension "$PI_FORMULA_VERIFY_EXTENSION"',
+      '--extension "$PI_FORMULA_VERIFY_PROMPT_EXTENSION"',
+    ),
+  );
+});
+
 test("探索モードは明示した追加拡張を読み込む", () => {
   assert.match(
     harness,
@@ -203,6 +214,7 @@ test("探索モードの寿命は全段階の期限と余裕を含む", () => {
     seconds("IMAGE_PATH_TIMEOUT") +
     seconds("STREAM_CAPTURE_TIMEOUT") +
     milliseconds / 1000 +
+    seconds("FINAL_FORMULA_TIMEOUT") +
     seconds("SESSION_TIMEOUT") +
     seconds("CAPTURE_READY_TIMEOUT") +
     2 * seconds("DETECTOR_TIMEOUT") +

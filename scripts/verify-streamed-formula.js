@@ -1,27 +1,33 @@
 #!/usr/bin/env node
 
 const fs = require("node:fs");
+const { hasCompleteDisplayFormula } = require("./display-stream-formula");
 const { assistantText } = require("./verify-echo");
 
-function verifyStreamedFormula(session, marker) {
+function verifyStreamedFormula(session, marker, finalMarker) {
   const formula = fs.readFileSync(marker, "utf8");
   if (!formula) throw new Error("ストリーミング中の表示数式 marker が空です");
   const response = assistantText(fs.readFileSync(session, "utf8"));
-  if (!response.includes(formula))
-    throw new Error("確定した応答にストリーミング中の表示数式がありません");
+  if (!hasCompleteDisplayFormula(response, formula))
+    throw new Error(
+      "確定した応答でストリーミング中の式が表示数式として認識されません",
+    );
+  const finalPath = fs.readFileSync(finalMarker, "utf8").trim();
+  if (finalPath !== "image")
+    throw new Error("確定した応答でストリーミング中の式が画像経路を通りません");
 }
 
-function main(session, marker) {
-  if (!session || !marker)
+function main(session, marker, finalMarker) {
+  if (!session || !marker || !finalMarker)
     throw new Error(
-      "Usage: verify-streamed-formula.js <session.jsonl> <formula-marker>",
+      "Usage: verify-streamed-formula.js <session.jsonl> <formula-marker> <final-path-marker>",
     );
-  verifyStreamedFormula(session, marker);
+  verifyStreamedFormula(session, marker, finalMarker);
 }
 
 if (require.main === module) {
   try {
-    main(process.argv[2], process.argv[3]);
+    main(process.argv[2], process.argv[3], process.argv[4]);
   } catch (error) {
     console.error(`表示数式の切り替え検証失敗: ${error.message}`);
     process.exitCode = 2;

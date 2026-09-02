@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const { advanceDisplayFormulaGate } = require("../display-stream-formula");
+const {
+  advanceDisplayFormulaGate,
+  inspectTargetFormulaRendering,
+} = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
 
 const STREAM_GATE_TIMEOUT_MS = 60_000;
@@ -53,4 +56,20 @@ export default function (pi: ExtensionAPI) {
   pi.on("input", (event) => transformDisplayPrompt(event.text));
   pi.on("message_update", (event) => gateWhenFormulaIsRendered(event.message));
   pi.on("message_end", (event) => gateWhenFormulaIsRendered(event.message));
+  pi.registerMarkdownTransformer((markdown, context) => {
+    if (
+      process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
+      context.messageType !== "assistant" ||
+      context.isStreaming
+    )
+      return markdown;
+    const result = inspectTargetFormulaRendering(markdown);
+    const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
+    if (finalMarker)
+      fs.writeFileSync(
+        finalMarker,
+        result.renderedAsImage ? "image\n" : "text\n",
+      );
+    return result.markdown;
+  });
 }

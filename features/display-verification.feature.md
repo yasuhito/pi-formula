@@ -112,6 +112,18 @@ pi-formula の worker として
 - When 同じ表示数式の探索中と確定後の描画経路を調べる
 - Then 早い地の文では止まらず同じ表示数式をテキスト経路と画像経路で検査する
 
+## Scenario Outline: 対象の表示数式が確定後に画像経路を通らない場合は拒否する
+
+- Given 対象式が `<example>` になる探索応答がある
+- When 対象式の確定後の画像経路を調べる
+- Then 対象式が画像経路を通らない確定応答は検証不能にする
+
+### Examples:
+
+  | example  |
+  | 上限超過 |
+  | 文中コード |
+
 ## Scenario: qni-math の描画 entry point を探索モードへ重ねない
 
 - Given qni-math の描画 entry point を指定した探索コマンドがある
