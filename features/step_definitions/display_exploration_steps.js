@@ -20,6 +20,9 @@ const {
 const {
   verifyStreamedFormula,
 } = require("../../scripts/verify-streamed-formula");
+const {
+  combineDisplayStatuses,
+} = require("../../scripts/combine-display-status");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
 const root = path.resolve(__dirname, "../..");
 
@@ -92,7 +95,7 @@ When("同じ表示数式の探索中と確定後の描画経路を調べる", fu
     "detect-streaming-display-bands",
     'run kill -CONT "$stream_process_pid"',
     'run touch "$STREAM_CAPTURE_ACK"',
-    "completed=false",
+    'if [[ "$MODE" == exploration && "$final_only" == false ]]',
     "verify-streamed-formula.js",
     'run_inside grim "$CAPTURE_FILE"',
     "detector detect-display-bands",
@@ -115,7 +118,7 @@ Then(
         harnessSequence: this.harnessSequence,
       },
       {
-        gatesBeforeFormula: [undefined, undefined, undefined],
+        gatesBeforeFormula: [undefined, undefined, this.displayFormula],
         gatedFormula: this.displayFormula,
         streamingContainsFormula: true,
         streamingUsesImage: false,
@@ -124,6 +127,64 @@ Then(
         harnessSequence: true,
       },
     );
+  },
+);
+
+Given("表示数式が一度の更新で本文末尾に現れる探索応答がある", function () {
+  this.singleUpdateFormula = "$$x^2+y^2=1$$";
+});
+
+When("その更新の撮影ゲートを調べる", function () {
+  this.singleUpdateGate = advanceDisplayFormulaGate(undefined, {
+    role: "assistant",
+    content: [
+      {
+        type: "text",
+        text: `説明です。\n\n${this.singleUpdateFormula}`,
+      },
+    ],
+  }).formulaToCapture;
+});
+
+Then("次の更新を待たずに表示数式の撮影を開始する", function () {
+  assert.equal(this.singleUpdateGate, this.singleUpdateFormula);
+});
+
+Given(
+  /^未完了フレームを撮れない `([^`]+)` の探索応答がある$/u,
+  function (reason) {
+    this.finalOnlyReason = reason;
+    this.harness = fs.readFileSync(
+      path.join(root, "scripts/verify-display"),
+      "utf8",
+    );
+    this.promptExtension = fs.readFileSync(
+      path.join(root, "scripts/verify-extensions/pi-formula-verify-prompt.ts"),
+      "utf8",
+    );
+  },
+);
+
+When("確定後だけ検査する終了を調べる", function () {
+  const expectedReason =
+    this.finalOnlyReason === "表示数式が現れなかった"
+      ? "表示数式が現れませんでした"
+      : "表示数式が確定と同時に現れました";
+  this.finalOnlyInspection = {
+    reasonIsRecorded: this.promptExtension.includes(expectedReason),
+    reportsFinalOnly: this.harness.includes("確定後のみ検査しました"),
+    status: combineDisplayStatuses([0], true),
+  };
+});
+
+Then(
+  "撮影できなかった理由と確定後のみの検査を終了コード3で知らせる",
+  function () {
+    assert.deepEqual(this.finalOnlyInspection, {
+      reasonIsRecorded: true,
+      reportsFinalOnly: true,
+      status: 3,
+    });
   },
 );
 

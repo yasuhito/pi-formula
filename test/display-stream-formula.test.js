@@ -23,18 +23,18 @@ test("表示数式より前の地の文では撮影ゲートを開始しない",
   );
 });
 
-test("完成した表示数式を見つけた更新は描画へ渡してから待つ", () => {
+test("完成した表示数式を見つけた更新で同じ式の撮影を開始する", () => {
   assert.deepEqual(
     advanceDisplayFormulaGate(undefined, assistant("説明です。\n\n$$x^2$$")),
     {
-      formulaToCapture: undefined,
-      hasReadyFormula: false,
+      formulaToCapture: "$$x^2$$",
+      hasReadyFormula: true,
       readyFormula: "$$x^2$$",
     },
   );
 });
 
-test("表示数式を描画へ渡した次の更新で同じ式の撮影を開始する", () => {
+test("表示数式を描画へ渡した次の更新でも同じ式の撮影を維持する", () => {
   assert.equal(
     advanceDisplayFormulaGate("$$x^2$$", assistant("説明です。\n\n$$x^2$$\n次"))
       .formulaToCapture,

@@ -47,12 +47,14 @@ function hasCompleteDisplayFormula(markdown, target) {
 
 function advanceDisplayFormulaGate(readyFormula, message) {
   const markdown = assistantMarkdown(message);
+  const nextFormula = readyFormula ?? findCompleteDisplayFormula(markdown);
+  const hasReadyFormula =
+    nextFormula !== undefined &&
+    hasCompleteDisplayFormula(markdown, nextFormula);
   return {
-    formulaToCapture: readyFormula,
-    hasReadyFormula:
-      readyFormula !== undefined &&
-      hasCompleteDisplayFormula(markdown, readyFormula),
-    readyFormula: readyFormula ?? findCompleteDisplayFormula(markdown),
+    formulaToCapture: hasReadyFormula ? nextFormula : undefined,
+    hasReadyFormula,
+    readyFormula: nextFormula,
   };
 }
 

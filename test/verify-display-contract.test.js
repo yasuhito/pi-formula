@@ -166,8 +166,8 @@ test("探索で得た応答をキャプチャ前にコーパスへ保存する",
     markersAppearInOrder(
       harness,
       "save-display-response.js",
-      '"$SESSION_FILE" "$RESPONSE_DESTINATION" "$STREAM_MARKER"',
-      "run_inside grim",
+      '"$' + '{save_response_args[@]}"',
+      'if [[ "$MODE" == corpus || "$final_only" == true ]]',
     ),
   );
 });
@@ -212,14 +212,43 @@ test("対象式の描画機会と画面変化を確認してからストリー�
   );
 });
 
-test("対象式をストリーミング描画へ渡してから撮影markerを書く", () => {
+test("対象式を含む更新だけでストリーミング撮影ゲートを開始する", () => {
   assert.ok(
     markersAppearInOrder(
       promptExtension,
-      "await waitForMarker(\n      renderedMarker",
-      "fs.writeFileSync(marker, next.formulaToCapture)",
-      "await waitForMarker(\n      acknowledgement",
+      "advanceDisplayFormulaGate(readyFormula, message)",
+      "hasCompleteDisplayFormula(markdown, readyFormula)",
+      "fs.writeFileSync(renderedMarker, readyFormula)",
+      "fs.writeFileSync(marker, readyFormula)",
     ),
+  );
+});
+
+test("未完了フレームを撮れない理由を記録する", () => {
+  assert.deepEqual(
+    {
+      marker: promptExtension.includes(
+        "PI_FORMULA_VERIFY_STREAM_UNAVAILABLE_MARKER",
+      ),
+      noFormula: promptExtension.includes("表示数式が現れませんでした"),
+      finalizedFormula: promptExtension.includes(
+        "表示数式が確定と同時に現れました",
+      ),
+    },
+    { marker: true, noFormula: true, finalizedFormula: true },
+  );
+});
+
+test("確定後だけの検査を出力と終了コード3で区別する", () => {
+  assert.deepEqual(
+    {
+      output: /確定後のみ検査しました/u.test(harness),
+      reason: /ストリーミング中のキャプチャを省略/u.test(harness),
+      status:
+        harness.includes("--final-only") &&
+        harness.includes("combine-display-status.js"),
+    },
+    { output: true, reason: true, status: true },
   );
 });
 
@@ -283,7 +312,7 @@ test("探索モードはストリーミング画面の後で確定画面も判�
       harness,
       "detect-streaming-display-bands",
       'run touch "$STREAM_CAPTURE_ACK"',
-      "completed=false",
+      'if [[ "$MODE" == exploration && "$final_only" == false ]]',
       'run_inside grim "$CAPTURE_FILE"',
       "detector detect-display-bands",
     ),

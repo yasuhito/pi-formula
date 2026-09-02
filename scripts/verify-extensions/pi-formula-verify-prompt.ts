@@ -55,39 +55,28 @@ export default function (pi: ExtensionAPI) {
   let finalCaptureStarted = false;
   let targetInCurrentMessage = false;
 
-  const gateWhenFormulaIsRendered = async (message: unknown) => {
-    const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
-    const renderedMarker = process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
-    const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
-    if (
-      process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
-      !marker ||
-      !renderedMarker ||
-      !acknowledgement ||
-      captureStarted
-    )
+  const observeDisplayFormula = (message: unknown) => {
+    if (process.env.PI_FORMULA_VERIFY_MODE !== "exploration" || captureStarted)
       return;
-
     const next = advanceDisplayFormulaGate(readyFormula, message);
     readyFormula = next.readyFormula;
     targetInCurrentMessage ||= readyFormula !== undefined;
-    if (!next.formulaToCapture) return;
+  };
 
-    captureStarted = true;
-    const gateDeadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
-    await waitForMarker(
-      renderedMarker,
-      next.formulaToCapture,
-      "対象式をストリーミング用 Markdown 描画へ渡せませんでした",
-      gateDeadline,
-    );
-    fs.writeFileSync(marker, next.formulaToCapture);
-    await waitForMarker(
-      acknowledgement,
+  const recordUnavailableReason = (message: unknown) => {
+    const unavailableMarker =
+      process.env.PI_FORMULA_VERIFY_STREAM_UNAVAILABLE_MARKER;
+    if (!unavailableMarker || fs.existsSync(unavailableMarker)) return;
+    const finalFormula = advanceDisplayFormulaGate(
       undefined,
-      "ストリーミング中のキャプチャ確認が timeout しました",
-      gateDeadline,
-    );
+      message,
+    ).readyFormula;
+    const reason = readyFormula
+      ? "表示数式を含む更新の後に Markdown transformer が実行されませんでした"
+      : finalFormula
+        ? "表示数式が確定と同時に現れました"
+        : "表示数式が現れませんでした";
+    fs.writeFileSync(unavailableMarker, `${reason}\n`);
   };
 
   pi.on("input", async (event) => {
@@ -145,7 +134,7 @@ export default function (pi: ExtensionAPI) {
       targetInCurrentMessage = false;
     }
   });
-  pi.on("message_update", (event) => gateWhenFormulaIsRendered(event.message));
+  pi.on("message_update", (event) => observeDisplayFormula(event.message));
   pi.on("message_end", async (event) => {
     const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
     if (
@@ -156,7 +145,19 @@ export default function (pi: ExtensionAPI) {
       !fs.existsSync(finalMarker)
     )
       fs.writeFileSync(finalMarker, "text\n");
-    await gateWhenFormulaIsRendered(event.message);
+
+    if (event.message.role === "assistant" && !captureStarted)
+      recordUnavailableReason(event.message);
+    if (captureStarted) {
+      const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
+      if (acknowledgement)
+        await waitForMarker(
+          acknowledgement,
+          undefined,
+          "ストリーミング中のキャプチャ確認が timeout しました",
+          Date.now() + STREAM_GATE_TIMEOUT_MS,
+        );
+    }
     if (targetInCurrentMessage && captureStarted)
       targetInCurrentMessage = false;
   });
@@ -170,13 +171,18 @@ export default function (pi: ExtensionAPI) {
     if (context.isStreaming) {
       const renderedMarker =
         process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
+      const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
       if (
         renderedMarker &&
+        marker &&
         readyFormula &&
         targetInCurrentMessage &&
         hasCompleteDisplayFormula(markdown, readyFormula)
-      )
+      ) {
         fs.writeFileSync(renderedMarker, readyFormula);
+        fs.writeFileSync(marker, readyFormula);
+        captureStarted = true;
+      }
       return markdown;
     }
 
