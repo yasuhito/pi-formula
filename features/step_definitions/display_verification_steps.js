@@ -123,7 +123,8 @@ When("ハーネスの安全条件を調べる", function () {
       /run-display-command" detector detect-display-bands/u.test(
         this.harness,
       ) &&
-      /exit "\$detector_status"/u.test(this.harness) &&
+      /combine-display-status\.js/u.test(this.harness) &&
+      /exit "\$combined_status"/u.test(this.harness) &&
       /fail\(\)[\s\S]*exit 2/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&

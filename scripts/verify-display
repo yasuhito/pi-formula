@@ -8,7 +8,9 @@ SESSION_TIMEOUT=150
 CAPTURE_READY_TIMEOUT=30
 CAPTURE_READY_INTERVAL=2
 STREAM_CAPTURE_TIMEOUT=30
+IMAGE_PATH_TIMEOUT=15
 WINDOW_LIFETIME=240
+EXPLORATION_WINDOW_LIFETIME=420
 SESSION_READY_TIMEOUT=30
 WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
@@ -62,6 +64,9 @@ else
   CORPUS=${1:-}
   shift || true
   [[ $# -eq 0 ]] || ARGUMENT_ERROR="未対応の引数です: $*"
+fi
+if [[ "$MODE" == exploration ]]; then
+  WINDOW_LIFETIME=$EXPLORATION_WINDOW_LIFETIME
 fi
 TEMP_DIR=
 CAGE_PID=
@@ -297,7 +302,7 @@ done
 [[ "$capture_size" == "1920x$HEIGHT" ]] \
   || fail "検証セッションの出力を 1920x${HEIGHT} で用意できませんでした"
 
-for _ in {1..15}; do
+for ((elapsed = 0; elapsed < IMAGE_PATH_TIMEOUT; elapsed += 1)); do
   [[ -s "$IMAGE_MARKER" ]] && break
   run sleep 1
 done
@@ -366,6 +371,10 @@ for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
   run sleep 1
 done
 [[ "$completed" == true ]] || fail "Pi の応答が ${SESSION_TIMEOUT} 秒以内に完了しませんでした"
+if [[ "$MODE" == exploration ]]; then
+  run node "$ROOT/scripts/verify-streamed-formula.js" "$SESSION_FILE" "$STREAM_MARKER" \
+    || fail "未完了時と確定後で同じ表示数式を確認できませんでした"
+fi
 if [[ "$MODE" == corpus ]]; then
   run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
     || fail "Pi の応答がコーパスと一字一句一致しません"
@@ -413,9 +422,10 @@ detector_status=0
   --ignore=130,130,124 --ignore=180,178,168 --ignore=220,216,202 \
   --ignore=238,235,224 --ignore=232,230,220 --ignore=228,236,224 \
   --ignore=240,226,222 --ignore=232,226,236 "$CAPTURE_FILE" || detector_status=$?
-# 帯の座標だけでは表示が壊れているかを決められない。撮れた画面を見て判断する。
-if [[ "$stream_detector_status" -eq 1 || "$detector_status" -eq 1 ]]; then
+# 検証不能を帯検出より優先し、両方の判定器が実行できた場合だけ帯検出を統合する。
+combined_status=$(run node "$ROOT/scripts/combine-display-status.js" \
+  "$stream_detector_status" "$detector_status")
+if [[ "$combined_status" -eq 1 ]]; then
   printf 'キャプチャを開いて表示を確認してください: %s\n' "$CAPTURE_DESTINATION" >&2
-  exit 1
 fi
-exit "$detector_status"
+exit "$combined_status"

@@ -5,10 +5,15 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
+const { registerFormula } = require("../../dist/api.js");
+const {
+  advanceDisplayFormulaGate,
+} = require("../../scripts/display-stream-formula");
 const {
   DISPLAY_PROMPT_PREFIX,
   transformDisplayPrompt,
 } = require("../../scripts/transform-display-prompt");
+const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
 const root = path.resolve(__dirname, "../..");
 
 function markersAppearInOrder(source, ...markers) {
@@ -21,46 +26,80 @@ function markersAppearInOrder(source, ...markers) {
   return true;
 }
 
-Given("ストリーミング撮影ゲートを持つ探索ハーネスがある", function () {
-  this.harness = fs.readFileSync(
-    path.join(root, "scripts/verify-display"),
-    "utf8",
-  );
-  this.promptExtension = fs.readFileSync(
-    path.join(root, "scripts/verify-extensions/pi-formula-verify-prompt.ts"),
-    "utf8",
-  );
-});
+Given(
+  "地の文の後に表示数式と後続本文を生成する探索ハーネスがある",
+  async function () {
+    this.harness = fs.readFileSync(
+      path.join(root, "scripts/verify-display"),
+      "utf8",
+    );
+    this.explorationPi = fakePi();
+    registerFormula(this.explorationPi.api);
+    await startWithKitty(this.explorationPi);
+    this.displayFormula = "$$x^2+y^2=1$$";
+    this.partialResponses = [
+      "説明します。",
+      "説明します。まず前提です。",
+      `説明します。まず前提です。\n\n${this.displayFormula}`,
+      `説明します。まず前提です。\n\n${this.displayFormula}\n\nこの式を使います。`,
+    ];
+  },
+);
 
-When("探索ハーネスの観測順序を調べる", function () {
-  this.explorationObservation = {
-    unfinishedResponseGate:
-      /PI_FORMULA_VERIFY_MODE !== "exploration"/u.test(this.promptExtension) &&
-      /textUpdates < 2/u.test(this.promptExtension) &&
-      /writeFileSync\(marker/u.test(this.promptExtension) &&
-      /await waitForCapture\(acknowledgement\)/u.test(this.promptExtension),
-    streamingThenFinal: markersAppearInOrder(
-      this.harness,
-      "stream_ready=false",
-      'check-display-session.js" "$SESSION_FILE"',
-      'run_inside grim "$STREAM_CAPTURE_FILE"',
-      "detect-streaming-display-bands",
-      'run touch "$STREAM_CAPTURE_ACK"',
-      "completed=false",
-      'check-display-session.js" "$SESSION_FILE"',
-      'run_inside grim "$CAPTURE_FILE"',
-      "detector detect-display-bands",
-    ),
-  };
+When("同じ表示数式の探索中と確定後の描画経路を調べる", function () {
+  let readyFormula;
+  this.gateDecisions = this.partialResponses.map((markdown) => {
+    const decision = advanceDisplayFormulaGate(readyFormula, {
+      role: "assistant",
+      content: [{ type: "text", text: markdown }],
+    });
+    readyFormula = decision.readyFormula;
+    return decision.formulaToCapture;
+  });
+  const transform = (markdown, isStreaming) =>
+    this.explorationPi.transformer()(markdown, {
+      messageType: "assistant",
+      isStreaming,
+      availableWidth: 80,
+    });
+  this.streamingFrame = transform(this.partialResponses.at(-2), true);
+  this.finalizedFrame = transform(this.partialResponses.at(-1), false);
+  this.harnessSequence = markersAppearInOrder(
+    this.harness,
+    "stream_ready=false",
+    'run_inside grim "$STREAM_CAPTURE_FILE"',
+    "detect-streaming-display-bands",
+    'run touch "$STREAM_CAPTURE_ACK"',
+    "completed=false",
+    "verify-streamed-formula.js",
+    'run_inside grim "$CAPTURE_FILE"',
+    "detector detect-display-bands",
+  );
 });
 
 Then(
-  "未完了時のピクセル判定後に同じセッションの確定後ピクセル判定を行う",
+  "早い地の文では止まらず同じ表示数式をテキスト経路と画像経路で検査する",
   function () {
-    assert.deepEqual(this.explorationObservation, {
-      unfinishedResponseGate: true,
-      streamingThenFinal: true,
-    });
+    assert.deepEqual(
+      {
+        gatesBeforeFormula: this.gateDecisions.slice(0, 3),
+        gatedFormula: this.gateDecisions.at(-1),
+        streamingContainsFormula: this.streamingFrame.includes(
+          this.displayFormula,
+        ),
+        streamingUsesImage: this.streamingFrame.includes("\x1b_Ga=T,f=100"),
+        finalizedUsesImage: this.finalizedFrame.includes("\x1b_Ga=T,f=100"),
+        harnessSequence: this.harnessSequence,
+      },
+      {
+        gatesBeforeFormula: [undefined, undefined, undefined],
+        gatedFormula: this.displayFormula,
+        streamingContainsFormula: true,
+        streamingUsesImage: false,
+        finalizedUsesImage: true,
+        harnessSequence: true,
+      },
+    );
   },
 );
 

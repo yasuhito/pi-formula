@@ -7,6 +7,13 @@ const harness = fs.readFileSync(
   path.resolve(__dirname, "../scripts/verify-display"),
   "utf8",
 );
+const promptExtension = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    "../scripts/verify-extensions/pi-formula-verify-prompt.ts",
+  ),
+  "utf8",
+);
 const runFunction = harness.slice(
   harness.indexOf("run()"),
   harness.indexOf("cleanup()"),
@@ -170,11 +177,37 @@ test("探索モードはストリーミング画面の後で確定画面も判�
   );
 });
 
-test("探索モードは二つの画面のどちらに帯があっても終了コード1にする", () => {
-  assert.match(
-    harness,
-    /stream_detector_status" -eq 1 \|\| "\$detector_status" -eq 1/u,
+test("二つの判定結果を検証不能優先の共通処理で統合する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "detector_status=0",
+      "combine-display-status.js",
+      'exit "$combined_status"',
+    ),
   );
+});
+
+test("探索モードの寿命は全段階の期限と余裕を含む", () => {
+  const seconds = (name, source = harness) =>
+    Number(
+      new RegExp(`^${name}=(?:([0-9]+)|([0-9_]+))$`, "mu").exec(source)?.[1],
+    );
+  const milliseconds = Number(
+    /^const STREAM_GATE_TIMEOUT_MS = ([0-9_]+);$/mu
+      .exec(promptExtension)?.[1]
+      .replaceAll("_", ""),
+  );
+  const boundedStages =
+    seconds("SESSION_READY_TIMEOUT") +
+    seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("STREAM_CAPTURE_TIMEOUT") +
+    milliseconds / 1000 +
+    seconds("SESSION_TIMEOUT") +
+    seconds("CAPTURE_READY_TIMEOUT") +
+    2 * seconds("DETECTOR_TIMEOUT") +
+    seconds("COMMAND_TIMEOUT");
+  assert.ok(seconds("EXPLORATION_WINDOW_LIFETIME") > boundedStages);
 });
 
 test("描画完了をピクセル判定前に確認する", () => {

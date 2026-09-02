@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+const { advanceDisplayFormulaGate } = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
 
 const STREAM_GATE_TIMEOUT_MS = 60_000;
@@ -26,28 +27,30 @@ function waitForCapture(acknowledgement: string): Promise<void> {
 }
 
 export default function (pi: ExtensionAPI) {
-  let textUpdates = 0;
+  let readyFormula: string | undefined;
   let waitingForCapture = false;
 
-  pi.on("input", (event) => transformDisplayPrompt(event.text));
-  pi.on("message_update", async (event) => {
+  const gateWhenFormulaIsRendered = async (message: unknown) => {
     const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
     const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
       !marker ||
       !acknowledgement ||
-      waitingForCapture ||
-      event.assistantMessageEvent.type !== "text_delta" ||
-      event.assistantMessageEvent.delta.length === 0
+      waitingForCapture
     )
       return;
 
-    textUpdates += 1;
-    if (textUpdates < 2) return;
+    const next = advanceDisplayFormulaGate(readyFormula, message);
+    readyFormula = next.readyFormula;
+    if (!next.formulaToCapture) return;
 
     waitingForCapture = true;
-    fs.writeFileSync(marker, `${textUpdates}\n`);
+    fs.writeFileSync(marker, next.formulaToCapture);
     await waitForCapture(acknowledgement);
-  });
+  };
+
+  pi.on("input", (event) => transformDisplayPrompt(event.text));
+  pi.on("message_update", (event) => gateWhenFormulaIsRendered(event.message));
+  pi.on("message_end", (event) => gateWhenFormulaIsRendered(event.message));
 }
