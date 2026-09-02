@@ -101,6 +101,16 @@ When("ハーネスの安全条件を調べる", function () {
       ) &&
       /キャプチャを開いて表示を確認してください/u.test(this.harness),
     imagePath: /verify-image-path\.js/u.test(this.harness),
+    imagePathTimeout:
+      Number(/^IMAGE_PATH_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]) >=
+      Math.max(
+        Number(/^SESSION_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
+        Number(/^CAPTURE_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
+      ),
+    imagePathRetry:
+      /while \(\(SECONDS < image_path_deadline\)\)[\s\S]*verify-image-path\.js[\s\S]*image_path_ready=true/u.test(
+        this.harness,
+      ),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
     exactEcho:
       /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u.test(
@@ -178,6 +188,43 @@ Then("公開 API で追加マクロを登録する拡張を読み込む", functi
 
 Then("キャプチャ前に画像経路を確認する", function () {
   assert.equal(this.safety.imagePath, true);
+});
+
+Then("画像経路の待機期限は他の準備待ちと同等以上である", function () {
+  assert.equal(this.safety.imagePathTimeout, true);
+});
+
+Then("待機期限まで画像経路の判定を繰り返す", function () {
+  assert.equal(this.safety.imagePathRetry, true);
+});
+
+Given(/^画像経路の確認記録が `([^`]+)` である$/u, function (selected) {
+  this.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-image-path-"),
+  );
+  this.imagePathMarker = path.join(this.directory, "marker");
+  if (selected !== "missing") {
+    fs.writeFileSync(this.imagePathMarker, `${selected}\n`);
+  }
+});
+
+When("画像経路の確認記録を検証する", function () {
+  this.imagePathResult = spawnSync(
+    process.execPath,
+    [path.join(root, "scripts/verify-image-path.js"), this.imagePathMarker],
+    { encoding: "utf8", timeout: 5_000 },
+  );
+  fs.rmSync(this.directory, { recursive: true, force: true });
+});
+
+Then(/^検証不能として `([^`]+)` を報告する$/u, function (reported) {
+  assert.deepEqual(
+    {
+      status: this.imagePathResult.status,
+      reportsSelection: this.imagePathResult.stderr.includes(reported),
+    },
+    { status: 2, reportsSelection: true },
+  );
 });
 
 Then("保存先の指定がなくてもキャプチャを残して報告する", function () {

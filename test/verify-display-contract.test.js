@@ -461,7 +461,14 @@ test("ビルドへ独立した長い時間上限を使う", () => {
 });
 
 test("Ghosttyの寿命に各段の期限とキャプチャの余裕を含める", () => {
-  assert.match(harness, /WINDOW_LIFETIME=240/u);
+  const seconds = (name) =>
+    Number(new RegExp(`^${name}=([0-9]+)$`, "mu").exec(harness)?.[1]);
+  const boundedStages =
+    seconds("SESSION_READY_TIMEOUT") +
+    seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("SESSION_TIMEOUT") +
+    seconds("CAPTURE_READY_TIMEOUT");
+  assert.ok(seconds("WINDOW_LIFETIME") > boundedStages);
 });
 
 test("セッション待機だけ未完了の終了コード1を保つ", () => {

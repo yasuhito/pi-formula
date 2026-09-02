@@ -82,6 +82,30 @@ pi-formula の worker として
 - When ハーネスの安全条件を調べる
 - Then キャプチャ前に画像経路を確認する
 
+## Scenario: 画像経路の準備を他の準備と同じ長さだけ待つ
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 画像経路の待機期限は他の準備待ちと同等以上である
+
+## Scenario: 画像経路が確定するまで判定を繰り返す
+
+- Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
+- When ハーネスの安全条件を調べる
+- Then 待機期限まで画像経路の判定を繰り返す
+
+## Scenario Outline: 画像経路が確定しない理由を報告する
+
+- Given 画像経路の確認記録が `<selected>` である
+- When 画像経路の確認記録を検証する
+- Then 検証不能として `<reported>` を報告する
+
+### Examples:
+
+  | selected | reported |
+  | text     | text     |
+  | missing  | missing  |
+
 ## Scenario: 描画完了を確認する
 
 - Given 実表示検証ハーネスと Issue 21 の再現コーパスがある
