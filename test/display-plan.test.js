@@ -42,10 +42,22 @@ test("組版できない表示数式だけをテキスト経路へ戻して計�
   });
 });
 
-test("組版できない表示数式のテキスト行を出力高へ加える", () => {
+test("組版できない表示数式のテキスト行を出力高へ一度だけ加える", () => {
   const corpus = `${"本文\n".repeat(100)}$$\n\\undefinedcommandhere\n$$\n\n$$x$$`;
 
-  assert.equal(planDisplay(corpus, { source: true }).height, 8224);
+  assert.equal(planDisplay(corpus, { source: true }).height, 8080);
+});
+
+test("文字数上限を超える表示数式の出力高が収まれば計画を続ける", () => {
+  const tooLong = `x=${"x".repeat(16_383)}`;
+  const corpus = ["$$x$$", `$$${tooLong}$$`].join("\n\n");
+
+  assert.deepEqual(planDisplay(corpus, { source: true }), {
+    height: 9712,
+    imageRows: 1,
+    displayFormulas: 2,
+    failedFormulas: 1,
+  });
 });
 
 test("既存の Issue 48 コーパスの計画結果を変えない", () => {

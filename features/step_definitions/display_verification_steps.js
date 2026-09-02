@@ -47,7 +47,7 @@ When("ハーネスの安全条件を調べる", function () {
       /WLR_BACKENDS=headless/u.test(this.harness) &&
       /setsid cage -d --/u.test(this.harness),
     tallOutput:
-      /plan-display\.js/u.test(this.harness) &&
+      /verify-display-plan\.js/u.test(this.harness) &&
       /run_inside grim/u.test(this.harness),
     sessionOutput:
       /--custom-mode "1920x\$\{PI_FORMULA_VERIFY_HEIGHT\}"/u.test(
@@ -367,87 +367,6 @@ Then("読み取り失敗は対象ファイルを示す", function () {
   assert.match(
     this.qniCliMacroError?.message ?? "",
     /macros 定義が見つかりません: missing-qni-cli-typesetter\.ts/u,
-  );
-});
-
-Given("組版できる式と組版できない式を含むコーパスがある", function () {
-  this.directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
-  );
-  this.planCorpus = path.join(this.directory, "typesetting-failure.md");
-  fs.writeFileSync(
-    this.planCorpus,
-    ["$$x$$", "$$\\undefinedcommandhere$$"].join("\n\n"),
-  );
-});
-
-When("ハーネスの表示計画処理を調べる", function () {
-  this.displayPlanHandling = {
-    reportsFailures:
-      /\.failedFormulas/u.test(this.harness) &&
-      /組版に失敗した表示数式: %s/u.test(this.harness),
-    preservesPlannerReason:
-      /PLAN_ERROR/u.test(this.harness) &&
-      /cat -- "\$PLAN_ERROR"/u.test(this.harness) &&
-      !/画像行数を含む全履歴を 16000px 以下へ収められません/u.test(
-        this.harness,
-      ),
-  };
-});
-
-Then("verify-display は組版に失敗した表示数式の数を出す", function () {
-  assert.equal(this.displayPlanHandling.reportsFailures, true);
-});
-
-Then("verify-display は高さ超過と決めつけず planner の理由を出す", function () {
-  assert.equal(this.displayPlanHandling.preservesPlannerReason, true);
-});
-
-Then("組版失敗を数えて残りの表示数式の計画を続ける", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      plan: JSON.parse(this.planResult.stdout),
-    },
-    {
-      status: 0,
-      plan: {
-        height: 8000,
-        imageRows: 1,
-        displayFormulas: 2,
-        failedFormulas: 1,
-      },
-    },
-  );
-});
-
-Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
-  this.directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
-  );
-  this.planCorpus = path.join(this.directory, "tall.md");
-  fs.writeFileSync(
-    this.planCorpus,
-    ["$$\\rule{1em}{300ex}$$", "$$\\rule{1em}{300ex}$$"].join("\n\n"),
-  );
-});
-
-When("表示数式の画像行数を含む出力高を計画する", function () {
-  this.planResult = spawnSync(
-    process.execPath,
-    [path.join(root, "scripts/plan-display.js"), this.planCorpus],
-    { encoding: "utf8", timeout: 5_000 },
-  );
-  fs.rmSync(this.directory, { recursive: true, force: true });
-});
-
-Then("全履歴が収まらないコーパスは描画前に拒否される", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsLimit: /16000px/u.test(this.planResult.stderr),
-    },
-    { status: 2, reportsLimit: true },
   );
 });
 

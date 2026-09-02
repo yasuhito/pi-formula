@@ -28,7 +28,6 @@ function planDisplay(input, options = {}) {
   const markdown = options.source ? input : fs.readFileSync(input, "utf8");
   let displayFormulas = 0;
   let failedFormulas = 0;
-  let fallbackRows = 0;
   let imageRows = 0;
   transformDisplayMath(markdown, (latex, original) => {
     displayFormulas += 1;
@@ -43,7 +42,6 @@ function planDisplay(input, options = {}) {
       imageRows += image.rows;
     } catch {
       failedFormulas += 1;
-      fallbackRows += sourceRows(original);
     }
     return original;
   });
@@ -51,8 +49,7 @@ function planDisplay(input, options = {}) {
   const required =
     FIXED_UI_HEIGHT +
     HISTORY_COPIES *
-      ((textRows + fallbackRows) * TEXT_LINE_HEIGHT +
-        imageRows * IMAGE_ROW_HEIGHT);
+      (textRows * TEXT_LINE_HEIGHT + imageRows * IMAGE_ROW_HEIGHT);
   if (required > MAX_HEIGHT) {
     throw new Error(
       `コーパス全体の表示には ${required}px 必要なため ${MAX_HEIGHT}px に収まりません`,
