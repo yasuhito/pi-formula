@@ -8,42 +8,9 @@ const {
   targetFitsViewport,
 } = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
+const { waitForMarker } = require("../wait-for-marker");
 
 const STREAM_GATE_TIMEOUT_MS = 60_000;
-
-function waitForMarker(
-  marker: string,
-  expected: string | undefined,
-  timeoutMessage: string,
-  deadline: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const poll = () => {
-      let value: string | undefined;
-      try {
-        value = fs.readFileSync(marker, "utf8");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-          reject(error);
-          return;
-        }
-      }
-      if (
-        value !== undefined &&
-        (expected === undefined || value === expected)
-      ) {
-        resolve();
-        return;
-      }
-      if (Date.now() >= deadline) {
-        reject(new Error(timeoutMessage));
-        return;
-      }
-      setTimeout(poll, 25);
-    };
-    poll();
-  });
-}
 
 export default function (pi: ExtensionAPI) {
   const processMarker = process.env.PI_FORMULA_VERIFY_STREAM_PROCESS_MARKER;
@@ -55,39 +22,33 @@ export default function (pi: ExtensionAPI) {
   let finalCaptureStarted = false;
   let targetInCurrentMessage = false;
 
-  const gateWhenFormulaIsRendered = async (message: unknown) => {
-    const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
-    const renderedMarker = process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
-    const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
-    if (
-      process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
-      !marker ||
-      !renderedMarker ||
-      !acknowledgement ||
-      captureStarted
-    )
-      return;
+  const streamCaptureCancelled = () => {
+    const marker = process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER;
+    return Boolean(marker && fs.existsSync(marker));
+  };
 
+  const observeDisplayFormula = (message: unknown) => {
+    if (process.env.PI_FORMULA_VERIFY_MODE !== "exploration" || captureStarted)
+      return;
     const next = advanceDisplayFormulaGate(readyFormula, message);
     readyFormula = next.readyFormula;
     targetInCurrentMessage ||= readyFormula !== undefined;
-    if (!next.formulaToCapture) return;
+  };
 
-    captureStarted = true;
-    const gateDeadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
-    await waitForMarker(
-      renderedMarker,
-      next.formulaToCapture,
-      "対象式をストリーミング用 Markdown 描画へ渡せませんでした",
-      gateDeadline,
-    );
-    fs.writeFileSync(marker, next.formulaToCapture);
-    await waitForMarker(
-      acknowledgement,
+  const recordUnavailableReason = (message: unknown) => {
+    const unavailableMarker =
+      process.env.PI_FORMULA_VERIFY_STREAM_UNAVAILABLE_MARKER;
+    if (!unavailableMarker || fs.existsSync(unavailableMarker)) return;
+    const finalFormula = advanceDisplayFormulaGate(
       undefined,
-      "ストリーミング中のキャプチャ確認が timeout しました",
-      gateDeadline,
-    );
+      message,
+    ).readyFormula;
+    const reason = readyFormula
+      ? "表示数式を含む更新の後に Markdown transformer が実行されませんでした"
+      : finalFormula
+        ? "表示数式が確定と同時に現れました"
+        : "表示数式が現れませんでした";
+    fs.writeFileSync(unavailableMarker, `${reason}\n`);
   };
 
   pi.on("input", async (event) => {
@@ -115,6 +76,7 @@ export default function (pi: ExtensionAPI) {
     const acknowledgement = process.env.PI_FORMULA_VERIFY_FINAL_CAPTURE_ACK;
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
+      streamCaptureCancelled() ||
       !captureStarted ||
       finalCaptureStarted ||
       !finalMarker ||
@@ -125,18 +87,23 @@ export default function (pi: ExtensionAPI) {
 
     finalCaptureStarted = true;
     const deadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
-    await waitForMarker(
+    const cancellationMarker =
+      process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER;
+    const finalResult = await waitForMarker(
       finalMarker,
       undefined,
       "対象式の確定描画を確認できませんでした",
       deadline,
+      cancellationMarker,
     );
+    if (finalResult === "cancelled") return;
     fs.writeFileSync(captureMarker, "ready\n");
     await waitForMarker(
       acknowledgement,
       undefined,
       "対象式の確定キャプチャ確認が timeout しました",
       deadline,
+      cancellationMarker,
     );
   });
   pi.on("message_start", (event) => {
@@ -145,7 +112,7 @@ export default function (pi: ExtensionAPI) {
       targetInCurrentMessage = false;
     }
   });
-  pi.on("message_update", (event) => gateWhenFormulaIsRendered(event.message));
+  pi.on("message_update", (event) => observeDisplayFormula(event.message));
   pi.on("message_end", async (event) => {
     const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
     if (
@@ -156,7 +123,24 @@ export default function (pi: ExtensionAPI) {
       !fs.existsSync(finalMarker)
     )
       fs.writeFileSync(finalMarker, "text\n");
-    await gateWhenFormulaIsRendered(event.message);
+
+    if (
+      event.message.role === "assistant" &&
+      event.message.stopReason !== "toolUse" &&
+      !captureStarted
+    )
+      recordUnavailableReason(event.message);
+    if (captureStarted && !streamCaptureCancelled()) {
+      const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
+      if (acknowledgement)
+        await waitForMarker(
+          acknowledgement,
+          undefined,
+          "ストリーミング中のキャプチャ確認が timeout しました",
+          Date.now() + STREAM_GATE_TIMEOUT_MS,
+          process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER,
+        );
+    }
     if (targetInCurrentMessage && captureStarted)
       targetInCurrentMessage = false;
   });
@@ -168,15 +152,21 @@ export default function (pi: ExtensionAPI) {
       return markdown;
 
     if (context.isStreaming) {
+      if (streamCaptureCancelled()) return markdown;
       const renderedMarker =
         process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
+      const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;
       if (
         renderedMarker &&
+        marker &&
         readyFormula &&
         targetInCurrentMessage &&
         hasCompleteDisplayFormula(markdown, readyFormula)
-      )
+      ) {
         fs.writeFileSync(renderedMarker, readyFormula);
+        fs.writeFileSync(marker, readyFormula);
+        captureStarted = true;
+      }
       return markdown;
     }
 

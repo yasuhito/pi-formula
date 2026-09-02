@@ -170,8 +170,8 @@ test("探索で得た応答をキャプチャ前にコーパスへ保存する",
     markersAppearInOrder(
       harness,
       "save-display-response.js",
-      '"$SESSION_FILE" "$RESPONSE_DESTINATION" "$STREAM_MARKER"',
-      "run_inside grim",
+      '"$' + '{save_response_args[@]}"',
+      'if [[ "$MODE" == corpus || "$final_only" == true ]]',
     ),
   );
 });
@@ -216,14 +216,82 @@ test("対象式の描画機会と画面変化を確認してからストリー�
   );
 });
 
-test("対象式をストリーミング描画へ渡してから撮影markerを書く", () => {
+test("対象式を含む更新だけでストリーミング撮影ゲートを開始する", () => {
   assert.ok(
     markersAppearInOrder(
       promptExtension,
-      "await waitForMarker(\n      renderedMarker",
-      "fs.writeFileSync(marker, next.formulaToCapture)",
-      "await waitForMarker(\n      acknowledgement",
+      "advanceDisplayFormulaGate(readyFormula, message)",
+      "hasCompleteDisplayFormula(markdown, readyFormula)",
+      "fs.writeFileSync(renderedMarker, readyFormula)",
+      "fs.writeFileSync(marker, readyFormula)",
     ),
+  );
+});
+
+test("未完了フレームを撮れない理由を記録する", () => {
+  assert.deepEqual(
+    {
+      marker: promptExtension.includes(
+        "PI_FORMULA_VERIFY_STREAM_UNAVAILABLE_MARKER",
+      ),
+      noFormula: promptExtension.includes("表示数式が現れませんでした"),
+      finalizedFormula: promptExtension.includes(
+        "表示数式が確定と同時に現れました",
+      ),
+    },
+    { marker: true, noFormula: true, finalizedFormula: true },
+  );
+});
+
+test("tool後のassistant応答を待ってから撮影不能を確定する", () => {
+  assert.match(
+    promptExtension,
+    /event\.message\.stopReason !== "toolUse"[\s\S]*recordUnavailableReason/u,
+  );
+});
+
+test("確定後だけの検査へ切り替えたら遅い撮影ゲートを解除する", () => {
+  assert.deepEqual(
+    {
+      harnessCancels: markersAppearInOrder(
+        harness,
+        "final_only=true",
+        'run touch "$STREAM_CANCEL_MARKER"',
+      ),
+      transformerStopsMarkers:
+        /streamCaptureCancelled\(\)[\s\S]*return markdown[\s\S]*fs\.writeFileSync\(marker, readyFormula\)/u.test(
+          promptExtension,
+        ),
+      messageEndSkipsAck:
+        /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker\([\s\S]*PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER/u.test(
+          promptExtension,
+        ),
+    },
+    {
+      harnessCancels: true,
+      transformerStopsMarkers: true,
+      messageEndSkipsAck: true,
+    },
+  );
+});
+
+test("確定後だけの検査は再試行でも基準画面との差分を求める", () => {
+  assert.match(
+    harness,
+    /install -m 0644 "\$CAPTURE_FILE" "\$PREVIOUS_CAPTURE_FILE"[\s\S]*if \[\[ "\$final_only" == true \]\]; then[\s\S]*rendered_options\+=\("--different-from=\$BASELINE_CAPTURE_FILE"\)[\s\S]*rendered_options\+=\("--previous=\$PREVIOUS_CAPTURE_FILE"\)/u,
+  );
+});
+
+test("確定後だけの検査を出力と終了コード3で区別する", () => {
+  assert.deepEqual(
+    {
+      output: /確定後のみ検査しました/u.test(harness),
+      reason: /ストリーミング中のキャプチャを省略/u.test(harness),
+      status:
+        harness.includes("--final-only") &&
+        harness.includes("combine-display-status.js"),
+    },
+    { output: true, reason: true, status: true },
   );
 });
 
@@ -287,7 +355,7 @@ test("探索モードはストリーミング画面の後で確定画面も判�
       harness,
       "detect-streaming-display-bands",
       'run touch "$STREAM_CAPTURE_ACK"',
-      "completed=false",
+      'if [[ "$MODE" == exploration && "$final_only" == false ]]',
       'run_inside grim "$CAPTURE_FILE"',
       "detector detect-display-bands",
     ),
