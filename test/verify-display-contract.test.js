@@ -263,7 +263,7 @@ test("確定後だけの検査へ切り替えたら遅い撮影ゲートを解�
           promptExtension,
         ),
       messageEndSkipsAck:
-        /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker/u.test(
+        /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker\([\s\S]*PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER/u.test(
           promptExtension,
         ),
     },

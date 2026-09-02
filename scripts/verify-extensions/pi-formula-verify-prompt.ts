@@ -8,42 +8,9 @@ const {
   targetFitsViewport,
 } = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
+const { waitForMarker } = require("../wait-for-marker");
 
 const STREAM_GATE_TIMEOUT_MS = 60_000;
-
-function waitForMarker(
-  marker: string,
-  expected: string | undefined,
-  timeoutMessage: string,
-  deadline: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const poll = () => {
-      let value: string | undefined;
-      try {
-        value = fs.readFileSync(marker, "utf8");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-          reject(error);
-          return;
-        }
-      }
-      if (
-        value !== undefined &&
-        (expected === undefined || value === expected)
-      ) {
-        resolve();
-        return;
-      }
-      if (Date.now() >= deadline) {
-        reject(new Error(timeoutMessage));
-        return;
-      }
-      setTimeout(poll, 25);
-    };
-    poll();
-  });
-}
 
 export default function (pi: ExtensionAPI) {
   const processMarker = process.env.PI_FORMULA_VERIFY_STREAM_PROCESS_MARKER;
@@ -120,18 +87,23 @@ export default function (pi: ExtensionAPI) {
 
     finalCaptureStarted = true;
     const deadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
-    await waitForMarker(
+    const cancellationMarker =
+      process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER;
+    const finalResult = await waitForMarker(
       finalMarker,
       undefined,
       "対象式の確定描画を確認できませんでした",
       deadline,
+      cancellationMarker,
     );
+    if (finalResult === "cancelled") return;
     fs.writeFileSync(captureMarker, "ready\n");
     await waitForMarker(
       acknowledgement,
       undefined,
       "対象式の確定キャプチャ確認が timeout しました",
       deadline,
+      cancellationMarker,
     );
   });
   pi.on("message_start", (event) => {
@@ -166,6 +138,7 @@ export default function (pi: ExtensionAPI) {
           undefined,
           "ストリーミング中のキャプチャ確認が timeout しました",
           Date.now() + STREAM_GATE_TIMEOUT_MS,
+          process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER,
         );
     }
     if (targetInCurrentMessage && captureStarted)

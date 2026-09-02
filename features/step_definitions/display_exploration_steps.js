@@ -23,6 +23,7 @@ const {
 const {
   combineDisplayStatuses,
 } = require("../../scripts/combine-display-status");
+const { waitForMarker } = require("../../scripts/wait-for-marker");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
 const root = path.resolve(__dirname, "../..");
 
@@ -214,41 +215,35 @@ Then(
 Given(
   "確定後のみ検査へ切り替えた後に表示数式が現れる探索応答がある",
   function () {
-    this.harness = fs.readFileSync(
-      path.join(root, "scripts/verify-display"),
-      "utf8",
+    this.markerDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "late-stream-capture-"),
     );
-    this.promptExtension = fs.readFileSync(
-      path.join(root, "scripts/verify-extensions/pi-formula-verify-prompt.ts"),
-      "utf8",
+    this.streamAcknowledgement = path.join(
+      this.markerDirectory,
+      "acknowledgement",
+    );
+    this.streamCancellation = path.join(this.markerDirectory, "cancellation");
+    this.streamWaiting = waitForMarker(
+      this.streamAcknowledgement,
+      undefined,
+      "timeoutしました",
+      Date.now() + 1_000,
+      this.streamCancellation,
     );
   },
 );
 
-When("遅れて始まるストリーミング撮影の解除を調べる", function () {
-  this.lateStreamingInspection = {
-    cancellationIsSent: markersAppearInOrder(
-      this.harness,
-      "final_only=true",
-      'run touch "$STREAM_CANCEL_MARKER"',
-    ),
-    markerIsSkipped:
-      /streamCaptureCancelled\(\)[\s\S]*return markdown[\s\S]*fs\.writeFileSync\(marker, readyFormula\)/u.test(
-        this.promptExtension,
-      ),
-    acknowledgementIsSkipped:
-      /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker/u.test(
-        this.promptExtension,
-      ),
-  };
+When("遅れて始まるストリーミング撮影の解除を調べる", async function () {
+  fs.writeFileSync(this.streamCancellation, "cancelled\n");
+  try {
+    this.lateStreamingResult = await this.streamWaiting;
+  } finally {
+    fs.rmSync(this.markerDirectory, { recursive: true, force: true });
+  }
 });
 
 Then("撮影 marker と ACK 待ちを作らず確定後のみ検査する", function () {
-  assert.deepEqual(this.lateStreamingInspection, {
-    cancellationIsSent: true,
-    markerIsSkipped: true,
-    acknowledgementIsSkipped: true,
-  });
+  assert.equal(this.lateStreamingResult, "cancelled");
 });
 
 Given(/^対象式が `([^`]+)` になる探索応答がある$/u, function (example) {
