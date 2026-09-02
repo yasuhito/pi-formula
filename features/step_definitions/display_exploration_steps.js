@@ -79,9 +79,13 @@ When("同じ表示数式の探索中と確定後の描画経路を調べる", fu
   ).renderedAsImage;
   this.harnessSequence = markersAppearInOrder(
     this.harness,
+    "baseline_ready=false",
+    'run touch "$BASELINE_CAPTURE_ACK"',
     "stream_ready=false",
+    'run sleep "$CAPTURE_READY_INTERVAL"',
     'run kill -STOP "$stream_process_pid"',
     "stream_capture_deadline=",
+    '"--different-from=$BASELINE_CAPTURE_FILE"',
     'run_inside grim "$STREAM_CAPTURE_FILE"',
     "check-streaming-display-rendered",
     "detect-streaming-display-bands",
@@ -244,6 +248,51 @@ Then(
     });
   },
 );
+
+When("tool 前の検査対象をコーパスファイルへ保存する", function () {
+  const session = path.join(this.directory, "session.jsonl");
+  const marker = path.join(this.directory, "formula.md");
+  this.savedResponse = path.join(this.directory, "response.md");
+  const messages = [
+    {
+      role: "assistant",
+      stopReason: "toolUse",
+      content: [{ type: "text", text: this.firstAssistant }],
+    },
+    { role: "toolResult", content: [] },
+    {
+      role: "assistant",
+      stopReason: "stop",
+      content: [{ type: "text", text: this.lastAssistant }],
+    },
+  ];
+  fs.writeFileSync(
+    session,
+    `${messages
+      .map((message) => JSON.stringify({ type: "message", message }))
+      .join("\n")}\n`,
+  );
+  fs.writeFileSync(marker, this.targetFormula);
+  this.saveResponseResult = spawnSync(
+    process.execPath,
+    [
+      path.join(root, "scripts/save-display-response.js"),
+      session,
+      this.savedResponse,
+      marker,
+    ],
+    { encoding: "utf8", timeout: 5_000 },
+  );
+});
+
+Then("保存したコーパスに実表示検査した対象式が残る", function () {
+  const saved =
+    this.saveResponseResult.status === 0
+      ? fs.readFileSync(this.savedResponse, "utf8")
+      : this.saveResponseResult.stderr;
+  fs.rmSync(this.directory, { recursive: true, force: true });
+  assert.equal(saved, this.firstAssistant);
+});
 
 Given("qni-math の描画 entry point を指定した探索コマンドがある", function () {
   this.verifyDisplayArguments = [

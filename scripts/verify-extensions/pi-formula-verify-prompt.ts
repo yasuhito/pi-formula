@@ -88,7 +88,25 @@ export default function (pi: ExtensionAPI) {
     );
   };
 
-  pi.on("input", (event) => transformDisplayPrompt(event.text));
+  pi.on("input", async (event) => {
+    const transformed = transformDisplayPrompt(event.text);
+    const baselineMarker = process.env.PI_FORMULA_VERIFY_BASELINE_MARKER;
+    const baselineAcknowledgement = process.env.PI_FORMULA_VERIFY_BASELINE_ACK;
+    if (
+      process.env.PI_FORMULA_VERIFY_MODE === "exploration" &&
+      baselineMarker &&
+      baselineAcknowledgement
+    ) {
+      fs.writeFileSync(baselineMarker, "ready\n");
+      await waitForMarker(
+        baselineAcknowledgement,
+        undefined,
+        "対象式前のキャプチャ確認が timeout しました",
+        Date.now() + STREAM_GATE_TIMEOUT_MS,
+      );
+    }
+    return transformed;
+  });
   pi.on("message_start", (event) => {
     if (event.message.role === "assistant" && !captureStarted) {
       readyFormula = undefined;

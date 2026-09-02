@@ -7,17 +7,26 @@ const { spawnSync } = require("node:child_process");
 
 const saver = path.resolve(__dirname, "../scripts/save-display-response.js");
 
-function saveResponse(message) {
+function saveResponse(message, formula) {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-save-response-"),
   );
   const session = path.join(directory, "session.jsonl");
   const corpus = path.join(directory, "corpus.md");
+  const messages = Array.isArray(message) ? message : [message];
   fs.writeFileSync(
     session,
-    `${JSON.stringify({ type: "message", message })}\n`,
+    `${messages
+      .map((entry) => JSON.stringify({ type: "message", message: entry }))
+      .join("\n")}\n`,
   );
-  const result = spawnSync(process.execPath, [saver, session, corpus], {
+  const args = [saver, session, corpus];
+  if (formula) {
+    const marker = path.join(directory, "formula.md");
+    fs.writeFileSync(marker, formula);
+    args.push(marker);
+  }
+  const result = spawnSync(process.execPath, args, {
     encoding: "utf8",
   });
   const saved = fs.existsSync(corpus) ? fs.readFileSync(corpus, "utf8") : null;
@@ -35,6 +44,29 @@ test("探索で得た完了済み応答を一字一句そのまま保存する",
   assert.deepEqual(
     { status: result.status, saved },
     { status: 0, saved: response },
+  );
+});
+
+test("tool前に検査した対象式を含むassistant messageを保存する", () => {
+  const target = "計算します。\n\n$$x^2$$";
+  const { result, saved } = saveResponse(
+    [
+      {
+        role: "assistant",
+        stopReason: "toolUse",
+        content: [{ type: "text", text: target }],
+      },
+      {
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: "計算結果を確認しました。" }],
+      },
+    ],
+    "$$x^2$$",
+  );
+  assert.deepEqual(
+    { status: result.status, saved },
+    { status: 0, saved: target },
   );
 });
 

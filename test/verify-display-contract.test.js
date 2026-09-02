@@ -164,19 +164,43 @@ test("探索で得た応答をキャプチャ前にコーパスへ保存する",
     markersAppearInOrder(
       harness,
       "save-display-response.js",
+      '"$SESSION_FILE" "$RESPONSE_DESTINATION" "$STREAM_MARKER"',
       "run_inside grim",
     ),
   );
 });
 
-test("探索モードは未完了と描画安定を確認してからストリーミング画面を判定する", () => {
+test("探索応答の開始前に基準キャプチャの完了を待つ", () => {
+  assert.match(
+    promptExtension,
+    /pi\.on\("input", async[\s\S]*fs\.writeFileSync\(baselineMarker[\s\S]*await waitForMarker\([\s\S]*baselineAcknowledgement/u,
+  );
+});
+
+test("対象式前の安定画面を保存してから探索を開始する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      "baseline_ready=false",
+      "baseline_capture_deadline=",
+      'run_inside grim "$BASELINE_CAPTURE_FILE"',
+      "check-baseline-rendered",
+      'run touch "$BASELINE_CAPTURE_ACK"',
+      "stream_ready=false",
+    ),
+  );
+});
+
+test("対象式の描画機会と画面変化を確認してからストリーミング画面を判定する", () => {
   assert.ok(
     markersAppearInOrder(
       harness,
       "stream_ready=false",
+      'run sleep "$CAPTURE_READY_INTERVAL"',
       'run kill -STOP "$stream_process_pid"',
       'check-display-session.js" "$SESSION_FILE"',
       "stream_capture_deadline=",
+      '"--different-from=$BASELINE_CAPTURE_FILE"',
       'run_inside grim "$STREAM_CAPTURE_FILE"',
       "check-streaming-display-rendered",
       "detect-streaming-display-bands",
@@ -252,8 +276,10 @@ test("探索モードの寿命は全段階の期限と余裕を含む", () => {
   const boundedStages =
     seconds("SESSION_READY_TIMEOUT") +
     seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("BASELINE_READY_TIMEOUT") +
+    seconds("BASELINE_CAPTURE_TIMEOUT") +
     seconds("STREAM_CAPTURE_TIMEOUT") +
-    milliseconds / 1000 +
+    2 * (milliseconds / 1000) +
     seconds("FINAL_FORMULA_TIMEOUT") +
     seconds("SESSION_TIMEOUT") +
     2 * seconds("CAPTURE_READY_TIMEOUT") +
