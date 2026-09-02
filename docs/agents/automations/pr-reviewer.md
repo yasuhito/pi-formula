@@ -16,9 +16,10 @@
 
 ## 原則
 
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../pulls/N/reviews`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
 - worker へのプロンプト送信は、この run 自身が `terminal create` で作成し、`terminal show` で worktree と起動コマンドを検証した handle だけに行う。create の失敗や handle の不整合時は、既存の別 terminal（main workspace の他 agent セッションを含む）へ送らず、新しい terminal を作り直す（2026-08-31 に REVIEW_PROMPT が監視用の別セッションへ誤送信された）。
-- 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。
+- 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする。この指示文そのものを復唱・要約・整形して出力してはならない（2026-09-01 に PR #24 の run でプロンプト全文をエコーするだけの空振りが起きた）（2026-08-31 reviewer run #53 で「選定から始めます」とだけ出力して終了した空振りが起きた）。
 - Coordinator は対象選択、bot review の収集、read-only review worker と implementation/fix worker の起動と監視、検証、push、コメント、ラベル操作、merge だけを行う。コードを直接編集しない。
 - Review worker は独立レビューだけを行い、ファイル編集、commit、push、ラベル操作、issue / PR コメント、PR 作成、issue close を禁止する。
 - 修正は元の implementation worker へ返す。元の terminal が失われた場合だけ、同じ worktree に replacement fix worker を起動する。
@@ -26,6 +27,7 @@
 - `agent:review` はレビュー待ち、`agent:reviewing` はレビュー中を表す。`ready-for-human` は既存の手動確認用ラベルとして候補から除外するが、この automation は追加しない。
 - Copilot の inline comment、review summary、top-level comment を確認し、actionable な指摘は修正するか、理由を明記して対応不要と判断する。
 - GitHub Copilot は新しい commit push 後に自動で再レビューされないことがある。最新 HEAD に対する Copilot review が無い場合は `gh pr edit <PR> --add-reviewer "@copilot"` で明示的に再依頼する。ただし、その HEAD に対して本文が「quota limit に達したためレビューできない」という趣旨（例: "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."）の Copilot review が既に付いている場合は、quota 枯渇と判断して再依頼しない。quota 枯渇の間は Copilot に関する待ち条件と merge 条件をすべて無視して独立レビューと merge 判定に進み、その旨を最後の要約に書く（2026-08-31 PR #19 で再依頼の無限ループが起きた）。この依頼が「Copilot をレビュアーに追加できない」という趣旨のエラーで失敗する場合は、このリポジトリで Copilot code review が利用できないと判断し、Copilot に関する待ち条件と merge 条件をすべて無視する。その旨を最後の要約に書く。
+- bot review の待ちには上限を設ける。同じ HEAD に対して bot review を依頼した run から数えて 2 run 経っても応答が無い場合は、その bot を利用不可とみなし、待ち条件と merge 条件から外して独立レビューと merge 判定へ進む。その旨を最後の要約に書く。加えて、直近 3 時間以内にこの repository のいずれかの PR で「quota limit に達した」趣旨の review が観測されている場合は、応答が来ていない他の PR についても quota 枯渇中と判断し、同じく待たない（2026-09-02 に、quota 枯渇中で応答が来ない PR が複数 run にわたって merge 判定へ進めなかった）。
 - GitHub PR コメントは日本語で書く。引用やエラーメッセージ、コード識別子、ファイルパス、コマンドは原文でよい。
 - GitHub issue / PR コメントには、読み手に必要な成果、判断、ブロッカー、レビュー対応、検証だけを書く。`ready-for-agent`、`agent:implement`、`agent:review`、`agent:reviewing`、`ready-for-human` などのラベル付けや内部状態遷移を「付けた」「外した」という作業ログとして書かない。ラベル名を書くのは、ユーザーに見える待ち状態やブロッカーそのものを説明する必要がある場合だけにする。
 - `npm run check` を成功させずに修正の push や merge をしない。
@@ -48,9 +50,49 @@ prs_json=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review -
 - `agent:review` label がある
 - `agent:reviewing`、`ready-for-human`、`agent:blocked` がない
 
-`agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
+`agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は、**直近のレビューから最も長く放置されている 1 件**を選ぶ。判定は自分が投稿した `<!-- pi-formula-auto-review:` marker 付きコメントの最終投稿時刻で行い、記録が 1 件も無い PR を最優先、次に最終記録が古いものから順とする。同時刻や判定不能なら番号が小さいものを選ぶ。番号順の固定にしない理由は、番号の小さい大きな PR が何巡もレビューを占有し、後ろの PR が一度も判定に進めない状態が起きたため（2026-09-02 に pi-formula #51 が 7 巡するあいだ #57 / #61 / #62 が滞留した）。
+
+```bash
+viewer=$(gh api user --jq '.login')
+# 候補ごとに最終レビュー記録の時刻を取り、古い順に並べる
+gh api repos/yasuhito/pi-formula/issues/<PR>/comments --paginate | jq --arg viewer "$viewer" '[.[] | select(.user.login == $viewer and ((.body // "") | contains("<!-- pi-formula-auto-review:"))) | .created_at] | max // ""'
+```
+
+選んだ PR が bot review 待ちで、その依頼が前の run で済んでいる場合は、この run では先へ進めない。run を空振りで終えず、次の候補 PR を同じ手順で選び直す。実際にレビュー作業を行うのは1つの run につき1件までにする。すべての候補が bot review 待ちなら、その旨を要約して終了する（2026-09-02 に、最小番号の PR が Copilot 待ちのあいだ、より重要な修正の PR が複数 run にわたって触られないまま溜まった）。
 
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
+
+### 1.7. Conflict gate: main と衝突している PR を解消する
+
+対象 PR の `mergeableState` を確認する。`DIRTY`（main と衝突）なら、レビューへ進む前に解消する。
+
+```bash
+gh pr view <PR> -R yasuhito/pi-formula --json mergeable,mergeStateStatus,headRefName
+```
+
+`DIRTY` のときは worker worktree で main を取り込み、衝突を解消させる。coordinator と同じ手順で worker terminal を作り、次を送る。
+
+```text
+PR #<PR> のブランチ <headRefName> が main と衝突しています。解消してください。
+
+- `git fetch origin main` のあと `git merge origin/main` で取り込む
+- 衝突は内容を読んで解消する。どちらかを機械的に捨てない。両側が別々の追記なら両方残す
+- 解消後に `npm run check` を成功させる
+- commit まで行う。push はしない
+- 完了したら `<promise>COMPLETE</promise>`、解消できなければ理由とともに `<promise>BLOCKED: 理由</promise>`
+```
+
+worker の完了後、reviewer が `npm run check` を実行してから push する。解消できない場合は `agent:blocked` を付け、衝突の内容を PR へ書いて終了する。
+
+`DIRTY` でなくても、対象 PR の base が main より古い場合は先に main を取り込む。この repository の CI は外部 repository の現在の状態を参照するため、古い base のままだと**その PR の変更と無関係な理由で CI が落ちる**（2026-09-02 に、#60 マージ前の main から切られた PR が、マクロ定義の突き合わせで落ちた）。
+
+```bash
+gh pr update-branch <PR> -R yasuhito/pi-formula
+```
+
+衝突なく取り込めた場合はそのままレビューへ進む。衝突した場合は上の worker 手順で解消する。
+
+完了条件: 対象 PR が main と衝突していない、または衝突を解消できない理由が PR に記録されている。
 
 ### 2. Draft gate: draft PR なら ready にする
 
@@ -205,6 +247,7 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 - commit、push、label 編集、issue / PR コメント、PR 作成、issue close をしない。
 - 作業場所を変更するコマンドを実行しない。
 - サブエージェントを起動しない。レビューはこの worker 自身だけで完結する。
+- テスト、ビルド、全体チェックを実行しない。レビューは差分と契約の照合に限る。検証は coordinator が Verify 段階で行うため重複であり、試験数の多いリポジトリでは実行時間が待機上限を超えて結果ファイルを出せなくなる（2026-09-01 に qni-cli の PR で発生）。
 - リポジトリ内のファイルを変更しない。唯一の例外として、レビュー結果を `<reviewReportPath>` に書いてよい。
 
 完了出力:
@@ -270,7 +313,7 @@ review_record_count=$(gh api repos/yasuhito/pi-formula/issues/<PR>/comments --pa
 
 PASS 相当として扱う場合:
 
-- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。`ready-for-agent` / `agent:implement` は付けない。
+- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。 follow-up issue にも実装契約（`## What to build` / `## Acceptance criteria` / `## Out of scope`）を含める。含めないと triage で毎回書き直しになる（2026-09-03 に pi-formula で 4 件が契約なしで滞留した）。`What to build` には再現手順と、件数だけでなく**何が起きているか**が分かる出力例を書く。`ready-for-agent` / `agent:implement` は付けない。
 - Review record の判定を `PASS（後続 issue #M へ切り出し）` とし、切り出した finding と issue 番号を「指摘と対応」に書く。
 - high 以上の finding が 1 件でもあれば、この打ち切りは適用せず通常どおり 7 の Fix へ進む。
 
@@ -278,7 +321,9 @@ PASS 相当として扱う場合:
 
 ### 6.5. Review record: 各 HEAD に1件だけ記録する
 
-レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
+レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。
+見た目を変える修正を返した場合は、Review record にも修正前後の画像を添付する。`gh pr comment <PR> -R yasuhito/pi-formula --body-file <file> --attach '<path>#<説明>'` を使う。文章だけで「直った」と書かない。
+生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
 
 コメント先頭には次の機械識別子を置く。
 

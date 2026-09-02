@@ -5,11 +5,15 @@ const http = require("node:http");
 const https = require("node:https");
 const net = require("node:net");
 const { resolve } = require("node:path");
+const { performance } = require("node:perf_hooks");
 const { Given, Then, When } = require("@cucumber/cucumber");
+const { Markdown } = require("@earendil-works/pi-tui");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
+  inspectPlacementBlocks,
   inspectStreamingRegression,
+  issue26Updates,
   renderStreamingRegression,
 } = require("../support/streaming-regression");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
@@ -32,6 +36,14 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function renderUnicode(markdown) {
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  return new Markdown(markdown, 0, 0, passthroughTheme)
+    .render(80)
+    .map((line) => line.trimEnd())
+    .join("\n");
+}
+
 function cacheImage(bytes) {
   return {
     svg: "s".repeat(bytes),
@@ -50,6 +62,281 @@ Given("画像経路で数式を描ける Pi がある", async function () {
   this.started = await startWithKitty(this.pi);
 });
 
+Given("ket と braket の追加マクロを登録する", function () {
+  require("../../dist/api.js").registerFormula(this.pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+});
+
+Given("braket の利用者マクロを設定した画像経路の Pi がある", async function () {
+  process.env.PI_FORMULA_MACROS = JSON.stringify({
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+  this.pi = fakePi();
+  registerFormula(this.pi.api);
+  this.started = await startWithKitty(this.pi);
+});
+
+Given(
+  "空文字列の利用者マクロを設定した画像経路の Pi がある",
+  async function () {
+    process.env.PI_FORMULA_MACROS = JSON.stringify({ empty: "" });
+    this.pi = fakePi();
+    registerFormula(this.pi.api);
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
+Given(
+  "置換境界を確認する追加マクロを登録した画像経路の Pi がある",
+  async function () {
+    this.pi = fakePi();
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+      sq: ["#1^2", 1],
+      groupedSq: ["{#1}^2", 1],
+      alpha: String.raw`\alpha`,
+      loop: String.raw`\loop`,
+    });
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
+When("ket 追加マクロを含むドル区切りのインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{s}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("braket 追加マクロを含む丸括弧区切りのインライン数式を描く", function () {
+  transform(this, String.raw`\(\braket{s|\psi}\)`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("braket 利用者マクロを含むドル区切りのインライン数式を描く", function () {
+  transform(this, String.raw`$\braket{s|\psi}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("Object prototype 名と ket 追加マクロを含む本文を変換する", function () {
+  transform(this, String.raw`$\constructor{x}$ and $\ket{s}$`);
+});
+
+When("金額とシェル変数の後に ket 追加マクロがある本文を描く", function () {
+  transform(
+    this,
+    [
+      String.raw`価格は $5、状態は $\ket{s}$。`,
+      String.raw`$HOME の後は $\ket{t}$。`,
+    ].join("\n"),
+  );
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[doc](/guide/$\ket{s}$)`);
+  },
+);
+
+When(
+  "スキームなし URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(
+      this,
+      [
+        String.raw`//example.com/$\ket{s}$`,
+        String.raw`example.com/$\ket{t}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+When("ket 追加マクロの直後に英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{x}y$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("グループを持たない二乗追加マクロを変換する", function () {
+  transform(this, String.raw`$\sq{a+b}$ / $\groupedSq{a+b}$`);
+});
+
+When("0 引数追加マクロの後に空白と英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\alpha x$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "バックスラッシュ制御記号の後に ket と同じ英字がある本文を変換する",
+  function () {
+    transform(this, String.raw`$\\ket{x}$`);
+  },
+);
+
+When(
+  "参照リンク定義に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[ket]: /guide/$\ket{s}$`);
+  },
+);
+
+When(
+  "丸括弧を含む相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[doc](/guide/(v1)/$\ket{s}$)`);
+  },
+);
+
+When("ket 追加マクロを含む Markdown 表を描く", function () {
+  transform(
+    this,
+    ["| 状態 |", "| --- |", String.raw`| $\ket{s}$ |`].join("\n"),
+  );
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  this.tableLines = new Markdown(this.rendered, 0, 0, passthroughTheme).render(
+    80,
+  );
+});
+
+When("入れ子の ket 追加マクロを含むインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{\ket{x}}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("自分自身を呼ぶ追加マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\loop$`);
+});
+
+When("空文字列の利用者マクロを含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\empty$`);
+});
+
+When(
+  "丸括弧区切りの ket 追加マクロ風文字列を含む bare URL を変換する",
+  function () {
+    transform(this, String.raw`https://example.com/\(\ket{s}\)`);
+  },
+);
+
+When("未登録の ket を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{s}$`);
+});
+
+When("展開後も描けない命令を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{\notacommand{x}}$`);
+});
+
+When(
+  "コードと金額と URL とシェル変数に追加マクロがある本文を変換する",
+  function () {
+    transform(
+      this,
+      [
+        "```text",
+        String.raw`$\ket{s}$`,
+        "```",
+        "inline: `$\\ket{s}$`",
+        "$5 and $10",
+        String.raw`https://example.com/$\ket{s}$`,
+        "$HOME and $" + "{PATH}",
+        String.raw`escaped: \$\ket{s}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+Then("ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|s⟩");
+});
+
+Then("braket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "⟨s|ψ⟩");
+});
+
+Then("braket 利用者マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "⟨s|ψ⟩");
+});
+
+Then("Object prototype 名は残り ket 追加マクロだけが展開される", function () {
+  assert.equal(
+    this.rendered,
+    String.raw`$\constructor{x}$ and $\left\vert{}s\right\rangle$`,
+  );
+});
+
+Then(
+  "金額とシェル変数は残り後続の ket 追加マクロが Unicode で描かれる",
+  function () {
+    assert.equal(this.unicode, "価格は $5、状態は |s⟩。\n$HOME の後は |t⟩。");
+  },
+);
+
+Then("相対 Markdown URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("スキームなし URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("ket 追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|x⟩y");
+});
+
+Then("二乗追加マクロの引数は自動でグループ化されない", function () {
+  assert.equal(this.rendered, "$a+b^2$ / $" + "{a+b}^2$");
+});
+
+Then("0 引数追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "αx");
+});
+
+Then("バックスラッシュ制御記号の後は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("参照リンク定義は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧を含む相対 Markdown URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("表の列を保ったまま ket 追加マクロが Unicode で描かれる", function () {
+  const row = this.tableLines.find((line) => line.includes("|s⟩"));
+  assert.equal((row?.match(/│/gu) ?? []).length, 2);
+});
+
+Then("入れ子の ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "||x⟩⟩");
+});
+
+Then("再帰する追加マクロは原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("空のインライン数式にせず原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧区切りを含む bare URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("未登録の ket は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("描けないインライン数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("追加マクロがある保護対象は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
 When("4 種類の数式区切りを含む本文を変換する", function () {
   transform(this, "$x$ と $$y$$ と \\(z\\) と \\[w\\]");
 });
@@ -65,6 +352,38 @@ When("コードフェンスと文中コードに数式がある本文を変換�
       "- ```text",
       "  $$listed$$",
       "  ```",
+    ].join("\n"),
+  );
+});
+
+When("長い区切りと字下げと末尾空白を持つコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "$$backtick$$",
+      "````  \t",
+      "   ~~~~text",
+      "   $$tilde$$",
+      "   ~~~~~   ",
+      "$$x+1$$",
+    ].join("\n"),
+  );
+});
+
+When("正規表現メタ文字を含む行があるコードフェンスを変換する", function () {
+  transform(
+    this,
+    [
+      "```text",
+      "```.*",
+      "$$afterBacktickMetacharacters$$",
+      "```",
+      "~~~text",
+      "~~~[a-z]+",
+      "$$afterTildeMetacharacters$$",
+      "~~~",
+      "$$x+1$$",
     ].join("\n"),
   );
 });
@@ -106,6 +425,58 @@ When("未完成な数式まで届いたストリーミング本文を変換す�
   transform(this, "途中\n$$\\frac{1}{2}", { isStreaming: true });
 });
 
+When("数式でない $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(
+    this,
+    [
+      "閉じていない $$ は数式になりません。",
+      "",
+      "## 行列指数",
+      "",
+      "$$e^{-i H t} = \\sum_{n=0}^{\\infty} \\frac{(-iHt)^n}{n!}$$",
+      "",
+      "以上です。",
+    ].join("\n"),
+  );
+});
+
+When("$$ を含む金額を変換する", function () {
+  transform(this, "価格は $$100 です。");
+});
+
+When("通常の表示数式を変換する", function () {
+  transform(this, "$$a = b$$");
+});
+
+When("$$ を含む URL を変換する", function () {
+  transform(this, "https://example.com/a$$b$$c");
+});
+
+When("シェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$; kill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
+When("改行を含むシェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$;\nkill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
+When("行頭の $$ を含む通常本文と後続の表示数式を変換する", function () {
+  transform(
+    this,
+    "前置き $$ は数式ではありません。\n$$100 です。\n\n$$x = 1$$",
+  );
+});
+
+When("数式でない $$ とラベル付き表示数式を含む本文を変換する", function () {
+  transform(this, "閉じていない $$ は数式になりません。\n\n式: $$\nx = 1\n$$");
+});
+
+When("数式でない $$ を一万個含む本文を変換する", function () {
+  const started = performance.now();
+  transform(this, "$$通常本文\n".repeat(10_000));
+  this.scanDuration = performance.now() - started;
+});
+
 When("不正な表示数式と正しい表示数式を含む本文を変換する", function () {
   transform(this, "$$\\notacommand{$$\n次の本文\n$$x$$");
 });
@@ -123,6 +494,43 @@ Then("インライン数式は残り、2 つの表示数式だけが画像にな
 
 Then("コード内の本文は変更されない", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then(
+  "2 種類のコードフェンスが閉じて後続の表示数式だけが画像になる",
+  function () {
+    assert.deepEqual(
+      {
+        backtickFormulaRemains: this.rendered.includes("$$backtick$$"),
+        tildeFormulaRemains: this.rendered.includes("$$tilde$$"),
+        imageCount: imageCount(this.rendered),
+      },
+      {
+        backtickFormulaRemains: true,
+        tildeFormulaRemains: true,
+        imageCount: 1,
+      },
+    );
+  },
+);
+
+Then("正規表現メタ文字を含む行の後もコード内の表示数式は残る", function () {
+  assert.deepEqual(
+    {
+      backtickFormulaRemains: this.rendered.includes(
+        "$$afterBacktickMetacharacters$$",
+      ),
+      tildeFormulaRemains: this.rendered.includes(
+        "$$afterTildeMetacharacters$$",
+      ),
+      imageCount: imageCount(this.rendered),
+    },
+    {
+      backtickFormulaRemains: true,
+      tildeFormulaRemains: true,
+      imageCount: 1,
+    },
+  );
 });
 
 Then("thinking の本文は変更されない", function () {
@@ -145,12 +553,77 @@ Then("画像は引用の階層に残る", function () {
   assert.equal(placeholderLines(this.rendered)[0]?.startsWith("> "), true);
 });
 
-Then("閉じた表示数式は画像になる", function () {
-  assert.equal(placeholderLines(this.rendered).length, 1);
+Then("閉じた表示数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 Then("未完成な数式は原文のまま残る", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then("後続の表示数式だけが画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+});
+
+Then("見送った本文は入力どおり一度だけ残る", function () {
+  const skipped = "閉じていない $$ は数式になりません。\n\n## 行列指数\n\n";
+  assert.equal(this.rendered.split(skipped).length - 1, 1);
+});
+
+Then("金額は入力どおり残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("一つの表示数式が画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+});
+
+Then("URL は入力どおり残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("シェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$; kill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("シェルに続く表示数式だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
+});
+
+Then("改行を含むシェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$;\nkill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("行頭の $$ を含む通常本文は入力どおり残る", function () {
+  const text = "前置き $$ は数式ではありません。\n$$100 です。";
+  assert.equal(this.rendered.split(text).length - 1, 1);
+});
+
+Then("後続の x = 1 だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
+});
+
+Then("ラベル付き表示数式の前の本文は入力どおり一度だけ残る", function () {
+  const text = "閉じていない $$ は数式になりません。\n\n式: ";
+  assert.equal(this.rendered.split(text).length - 1, 1);
+});
+
+Then("走査は一秒以内に終わる", function () {
+  assert.ok(this.scanDuration < 1_000, `${this.scanDuration}ms`);
 });
 
 Then("不正な数式は残り、正しい数式だけが画像になる", function () {
@@ -173,7 +646,7 @@ When("固定上限を確認する", function () {
 });
 
 Then(
-  "入力文字数、画像列数・行数、一時保存件数・バイト数が有限の正数である",
+  "入力文字数、画像列数・行数、既成PNGのバイト数・ピクセル数、一時保存件数・バイト数が有限の正数である",
   function () {
     assert.deepEqual(
       {
@@ -189,6 +662,8 @@ Then(
           "imageColumns",
           "imageRows",
           "latexCharacters",
+          "pngBytes",
+          "pngPixels",
         ],
         allFinitePositiveIntegers: true,
       },
@@ -363,54 +838,6 @@ Then("同じ失敗項目の画像処理は一回だけになる", function () {
   assert.equal(this.failedCreates, 1);
 });
 
-When("1件目の表示数式だけ配置を失敗させて同じ入力を再変換する", function () {
-  const kitty = require("../../dist/kitty.js");
-  const original = kitty.encodePlaceholderRows;
-  const callsById = new Map();
-  let failedId;
-  kitty.encodePlaceholderRows = (id, ...args) => {
-    callsById.set(id, (callsById.get(id) ?? 0) + 1);
-    if (failedId === undefined) failedId = id;
-    if (id === failedId) throw new Error("injected placement failure");
-    return original(id, ...args);
-  };
-
-  this.failedPlacementSource = "$$x_{placement_failure}$$";
-  const validSource = "$$x_{placement_ok}$$";
-  try {
-    transform(this, `${this.failedPlacementSource}\n${validSource}`);
-    this.firstPlacementRendered = this.rendered;
-    transform(this, this.failedPlacementSource);
-    this.repeatedPlacementRendered = this.rendered;
-  } finally {
-    kitty.encodePlaceholderRows = original;
-  }
-  this.failedPlacementCalls = callsById.get(failedId);
-});
-
-Then(
-  "失敗した数式は残り後続は画像になり失敗した配置は一回だけ試される",
-  function () {
-    assert.deepEqual(
-      {
-        failedFormulaRemains: this.firstPlacementRendered.includes(
-          this.failedPlacementSource,
-        ),
-        followingImageCount: imageCount(this.firstPlacementRendered),
-        repeatedFailureRemains:
-          this.repeatedPlacementRendered === this.failedPlacementSource,
-        failedPlacementCalls: this.failedPlacementCalls,
-      },
-      {
-        failedFormulaRemains: true,
-        followingImageCount: 1,
-        repeatedFailureRemains: true,
-        failedPlacementCalls: 1,
-      },
-    );
-  },
-);
-
 When(
   "通常本文とインライン数式と大きな行列を含む再現本文を逐次描画する",
   function () {
@@ -436,6 +863,71 @@ Then(
     );
   },
 );
+
+When(
+  "先行するツール描画後にIssue 26の異なる3式を逐次更新して確定する",
+  function () {
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+    });
+    this.issue26Updates = issue26Updates(this.pi);
+  },
+);
+
+Then("逐次更新中は文字を保ち確定後に3式の転送と配置が対応する", function () {
+  const blocks = inspectPlacementBlocks(this.issue26Updates.finalized);
+  assert.deepEqual(
+    {
+      precedingToolDrawn:
+        this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
+      streamingImages: this.issue26Updates.streaming.map(imageCount),
+      streamingTuiImages:
+        this.issue26Updates.tuiWrites.streaming.map(imageCount),
+      finalizedTuiImages: imageCount(this.issue26Updates.tuiWrites.finalized),
+      placements: blocks.length,
+      multipleRows: blocks.some((block) => block.rows > 1),
+      matching: blocks.every(
+        (block) =>
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
+    },
+    {
+      precedingToolDrawn: true,
+      streamingImages: [0, 0, 0],
+      streamingTuiImages: [0, 0, 0],
+      finalizedTuiImages: 3,
+      placements: 3,
+      multipleRows: true,
+      matching: true,
+    },
+  );
+});
+
+When("同じ複数行表示数式を一回の確定応答内に二回配置する", function () {
+  const formula = String.raw`$$\begin{pmatrix}1&0\\0&1\end{pmatrix}$$`;
+  transform(this, [formula, "端末上の画像を破棄", formula].join("\n\n"));
+  this.cachedPlacementBlocks = inspectPlacementBlocks(this.rendered);
+});
+
+Then("各配置で同じ画像IDの複数行転送とプレースホルダーが対応する", function () {
+  const [first, second] = this.cachedPlacementBlocks;
+  assert.equal(
+    this.cachedPlacementBlocks.length === 2 &&
+      first.id === second.id &&
+      this.cachedPlacementBlocks.every(
+        (block) =>
+          block.rows > 1 &&
+          block.id === block.transferId &&
+          block.rows === block.declaredRows &&
+          block.completeTransfer &&
+          block.adjacentTransfer,
+      ),
+    true,
+  );
+});
 
 When("外部作用を監視しながら表示数式を変換する", function () {
   const calls = [];
@@ -528,7 +1020,7 @@ When("入力上限を超えた表示数式を変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.oversizedPreparation = JSON.parse(result.stdout);
 });
 
@@ -560,7 +1052,7 @@ When("表示数式を初めて変換する", function () {
     cwd: this.projectRoot,
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr);
+  if (result.status !== 0) throw new Error(result.stderr);
   this.lazyPreparation = JSON.parse(result.stdout);
 });
 
@@ -601,7 +1093,7 @@ When(
       cwd: resolve(__dirname, "../.."),
       encoding: "utf8",
     });
-    assert.equal(result.status, 0, result.stderr);
+    if (result.status !== 0) throw new Error(result.stderr);
     this.durations = JSON.parse(result.stdout);
   },
 );

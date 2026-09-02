@@ -3,3 +3,10 @@ dist/
 *.tgz
 coverage/
 .release/
+.qni-cli-reference/
+
+# OpenClaw agent workspace state
+IDENTITY.md
+SOUL.md
+USER.md
+memory/

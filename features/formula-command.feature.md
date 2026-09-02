@@ -29,6 +29,12 @@ Formula for Pi の利用者として
 - When formula コマンドの image と text と auto を順に実行する
 - Then 経路が切り替わり、すべての指定が現在のセッションへ保存される
 
+## Scenario: セッションの auto 指定で全体既定から自動判定へ戻す
+
+- Given テキスト経路の全体既定と画像対応端末がある
+- When セッションで formula auto を実行する
+- Then PNG 問い合わせによる画像経路へ戻る
+
 ## Scenario: default 指定だけを XDG 設定へ保存する
 
 - Given 一時的な XDG 設定を使う Pi がある
@@ -45,7 +51,7 @@ Formula for Pi の利用者として
 
 - Given 秘密のマクロ設定がある Kitty の Pi がある
 - When formula status を実行する
-- Then 版、経路、理由、端末、マクロ数、一時保存、直近の失敗だけを英語表示する
+- Then 版、経路、理由、端末、セリフ体、マクロ数、一時保存、直近の失敗だけを英語表示する
 
 ## Scenario: 画面のない Pi では端末問い合わせを行わない
 

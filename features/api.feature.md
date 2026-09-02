@@ -64,11 +64,11 @@ Pi の画面部品に依存せず PNG を配置したい
 - When その追加マクロを使う PNG を公開 API で作る
 - Then Object prototype と同名の追加マクロが使える
 
-## Scenario: 公開 API を登録と PNG 作成に絞る
+## Scenario: 既存の公開 API と画像描画 API を公開する
 
 - Given pi-formula の CommonJS 公開 API がある
 - When 公開された名前を調べる
-- Then 拡張登録と同期的な PNG 作成だけが公開される
+- Then 既存の公開 API と画像経路向け API が公開される
 
 ## Scenario: 公開 API の不正な LaTeX 入力を安全に拒否する
 
@@ -94,11 +94,106 @@ Pi の画面部品に依存せず PNG を配置したい
 - When テーマの文字色を変えて同じ表示数式の PNG を作る
 - Then 変更後の文字色で新しい PNG が作られる
 
+## Scenario Outline: 動的字形を含む表示数式を画像にする
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When "<latex>" を含む表示数式の PNG を公開 API で作る
+- Then 動的字形を含む表示数式の PNG が返る
+
+### Examples:
+
+  | latex            |
+  | `\\mathcal{H}`  |
+  | `\\mathscr{F}`  |
+  | `\\mathbb{R}`   |
+  | `\\mathfrak{g}` |
+  | `\\mathsf{T}`   |
+  | `\\mathtt{x}`   |
+
+## Scenario Outline: 既存の字形を含む表示数式を引き続き画像にする
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When "<latex>" を含む表示数式の PNG を公開 API で作る
+- Then 既存の字形を含む表示数式の PNG が返る
+
+### Examples:
+
+  | latex                 |
+  | `\\mathbf{v}`        |
+  | `\\mathrm{d}x`       |
+  | `a^2 + b^2 = c^2`    |
+
+## Scenario: 表示数式の PNG を同期的に作る
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 動的字形を含む表示数式の PNG を公開 API で作る
+- Then 公開 API は同期的に PNG を返す
+
+## Scenario: 動的字形を読み込めないときは表示数式をテキストへ戻す
+
+- Given 動的字形を読み込めない画像経路がある
+- When 動的字形を含む表示数式を描く
+- Then 例外を出さずその表示数式だけテキストへ戻る
+
 ## Scenario: テキスト経路では PNG を返さない
 
 - Given テキスト経路を使う試験用の連携拡張がある
 - When 連携拡張が公開 API で PNG を作る
 - Then 公開 API は画像を返さない
+
+## Scenario: 現在の画像経路を問い合わせる
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 現在の表示経路を公開 API で問い合わせる
+- Then 現在の表示経路は画像経路である
+
+## Scenario: 現在のテキスト経路を問い合わせる
+
+- Given テキスト経路を使う試験用の連携拡張がある
+- When 現在の表示経路を公開 API で問い合わせる
+- Then 現在の表示経路はテキスト経路である
+
+## Scenario: Buffer の既成 PNG を画像経路で描く
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 端末寸法に合わせた画像転送と配置が返る
+
+## Scenario: 危険域の画像 ID でも Pi の装飾追跡を汚さない
+
+- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 下線色はコロン形式になり背景色と dim は残らない
+
+## Scenario: ファイルの既成 PNG を画像経路で描く
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When ファイルの既成 PNG を公開 API で描く
+- Then ファイルの画像転送と配置が返る
+
+## Scenario: テキスト経路では既成 PNG を描かない
+
+- Given テキスト経路を使う試験用の連携拡張がある
+- When Buffer の既成 PNG を公開 API で描く
+- Then 代替表示を選べる結果が返る
+
+## Scenario: 安全上限を超える既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 安全上限を超える既成 PNG を公開 API で描く
+- Then 安全上限による拒否結果が返る
+
+## Scenario: 途中で切れた既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 途中で切れた既成 PNG を公開 API で描く
+- Then 不正な PNG による拒否結果が返る
+
+## Scenario: 展開上限を超える既成 PNG を描かない
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 展開上限を超える既成 PNG を公開 API で描く
+- Then 安全上限による拒否結果が返る
 
 ## Scenario: 終了後の新しい拡張 runtime へ再登録する
 

@@ -1,5 +1,6 @@
 import type { CellDimensions, RasterLayout } from "./layout";
 import type { FormulaMacros } from "./macros";
+import { formulaSerifFamily } from "./system-font";
 
 const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
@@ -9,6 +10,8 @@ export const FORMULA_SAFETY_LIMITS = Object.freeze({
   latexCharacters: 16_384,
   imageColumns: 255,
   imageRows: 255,
+  pngBytes: 32 * 1024 * 1024,
+  pngPixels: 2048 * 2048,
   cacheEntries: 64,
   cacheBytes: 32 * 1024 * 1024,
 });
@@ -32,6 +35,12 @@ interface MathDocument {
       containerWidth: number;
     },
   ): unknown;
+}
+
+interface SvgOutput {
+  font: {
+    loadDynamicFilesSync(): void;
+  };
 }
 
 interface PreparedTypesetter {
@@ -64,6 +73,11 @@ function prepareTypesetter(): PreparedTypesetter {
       options: {
         shapeRendering: number;
         textRendering: number;
+        font: {
+          loadSystemFonts: boolean;
+          defaultFontFamily?: string;
+          serifFamily?: string;
+        };
       },
     ) => { render(): { asPng(): Uint8Array } };
   };
@@ -87,12 +101,26 @@ function prepareTypesetter(): PreparedTypesetter {
       document(source: string, options: Record<string, unknown>): MathDocument;
     };
   };
+  require("@mathjax/src/js/util/asyncLoad/node.js");
   const { SVG } = require("@mathjax/src/js/output/svg.js") as {
-    SVG: new (options: Record<string, unknown>) => unknown;
+    SVG: new (options: Record<string, unknown>) => SvgOutput;
   };
 
   const adaptor = liteAdaptor({ fontSize: 16 });
   RegisterHTMLHandler(adaptor);
+  const svgOutput = new SVG({
+    fontCache: "local",
+    linebreaks: { inline: false },
+  });
+  svgOutput.font.loadDynamicFilesSync();
+  const serifFamily = formulaSerifFamily();
+  const font = serifFamily
+    ? {
+        loadSystemFonts: true,
+        defaultFontFamily: serifFamily,
+        serifFamily,
+      }
+    : { loadSystemFonts: true };
   prepared = {
     adaptor,
     createDocument: (macros) => {
@@ -103,10 +131,6 @@ function prepareTypesetter(): PreparedTypesetter {
           throw error;
         },
       });
-      const svgOutput = new SVG({
-        fontCache: "local",
-        linebreaks: { inline: false },
-      });
       return mathjax.document("", { InputJax: tex, OutputJax: svgOutput });
     },
     rasterize: (svg) =>
@@ -114,6 +138,7 @@ function prepareTypesetter(): PreparedTypesetter {
         new Resvg(svg, {
           shapeRendering: 2,
           textRendering: 2,
+          font,
         })
           .render()
           .asPng(),
@@ -145,7 +170,10 @@ function svgFor(
 }
 
 function exDimension(svg: string, name: "width" | "height"): number {
-  const match = new RegExp(`\\b${name}="([\\d.]+)ex"`).exec(svg);
+  const match =
+    name === "width"
+      ? /\bwidth="([\d.]+)ex"/u.exec(svg)
+      : /\bheight="([\d.]+)ex"/u.exec(svg);
   const value = Number.parseFloat(match?.[1] ?? "");
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`MathJax SVG has no positive ${name}`);

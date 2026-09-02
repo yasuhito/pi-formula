@@ -22,7 +22,7 @@ Pi は拡張を自動で読み込みます。インライン数式には `$...$`
 
 ## 動作
 
-- **インライン数式**（`$...$` と `\(...\)`）は Pi 標準の Unicode テキスト経路を使います。選択、検索、折り返しができます。
+- **インライン数式**（`$...$` と `\(...\)`）は、登録済みの利用者マクロと追加マクロを展開してから Pi 標準の Unicode テキスト経路を使います。選択、検索、折り返しができます。展開後の数式を Pi が描けない場合は、元の LaTeX を残します。
 - **表示数式**（`$$...$$` と `\[...\]`）は、画像経路で透明な MathJax PNG になります。
 - 画像を使えない場合は、表示数式もテキスト経路を使います。
 - 画面上の Markdown だけを変えます。保存した会話とモデルへ渡す文脈には元の LaTeX が残ります。
@@ -35,7 +35,7 @@ Pi は拡張を自動で読み込みます。インライン数式には `$...$`
 
 | コマンド | 動作 |
 | --- | --- |
-| `/formula status` | 版、現在の経路、選択理由、端末、マクロ数、メモリ内の一時保存、直近の失敗を表示します。 |
+| `/formula status` | 版、現在の経路、選択理由、端末、表示数式で選んだセリフ体、マクロ数、メモリ内の一時保存、直近の失敗を表示します。 |
 | `/formula image` | 現在の Pi セッションで画像経路を選びます。 |
 | `/formula text` | 現在の Pi セッションでテキスト経路を選びます。 |
 | `/formula auto` | 現在の Pi セッションを自動判定へ戻します。 |
@@ -92,27 +92,40 @@ export PI_FORMULA_MACROS='{"RR":"\\mathbb{R}"}'
 
 ## 画像処理の安全性
 
-MathJax と Resvg は、最初の表示数式が画像経路へ入るまで読み込みません。SVG と PNG は上限のあるメモリ内一時保存だけに置き、ディスクへ書きません。ネットワーク、ブラウザ、子プロセスも使いません。
+MathJax と Resvg は、最初の表示数式が画像経路へ入るまで読み込みません。`\\text{}` の字形には、実在する Noto Serif CJK JP、Source Han Serif JP、Source Han Serif、IPAexMincho の順でセリフ体を選びます。どれも無い場合は Resvg のシステム代替を使います。SVG と PNG は上限のあるメモリ内一時保存だけに置き、ディスクへ書きません。ネットワーク、ブラウザ、子プロセスも使いません。
 
-固定上限は LaTeX 16,384 文字、画像 255 列、255 行、一時保存 64 件、合計 32 MiB です。失敗結果も一時保存するため、同じ不正入力を繰り返し組版しません。
+固定上限は LaTeX 16,384 文字、画像 255 列、255 行、一時保存 64 件、合計 32 MiB です。既成 PNG は 1 件 32 MiB、展開後 4,194,304 ピクセルまでです。失敗結果も一時保存するため、同じ不正入力を繰り返し組版しません。
 
 ## 拡張向け公開 API
 
-CommonJS パッケージは、同期的な `registerFormula` と `createFormulaPng` だけを公開します。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
+CommonJS パッケージのルートは、同期的な `registerFormula`、`createFormulaPng`、`getFormulaPath`、`renderPng` を公開します。内部 subpath は公開しません。他の Pi 拡張は、保護された追加マクロを登録し、同じ経路で表示数式の PNG を作れます。
 
 ```js
-const { createFormulaPng, registerFormula } = require("pi-formula");
+const {
+  createFormulaPng,
+  getFormulaPath,
+  registerFormula,
+  renderPng
+} = require("pi-formula");
 
 registerFormula(pi, {
   ket: ["\\left|#1\\right\\rangle", 1]
 });
 
 const image = createFormulaPng("\\ket{0}", availableWidth);
+
+if (getFormulaPath() === "image") {
+  const result = renderPng("/tmp/circuit.png", availableWidth);
+  if (result.rendered) return result.output;
+}
+return asciiCircuit;
 ```
 
 追加マクロ名には ASCII の英字を使い、先頭のバックスラッシュは省略できます。不正な追加マクロでは `registerFormula` が `TypeError` を出します。追加マクロは利用者マクロより優先し、単体版と同梱版をどちらの順で登録しても保護されます。再読み込みやセッション切り替えでは拡張を結び直し、利用者マクロを読み直します。
 
 テキスト経路では `image` は `undefined` です。画像経路では PNG の `data`、ピクセル寸法、端末の列数と行数を返します。Pi の画面部品は返しません。呼び出しごとに独立した PNG バッファを返します。
+
+`getFormulaPath()` は現在の画像経路またはテキスト経路を返します。`renderPng()` は PNG の `Buffer` またはファイルパスと、使える最大列数を受け取ります。画像経路では、端末寸法から表示列数と行数を計算し、Kitty 画像転送と配置を `output` に返します。この文字列を拡張の表示結果として返してください。テキスト経路では `{ rendered: false, reason: "image-unavailable" }` を返すため、呼び出し側で代替表示を選べます。署名、チャンク、CRC、圧縮データを検証できない PNG は `invalid-png`、32 MiB、4,194,304 ピクセル、または列数・行数の固定上限を超える PNG は `safety-limit` となり、例外を出しません。ファイルパスでは通常ファイルだけを読み込みます。
 
 ## 監査と変更履歴
 
@@ -120,7 +133,7 @@ const image = createFormulaPng("\\ket{0}", availableWidth);
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): コードの由来、直接依存の版、更新状況、ライセンス、日付付き脆弱性確認
 - [LICENSE](LICENSE): MIT License
 
-npm 配布物の内容は次のコマンドで確認できます。
+`npm run build` はコンパイル前に以前の `dist` を削除するため、削除済みソースの古い成果物は配布物に残りません。npm 配布物の内容は次のコマンドで確認できます。
 
 ```sh
 npm pack --dry-run

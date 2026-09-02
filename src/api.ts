@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -6,35 +5,30 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with {
   "resolution-mode": "import",
 };
 
-const { getCellDimensions } = require("@earendil-works/pi-tui") as {
-  getCellDimensions(): { widthPx: number; heightPx: number };
-};
-
-import { encodePlaceholderRows, encodeTransfer, stableImageId } from "./kitty";
-import {
-  type FormulaMacros,
-  loadUserMacros,
-  type MacroDefinition,
-  validateAdditionalMacros,
-} from "./macros";
-import { transformDisplayMath } from "./markdown";
 import {
   type FormulaPathMode,
   formulaConfigPath,
-  readDefaultPath,
-  writeDefaultPath,
-} from "./path-settings";
-import { RenderCache } from "./render-cache";
+  loadFormulaConfig,
+  saveDefaultPath,
+} from "./config";
+import {
+  FormulaImageRenderer,
+  type FormulaPng,
+  type PngRenderResult,
+} from "./formula-image-renderer";
+import {
+  type FormulaMacros,
+  type MacroDefinition,
+  validateAdditionalMacros,
+} from "./macros";
+import { transformDisplayMath, transformInlineMath } from "./markdown";
+import type { PngSource } from "./png-source";
+import { formulaSerifStatus } from "./system-font";
 import {
   multiplexerProbeResult,
   probePngSupport,
   type TerminalProbe,
 } from "./terminal-probe";
-import {
-  FORMULA_SAFETY_LIMITS,
-  type TypesetImage,
-  typesetMath,
-} from "./typesetter";
 
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../package.json"), "utf8"),
@@ -46,19 +40,18 @@ if (typeof manifest.version !== "string") {
 const PATH_ENTRY = "pi-formula-path";
 const SHARED_KEY = Symbol.for("pi-formula.shared-api.v1");
 
-export interface FormulaPng {
-  data: Buffer;
-  widthPx: number;
-  heightPx: number;
-  columns: number;
-  rows: number;
-}
+export type FormulaPath = "image" | "text";
+export type {
+  FormulaPng,
+  PngRenderResult,
+} from "./formula-image-renderer";
+export type { PngSource } from "./png-source";
 
 interface FormulaState {
   path: "image" | "text";
   selectionReason: string;
   probe: TerminalProbe;
-  sessionMode: FormulaPathMode;
+  sessionPreference: FormulaPathMode | undefined;
   defaultPath?: "image" | "text";
   configPath: string;
   terminal: string;
@@ -67,7 +60,7 @@ interface FormulaState {
   textColor: () => string | undefined;
   userMacros: FormulaMacros;
   additionalMacros: Record<string, MacroDefinition>;
-  imageCache: RenderCache;
+  imageRenderer: FormulaImageRenderer;
 }
 
 interface SharedStore {
@@ -100,46 +93,9 @@ function effectiveMacros(state: FormulaState): FormulaMacros {
   return { ...state.userMacros, ...state.additionalMacros };
 }
 
-interface CachedImage {
-  image: TypesetImage;
-  key: string;
-}
-
-function cachedImage(
-  state: FormulaState,
-  latex: string,
-  availableWidth: number,
-): CachedImage | undefined {
-  if (
-    state.path === "text" ||
-    latex.length > FORMULA_SAFETY_LIMITS.latexCharacters
-  )
-    return undefined;
-  const color = state.textColor();
-  if (!color) return undefined;
-  const cell = getCellDimensions();
-  const macros = effectiveMacros(state);
-  const key = createHash("sha256")
-    .update(
-      JSON.stringify([
-        latex,
-        color,
-        availableWidth,
-        cell.widthPx,
-        cell.heightPx,
-        macros,
-      ]),
-    )
-    .digest("hex");
-  const image = state.imageCache.getOrCreate(
-    key,
-    () => typesetMath(latex, color, availableWidth, cell, macros),
-    (value) => value.scale >= 0.5,
-  );
-  return image ? { image, key } : undefined;
-}
-
-function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
+function restoredSessionPreference(
+  entries: readonly unknown[],
+): FormulaPathMode | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index] as {
       type?: unknown;
@@ -150,7 +106,7 @@ function restoredSessionMode(entries: readonly unknown[]): FormulaPathMode {
     const path = entry.data?.path;
     if (path === "auto" || path === "image" || path === "text") return path;
   }
-  return "auto";
+  return undefined;
 }
 
 function terminalName(env: NodeJS.ProcessEnv): string {
@@ -168,10 +124,13 @@ function selectPath(state: FormulaState): void {
   if (state.imagePathForbidden) {
     state.path = "text";
     state.selectionReason = state.probe.reason;
-  } else if (state.sessionMode !== "auto") {
-    state.path = state.sessionMode;
+  } else if (
+    state.sessionPreference === "image" ||
+    state.sessionPreference === "text"
+  ) {
+    state.path = state.sessionPreference;
     state.selectionReason = "manual session setting";
-  } else if (state.defaultPath) {
+  } else if (state.sessionPreference === undefined && state.defaultPath) {
     state.path = state.defaultPath;
     state.selectionReason = "default setting";
   } else {
@@ -189,7 +148,7 @@ function newState(): FormulaState {
       reason: "session has not started",
       response: "not started",
     },
-    sessionMode: "auto",
+    sessionPreference: undefined,
     configPath: formulaConfigPath(process.env),
     terminal: "unknown",
     hasTerminalScreen: false,
@@ -197,10 +156,7 @@ function newState(): FormulaState {
     textColor: () => undefined,
     userMacros: {},
     additionalMacros: Object.create(null) as Record<string, MacroDefinition>,
-    imageCache: new RenderCache(
-      FORMULA_SAFETY_LIMITS.cacheEntries,
-      FORMULA_SAFETY_LIMITS.cacheBytes,
-    ),
+    imageRenderer: new FormulaImageRenderer(),
   };
 }
 
@@ -212,7 +168,25 @@ function addProtectedMacros(state: FormulaState, macros: FormulaMacros): void {
     state.additionalMacros[name] = definition;
     changed = true;
   }
-  if (changed) state.imageCache.clear();
+  if (changed) state.imageRenderer.clear();
+}
+
+/** Return the registered extension's current display path. */
+export function getFormulaPath(): FormulaPath {
+  return sharedStore().current?.path ?? "text";
+}
+
+/** Render an existing PNG for the current image path. */
+export function renderPng(
+  source: PngSource,
+  availableWidth: number,
+): PngRenderResult {
+  if (getFormulaPath() !== "image") {
+    return { rendered: false, reason: "image-unavailable" };
+  }
+  const state = sharedStore().current;
+  if (!state) return { rendered: false, reason: "image-unavailable" };
+  return state.imageRenderer.renderPng(source, availableWidth);
 }
 
 /** Create one display-formula PNG using the registered extension's current path and theme. */
@@ -228,15 +202,12 @@ export function createFormulaPng(
     availableWidth <= 0
   )
     return undefined;
-  const cached = cachedImage(state, latex, availableWidth);
-  if (!cached) return undefined;
-  return {
-    data: Buffer.from(cached.image.png),
-    widthPx: cached.image.widthPx,
-    heightPx: cached.image.heightPx,
-    columns: cached.image.columns,
-    rows: cached.image.rows,
-  };
+  if (state.path === "text") return undefined;
+  return state.imageRenderer.createPng(latex, {
+    availableWidth,
+    color: state.textColor(),
+    macros: effectiveMacros(state),
+  });
 }
 
 /** Register Formula for Pi and merge protected additional macros from another extension. */
@@ -257,17 +228,20 @@ export function registerFormula(
 
   pi.on("session_shutdown", () => {
     if (store.current !== state) return;
-    state.imageCache.clear();
+    state.imageRenderer.clear();
     store.current = undefined;
   });
 
   pi.on("session_start", async (_event, ctx) => {
     state.textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
-    state.configPath = formulaConfigPath(process.env);
-    state.defaultPath = readDefaultPath(state.configPath);
-    state.userMacros = loadUserMacros(process.env).macros;
-    state.imageCache.clear();
-    state.sessionMode = restoredSessionMode(ctx.sessionManager.getBranch());
+    const config = loadFormulaConfig(process.env);
+    state.configPath = config.filePath;
+    state.defaultPath = config.defaultPath;
+    state.userMacros = config.macros;
+    state.imageRenderer.clear();
+    state.sessionPreference = restoredSessionPreference(
+      ctx.sessionManager.getBranch(),
+    );
     state.terminal = terminalName(process.env);
     state.hasTerminalScreen = ctx.mode === "tui";
 
@@ -301,35 +275,16 @@ export function registerFormula(
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
-    if (context.messageType === "assistant-thinking" || state.path === "text")
-      return markdown;
-    const transferredIds = new Set<number>();
-    return transformDisplayMath(markdown, (latex, original) => {
-      const cached = cachedImage(state, latex, context.availableWidth);
-      if (!cached) return original;
-      try {
-        const id = stableImageId(cached.key);
-        const placeholder = encodePlaceholderRows(
-          id,
-          cached.image.columns,
-          cached.image.rows,
-        ).join("\n");
-        if (transferredIds.has(id)) return placeholder;
-        const transfer = encodeTransfer(
-          cached.image.png,
-          id,
-          cached.image.columns,
-          cached.image.rows,
-        );
-        transferredIds.add(id);
-        // Keep the final Kitty terminator away from Markdown's line-ending
-        // backslash handling, and isolate the transfer as its own rendered line.
-        return `${transfer}\x1b[0m\n\n${placeholder}`;
-      } catch {
-        state.imageCache.recordFailure(cached.key, "placement failed");
-        return original;
-      }
+    if (context.messageType === "assistant-thinking") return markdown;
+    const macros = effectiveMacros(state);
+    const withInlineMacros = transformInlineMath(markdown, macros);
+    if (context.isStreaming || state.path === "text") return withInlineMacros;
+    const renderFormula = state.imageRenderer.createMarkdownRenderer({
+      availableWidth: context.availableWidth,
+      color: state.textColor(),
+      macros,
     });
+    return transformDisplayMath(withInlineMacros, renderFormula);
   });
 
   pi.registerCommand("formula", {
@@ -341,7 +296,7 @@ export function registerFormula(
       const saveDefault = tokens.length === 2 && tokens[1] === "--default";
 
       if (action === "clear" && tokens.length === 1) {
-        state.imageCache.clear();
+        state.imageRenderer.clear();
         ctx.ui.notify("pi-formula cache cleared", "info");
         return;
       }
@@ -352,8 +307,7 @@ export function registerFormula(
       ) {
         if (saveDefault) {
           try {
-            writeDefaultPath(state.configPath, action);
-            state.defaultPath = readDefaultPath(state.configPath);
+            state.defaultPath = saveDefaultPath(state.configPath, action);
           } catch {
             ctx.ui.notify(
               "Could not save the pi-formula default; the session path was not changed.",
@@ -362,7 +316,7 @@ export function registerFormula(
             return;
           }
         }
-        state.sessionMode = action;
+        state.sessionPreference = action;
         pi.appendEntry(PATH_ENTRY, { path: action });
         selectPath(state);
         ctx.ui.notify(
@@ -380,7 +334,7 @@ export function registerFormula(
         return;
       }
 
-      const stats = state.imageCache.stats();
+      const stats = state.imageRenderer.stats();
       ctx.ui.setWidget(
         "pi-formula-status",
         [
@@ -388,6 +342,7 @@ export function registerFormula(
           `path: ${state.path}`,
           `reason: ${state.selectionReason}`,
           `terminal: ${state.terminal}`,
+          `serif: ${formulaSerifStatus()}`,
           `macros: ${Object.keys(effectiveMacros(state)).length}`,
           `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
           `last failure: ${stats.lastFailure ?? "none"}`,

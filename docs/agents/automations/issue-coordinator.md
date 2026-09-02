@@ -30,6 +30,7 @@
 - PR タイトルと本文は、issue 番号だけの汎用文にしない。worker の実際の差分と commit から、変更内容が分かる題名と概要を書く。タイトルは「何が起きているか」が分かる具体的な一文にし、「issue 対応」「レビュー指摘を修正」のような中身を読まないと分からない題名は禁止。本文は「問題 → 原因 → 修正」の順で書く。
 - PR は最初からレビュー可能な状態で作る。`gh pr create --draft` は使わない。人間のマージ待ちは `agent:review` / `ready-for-human` label で表す。
 - merged / closed PR に対応する worker terminal は停止し、不要な worker worktree は安全確認後に削除する。
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。GraphQL でしか取れない Relationships（`parent` / `subIssues` / `blockedBy` / `blocking`）が取れなかった場合は、本文・コメントの依存記述だけで判断し、確認できなかったことを最後の要約に明記する。
 - どの経路でも、最後に短い日本語要約を出す。
 
 ## ループ
@@ -149,6 +150,12 @@ candidates_json=$(printf '%s' "$issues_json" | jq '[.[] | {number,title,url,labe
 ```
 
 - `agent:in-progress` を持つ open issue が1件でもあれば、worker が動作中なので候補を選ばず終了する（同時実行は1件だけ）。
+- レビュー待ちが溜まっているときは新しい worker を起動しない。`agent:review` を持ち `ready-for-human` と `agent:blocked` を持たない open PR が3件以上あれば、候補を選ばず終了する。理由は、同じファイルを触る PR が並ぶと、先にマージされた側へ合わせる作り直しが必ず発生するため（2026-09-02 に `features/` の同じ2ファイルを触る PR が3本同時に並んだ）。要約にレビュー待ち件数を書く。
+
+```bash
+review_backlog=$(gh pr list -R yasuhito/pi-formula --state open --label agent:review --limit 100 --json number,labels | jq '[.[] | select(([.labels[].name] | index("ready-for-human")) | not) | select(([.labels[].name] | index("agent:blocked")) | not)] | length')
+```
+
 - 候補が0件なら、GitHub へ書き込まず終了する。
 - 候補が複数あっても、番号が最小の1件だけ扱う。
 
@@ -161,6 +168,22 @@ candidates_json=$(printf '%s' "$issues_json" | jq '[.[] | {number,title,url,labe
 ```bash
 gh issue view <N> -R yasuhito/pi-formula --comments --json number,title,body,labels,comments,url
 # 併せて GraphQL で parent / subIssues / blockedBy / blocking を確認する
+```
+
+Relationships の確認には次のクエリをそのまま使う。フィールド名を推測しない（`blockedByIssues` などは存在しない）。
+
+```bash
+gh api graphql -f owner=yasuhito -f name=pi-formula -F number=<N> -f query='
+query($owner:String!,$name:String!,$number:Int!){
+  repository(owner:$owner,name:$name){
+    issue(number:$number){
+      parent{number}
+      subIssues(first:50){nodes{number state}}
+      blockedBy(first:20){nodes{number state}}
+      blocking(first:20){nodes{number state}}
+    }
+  }
+}'
 ```
 
 実装に進める条件:
@@ -233,6 +256,22 @@ for attempt in $(seq 1 30); do
   orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' && break
   sleep 2
 done
+
+# 30 回待ってもフッターが出ない場合、pi が起動していない可能性がある。
+# `terminal create --command` が実行されず、コマンド文字列がシェルの入力行に
+# 残るだけの状態が実際に起きた（2026-09-02 issue #17。1 時間半放置された）。
+# 画面にシェルプロンプトと未実行の pi コマンドが見えるなら Enter を 1 回送って起動し、
+# 再度フッターを待つ。それでも起動しなければ Fail へ進む。
+if ! orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol'; then
+  orca-ide terminal send --terminal "$worker_terminal" --text "" --enter --json
+  for attempt in $(seq 1 30); do
+    orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' && break
+    sleep 2
+  done
+fi
+orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' || {
+  echo "pi が起動しないため Fail へ進む"
+}
 orca-ide terminal send --terminal "$worker_terminal" --text "$IMPLEMENT_PROMPT" --enter --json
 
 # 送信が受理されたか確認する。pi が動き出すと画面に「Working」や tool 実行の行が出る。
@@ -272,6 +311,7 @@ Issue #<N> を実装してください。
 - issue / PR にコメントしない。
 - PR を作らない。
 - issue を閉じない。
+- PR / issue の本文を編集しない。GitHub への書き込みは一切しない。本文の更新が受け入れ基準に含まれる場合は、worker ではなく coordinator が実施する（2026-09-03 に worker が PR 本文を書き換え、検証数の記述が誤っていた）。
 - unrelated な変更を戻さない。
 - GUI ウィンドウ（Ghostty / Kitty などの端末エミュレータを含む）を開かない。スクリーンショットを撮らない。`hyprctl` / `grim` などデスクトップ操作コマンドを使わない。実表示の目視確認は人間が行う。ただし、issue の契約が headless 検証ハーネスの実装・実行を明示的に求める場合に限り、`hyprctl output create headless` で作った不可視出力の上でのウィンドウ作成・`grim -o <headless出力>` キャプチャ・`hyprctl` 操作を許可する。その場合も、ユーザーの可視ワークスペースにウィンドウ・フォーカス変化を一切出さず、すべての操作に timeout を付け、終了時に headless 出力とウィンドウを必ず片付けること。
 - 1 コマンドが 10 分を超えそうな処理は `timeout` を付ける。
@@ -355,8 +395,30 @@ PR 本文の規則:
 - `## 概要`: 何が起きているか（問題）→ なぜ起きるか（原因）→ どう直したか（修正）の順に2〜4行で説明する。
 - `## 変更内容`: 主要な変更を箇条書きにする。変更ファイル名だけでなく、意味を書く。
 - `## 確認`: coordinator が実行した検証を書く。少なくとも `npm run check` を含める。
+- 表示や描画の**見た目を変える修正**では、修正前と修正後の画像を必ず添付する。文章だけで「直った」と書かない。
 - `Closes #<N>` を必ず含める。
 - worker / Orca automation が作成した、という説明だけで終わらせない。
+
+### 見た目を変える修正の画像添付
+
+表示、描画、レイアウト、色、フォントなど**目で見て分かる変化**を伴う PR では、修正前と修正後の画像を添付する。
+
+- 同じ入力・同じ条件で撮る。修正前は変更前のコード、修正後は変更後のコードで生成する
+- 差が分かる範囲だけを切り出す。全画面を貼らない
+- `gh pr create` / `gh pr comment` の `--attach` を使う。alt text は `<path>#<説明>` で付ける
+
+```bash
+gh pr create -R yasuhito/pi-formula --base main --head "$branch" \
+  --title "<タイトル>" --body-file <body> \
+  --attach '/tmp/before.png#修正前: 日本語が太いゴシックでベースラインがずれる' \
+  --attach '/tmp/after.png#修正後: 数式本体と同じ字面・同じ行に揃う'
+```
+
+- 本文で `![alt](./file.png)` のように添付ファイルを参照する場合、その参照は**アップロード先の URL へ書き換えられる**。参照と `--attach` の両方を書いても画像は 1 枚だけになる。参照を書かずに `--attach` だけを使うと本文末尾へ追加される。どちらか一方にし、同じ画像が二重に表示されないようにする。
+
+pi-formula では、`dist/typesetter.js` の `typesetMath(latex, color, availableWidth, cell, macros)` を直接呼べば数式 1 つの PNG を作れる。マクロ定義や色を変えた前後を同じ引数で描けば、修正前後の比較画像になる。端末全体の見た目が変わる修正では `scripts/verify-display` のキャプチャを使い、変化した箇所だけを切り出す。
+
+画像を作れない場合（見た目の変化が無い、生成手段が無い）は、その理由を PR 本文に1行書く。
 
 作成例:
 
@@ -423,6 +485,7 @@ gh issue edit <N> -R yasuhito/pi-formula --remove-label "agent:in-progress" || t
 - PR URL（あれば）
 - blocked 理由（あれば）
 - stale `agent:in-progress` 候補（あれば。自動では触っていないことも明記）
+- `needs-triage` の open issue（あれば番号と件数。誰も見ないまま溜まると、レビューが切り出した実在の不具合が放置される）
 - dependency wait に移した issue（あれば）
 - dependency wait から再実行候補へ戻した issue（あれば）
 - 停止した closed / merged PR の worker terminal（あれば）

@@ -1,10 +1,11 @@
 const assert = require("node:assert/strict");
-const { mkdirSync, rmSync, writeFileSync } = require("node:fs");
-const { mkdtempSync } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
-const { join } = require("node:path");
+const { join, resolve } = require("node:path");
 const { After, Before, Given, Then, When } = require("@cucumber/cucumber");
 
+const { createPngFromScanlines } = require("../../test/support/png-fixture.js");
 const {
   fakePi,
   resetFormulaState,
@@ -30,6 +31,15 @@ function writeConfig(world, macros) {
   const directory = join(world.xdg, "pi-formula");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "config.json"), JSON.stringify({ macros }));
+}
+
+function pngWithDimensions(width, height) {
+  return createPngFromScanlines(
+    width,
+    height,
+    Buffer.alloc(height * (width + 1)),
+    0,
+  );
 }
 
 async function registeredImageApi(world, additional = {}) {
@@ -215,8 +225,13 @@ When("公開された名前を調べる", function () {
   this.publicNames = Object.keys(this.formula).sort();
 });
 
-Then("拡張登録と同期的な PNG 作成だけが公開される", function () {
-  assert.deepEqual(this.publicNames, ["createFormulaPng", "registerFormula"]);
+Then("既存の公開 API と画像経路向け API が公開される", function () {
+  assert.deepEqual(this.publicNames, [
+    "createFormulaPng",
+    "getFormulaPath",
+    "registerFormula",
+    "renderPng",
+  ]);
 });
 
 Given("画像経路を使う試験用の連携拡張がある", async function () {
@@ -296,8 +311,182 @@ Given("テキスト経路を使う試験用の連携拡張がある", async func
   await startWithText(this.pi);
 });
 
+When("{string} を含む表示数式の PNG を公開 API で作る", function (latex) {
+  this.image = this.integration.createPng(latex);
+});
+
+Then("動的字形を含む表示数式の PNG が返る", function () {
+  assert.equal(Buffer.isBuffer(this.image?.data), true);
+});
+
+Then("既存の字形を含む表示数式の PNG が返る", function () {
+  assert.equal(Buffer.isBuffer(this.image?.data), true);
+});
+
+When("動的字形を含む表示数式の PNG を公開 API で作る", function () {
+  this.image = this.integration.createPng("\\mathcal{L}");
+});
+
+Then("公開 API は同期的に PNG を返す", function () {
+  assert.equal(Object.prototype.toString.call(this.image), "[object Object]");
+});
+
+Given("動的字形を読み込めない画像経路がある", function () {
+  this.dynamicFontProbe = resolve(
+    __dirname,
+    "../../test/support/dynamic-font-probe.js",
+  );
+});
+
+When("動的字形を含む表示数式を描く", function () {
+  const result = spawnSync(process.execPath, [this.dynamicFontProbe], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(result.stderr);
+  this.dynamicFontResult = JSON.parse(result.stdout);
+});
+
+Then("例外を出さずその表示数式だけテキストへ戻る", function () {
+  assert.deepEqual(this.dynamicFontResult, {
+    dynamic: "$$\\mathcal{L}$$",
+    ordinaryImage: true,
+  });
+});
+
 Then("公開 API は画像を返さない", function () {
   assert.equal(this.image, undefined);
+});
+
+When("現在の表示経路を公開 API で問い合わせる", function () {
+  this.path = freshApi().getFormulaPath();
+});
+
+Then("現在の表示経路は画像経路である", function () {
+  assert.equal(this.path, "image");
+});
+
+Then("現在の表示経路はテキスト経路である", function () {
+  assert.equal(this.path, "text");
+});
+
+Given("危険域のバイトを含む画像 ID になる既成 PNG がある", async function () {
+  await registeredImageApi(this);
+  this.dangerousIdPng = createPngFromScanlines(
+    1,
+    1,
+    Buffer.from([0, 7, 0, 0, 255]),
+  );
+});
+
+When("Buffer の既成 PNG を公開 API で描く", function () {
+  const png = this.dangerousIdPng ?? pngWithDimensions(100, 50);
+  this.renderedPng = freshApi().renderPng(png, 8);
+});
+
+Then("端末寸法に合わせた画像転送と配置が返る", function () {
+  assert.deepEqual(
+    {
+      rendered: this.renderedPng.rendered,
+      reason: this.renderedPng.reason,
+      hasTransfer: this.renderedPng.output?.includes("\x1b_Ga=T,f=100"),
+      hasPlaceholder: this.renderedPng.output?.includes(
+        String.fromCodePoint(0x10eeee),
+      ),
+      withinWidth: this.renderedPng.columns <= 8,
+      positiveRows: this.renderedPng.rows > 0,
+    },
+    {
+      rendered: true,
+      reason: undefined,
+      hasTransfer: true,
+      hasPlaceholder: true,
+      withinWidth: true,
+      positiveRows: true,
+    },
+  );
+});
+
+Then("下線色はコロン形式になり背景色と dim は残らない", function () {
+  const output = this.renderedPng.output ?? "";
+  const id = Number(/(?:^|,)i=(\d+)(?:,|$)/u.exec(output)?.[1]);
+  const state = { background: null, dim: false };
+  for (const match of output.matchAll(/\x1b\[([\d;]*)m/gu)) {
+    const parameters = match[1].split(";").map(Number);
+    for (let index = 0; index < parameters.length; index += 1) {
+      const parameter = parameters[index];
+      if (parameter === 38 || parameter === 48) index += 4;
+      else if (parameter === 0) {
+        state.background = null;
+        state.dim = false;
+      } else if (parameter === 2) state.dim = true;
+      else if (
+        (parameter >= 40 && parameter <= 47) ||
+        (parameter >= 100 && parameter <= 107)
+      ) {
+        state.background = parameter;
+      }
+    }
+  }
+  assert.deepEqual(
+    {
+      idBytes: [(id >> 16) & 0xff, (id >> 8) & 0xff, id & 0xff],
+      colonUnderline: /\x1b\[58:2::216:242:43m/u.test(output),
+      ...state,
+    },
+    {
+      idBytes: [216, 242, 43],
+      colonUnderline: true,
+      background: null,
+      dim: false,
+    },
+  );
+});
+
+When("ファイルの既成 PNG を公開 API で描く", function () {
+  const path = join(this.xdg, "existing.png");
+  writeFileSync(path, pngWithDimensions(120, 60));
+  this.renderedPng = freshApi().renderPng(path, 10);
+});
+
+Then("ファイルの画像転送と配置が返る", function () {
+  assert.equal(
+    this.renderedPng.rendered && this.renderedPng.output.includes("iVBOR"),
+    true,
+  );
+});
+
+Then("代替表示を選べる結果が返る", function () {
+  assert.deepEqual(this.renderedPng, {
+    rendered: false,
+    reason: "image-unavailable",
+  });
+});
+
+When("安全上限を超える既成 PNG を公開 API で描く", function () {
+  this.renderedPng = freshApi().renderPng(pngWithDimensions(1, 100_000), 80);
+});
+
+Then("安全上限による拒否結果が返る", function () {
+  assert.deepEqual(this.renderedPng, {
+    rendered: false,
+    reason: "safety-limit",
+  });
+});
+
+When("途中で切れた既成 PNG を公開 API で描く", function () {
+  const png = pngWithDimensions(10, 10);
+  this.renderedPng = freshApi().renderPng(png.subarray(0, png.length - 5), 80);
+});
+
+Then("不正な PNG による拒否結果が返る", function () {
+  assert.deepEqual(this.renderedPng, {
+    rendered: false,
+    reason: "invalid-png",
+  });
+});
+
+When("展開上限を超える既成 PNG を公開 API で描く", function () {
+  this.renderedPng = freshApi().renderPng(pngWithDimensions(3000, 2000), 80);
 });
 
 Given("利用者マクロを読む拡張 runtime がある", async function () {

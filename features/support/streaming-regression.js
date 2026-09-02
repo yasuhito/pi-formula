@@ -1,7 +1,9 @@
-const { Markdown } = require("@earendil-works/pi-tui");
+const fs = require("node:fs");
+const path = require("node:path");
+const { Markdown, TuiMainScreen } = require("@earendil-works/pi-tui");
 
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
-const SGR = /\x1b\[[0-9;]*m/gu;
+const SGR = /\x1b\[[0-9;:]*m/gu;
 
 const REPRODUCTION_PARTS = [
   String.raw`N 次元の計算基底 $|x\rangle$（$x = 0, \dots, N-1$）に対して
@@ -52,7 +54,9 @@ function controls(command) {
 }
 
 function placeholderId(line) {
-  const match = /\x1b\[38;2;(\d+);(\d+);(\d+)m\x1b\[58;2;\1;\2;\3m/u.exec(line);
+  const match = /\x1b\[38;2;(\d+);(\d+);(\d+)m\x1b\[58:2::\1:\2:\3m/u.exec(
+    line,
+  );
   if (!match || !line.includes(PLACEHOLDER)) return undefined;
   return (Number(match[1]) << 16) | (Number(match[2]) << 8) | Number(match[3]);
 }
@@ -141,7 +145,7 @@ function renderStreamingRegression(pi) {
     const source = REPRODUCTION_PARTS.slice(0, index + 1).join("\n\n");
     const transformed = pi.transformer()(source, {
       messageType: "assistant",
-      isStreaming: true,
+      isStreaming: false,
       availableWidth: 80,
     });
     return {
@@ -158,4 +162,115 @@ function inspectStreamingRegression(frames) {
   return frames.map(inspectFrame);
 }
 
-module.exports = { inspectStreamingRegression, renderStreamingRegression };
+function renderMarkdown(markdown) {
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  return new Markdown(markdown, 0, 0, passthroughTheme).render(80);
+}
+
+function inspectPlacementBlocks(markdown) {
+  const lines = renderMarkdown(markdown);
+  const blocks = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const id = placeholderId(lines[index]);
+    if (id === undefined) continue;
+    const start = index;
+    while (placeholderId(lines[index + 1]) === id) index += 1;
+    const rows = index - start + 1;
+    let transferIndex = start - 1;
+    while (
+      transferIndex >= 0 &&
+      !lines[transferIndex].includes("\x1b_G") &&
+      lines[transferIndex].replace(SGR, "").trim() === ""
+    ) {
+      transferIndex -= 1;
+    }
+    const transferLine = lines[transferIndex] ?? "";
+    const commands = graphicsCommands(transferLine);
+    const header = commands[0] ? controls(commands[0]) : new Map();
+    const between = lines.slice(transferIndex + 1, start);
+    blocks.push({
+      id,
+      rows,
+      transferId: Number(header.get("i")),
+      declaredRows: Number(header.get("r")),
+      completeTransfer: chunksAreComplete(transferLine, commands),
+      adjacentTransfer: between.every(
+        (line) =>
+          !line.includes("\x1b_G") && line.replace(SGR, "").trim() === "",
+      ),
+    });
+  }
+  return blocks;
+}
+
+function renderTuiUpdates(precedingToolLines, streaming, finalized) {
+  const writes = [];
+  const terminal = {
+    columns: 80,
+    rows: 300,
+    kittyProtocolActive: false,
+    start() {},
+    stop() {},
+    async drainInput() {},
+    write(value) {
+      writes.push(value);
+    },
+    moveBy() {},
+    hideCursor() {},
+    showCursor() {},
+    clearLine() {},
+    clearFromCursor() {},
+    clearScreen() {},
+    setTitle() {},
+    setProgress() {},
+  };
+  let lines = precedingToolLines;
+  const content = { render: () => lines, invalidate() {} };
+  const tui = new TuiMainScreen(terminal, false);
+  tui.addChild(content);
+  tui.start();
+  const render = (markdown) => {
+    const start = writes.length;
+    lines = [...precedingToolLines, ...renderMarkdown(markdown)];
+    tui.renderNow();
+    return writes.slice(start).join("");
+  };
+  const initial = render("");
+  const streamingWrites = streaming.map(render);
+  const finalizedWrite = render(finalized);
+  tui.stop({ preserveScreen: true });
+  return { initial, streaming: streamingWrites, finalized: finalizedWrite };
+}
+
+function issue26Updates(pi) {
+  const corpus = fs.readFileSync(
+    path.resolve(__dirname, "../../docs/agents/verify-corpus/issue-26.md"),
+    "utf8",
+  );
+  const delimiters = [...corpus.matchAll(/^\$\$$/gmu)];
+  const partials = delimiters
+    .filter((_match, index) => index % 2 === 1)
+    .map((match) => corpus.slice(0, match.index + match[0].length));
+  const transform = (source, isStreaming) =>
+    pi.transformer()(source, {
+      messageType: "assistant",
+      isStreaming,
+      availableWidth: 80,
+    });
+  const precedingToolLines = ["qni tool call", "qni tool result"];
+  const streaming = partials.map((source) => transform(source, true));
+  const finalized = transform(corpus, false);
+  return {
+    precedingToolLines,
+    streaming,
+    finalized,
+    tuiWrites: renderTuiUpdates(precedingToolLines, streaming, finalized),
+  };
+}
+
+module.exports = {
+  inspectPlacementBlocks,
+  inspectStreamingRegression,
+  issue26Updates,
+  renderStreamingRegression,
+};

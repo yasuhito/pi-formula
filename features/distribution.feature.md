@@ -22,6 +22,37 @@ pi-formula の利用者として
 - When tarball のファイル一覧を調べる
 - Then src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品情報、表示見本だけが配布される
 
+## Scenario: npm tarball に Ghostty の表示見本を入れる
+
+- Given pi-formula の npm tarball を作る
+- When tarball のファイル一覧を調べる
+- Then Ghostty の表示見本が配布される
+
+## Scenario: clean build で削除済みソースの古い成果物を消す
+
+- Given 削除済みソースに対応する古い成果物がある
+- When pi-formula を build する
+- Then 生成後の dist に古い成果物が残らない
+
+## Scenario: npm tarball から削除済みソースの古い成果物を除く
+
+- Given 削除済みソースに対応する古い成果物がある
+- And pi-formula の npm tarball を作る
+- When tarball のファイル一覧を調べる
+- Then tarball に古い成果物が配布されない
+
+## Scenario: npm tarball のルートから公開 API を読み込む
+
+- Given pi-formula の npm tarball を一時環境へ導入する
+- When 導入したパッケージのルートを読み込む
+- Then 拡張登録と同期的な PNG 作成が使える
+
+## Scenario: npm tarball の内部 subpath を公開しない
+
+- Given pi-formula の npm tarball を一時環境へ導入する
+- When 導入したパッケージの内部 Markdown subpath を読み込む
+- Then 内部 subpath は公開されていない
+
 ## Scenario: 公開候補 tarball を隔離環境で試験する
 
 - Given pi-formula の公開候補 tarball がある

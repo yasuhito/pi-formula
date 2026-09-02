@@ -72,7 +72,7 @@ export function encodePlaceholderRows(
   const green = (id >> 8) & 0xff;
   const blue = id & 0xff;
   const foreground = `${ESC}[38;2;${red};${green};${blue}m`;
-  const underline = `${ESC}[58;2;${red};${green};${blue}m`;
+  const underline = `${ESC}[58:2::${red}:${green}:${blue}m`;
   return Array.from({ length: rows }, (_, row) => {
     const cells = Array.from(
       { length: columns },
