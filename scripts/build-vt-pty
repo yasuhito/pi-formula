@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+PIN_FILE="$ROOT/native/libghostty-vt.commit"
+PIN=$(tr -d '\r\n' <"$PIN_FILE")
+[[ "$PIN" =~ ^[0-9a-f]{40}$ ]] || {
+  printf '%s には完全な commit hash を一行で指定してください\n' "$PIN_FILE" >&2
+  exit 2
+}
+
+CACHE_ROOT=${PI_FORMULA_NATIVE_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/pi-formula/libghostty-vt}
+PREFIX="$CACHE_ROOT/$PIN/prefix"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prefix)
+      [[ $# -ge 2 ]] || { printf 'build-vt-pty: --prefix の値がありません\n' >&2; exit 2; }
+      PREFIX=$2
+      shift 2
+      ;;
+    *)
+      printf 'Usage: scripts/build-vt-pty [--prefix <dir>]\n' >&2
+      exit 2
+      ;;
+  esac
+done
+
+VT_TOOL="$PREFIX/bin/vt-pty"
+if [[ -x "$VT_TOOL" && -f "$PREFIX/include/ghostty/vt.h" ]]; then
+  printf 'vt-pty: %s\n' "$VT_TOOL"
+  exit 0
+fi
+
+command -v zig >/dev/null || { printf 'build-vt-pty: zig 0.16.0 が必要です\n' >&2; exit 2; }
+[[ "$(zig version)" == 0.16.0 ]] || {
+  printf 'build-vt-pty: zig 0.16.0 が必要です（現在: %s）\n' "$(zig version)" >&2
+  exit 2
+}
+command -v git >/dev/null || { printf 'build-vt-pty: git が必要です\n' >&2; exit 2; }
+command -v "${CC:-cc}" >/dev/null || { printf 'build-vt-pty: C compiler が必要です\n' >&2; exit 2; }
+
+SOURCE=${PI_FORMULA_GHOSTTY_SOURCE:-$CACHE_ROOT/sources/$PIN/ghostty}
+if [[ ! -d "$SOURCE/.git" ]]; then
+  mkdir -p "$(dirname "$SOURCE")"
+  git clone --filter=blob:none --no-checkout https://github.com/ghostty-org/ghostty.git "$SOURCE"
+fi
+
+if [[ "$(git -C "$SOURCE" rev-parse HEAD 2>/dev/null || true)" != "$PIN" || ! -f "$SOURCE/build.zig" ]]; then
+  (
+    cd "$SOURCE"
+    git fetch --depth 1 origin "$PIN"
+    git checkout --detach FETCH_HEAD
+  )
+fi
+[[ "$(git -C "$SOURCE" rev-parse HEAD)" == "$PIN" ]] || {
+  printf 'build-vt-pty: Ghostty source が pin と一致しません\n' >&2
+  exit 2
+}
+
+mkdir -p "$PREFIX"
+(
+  cd "$SOURCE"
+  zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix "$PREFIX"
+)
+mkdir -p "$PREFIX/bin"
+link_options=("-Wl,-rpath,$PREFIX/lib" -lghostty-vt)
+if [[ "$(uname -s)" == Linux ]]; then
+  link_options+=(-lutil)
+fi
+"${CC:-cc}" -std=c11 -O2 -I"$PREFIX/include" \
+  "$ROOT/native/vt-pty.c" -L"$PREFIX/lib" "${link_options[@]}" -o "$VT_TOOL"
+printf 'vt-pty: %s\n' "$VT_TOOL"
