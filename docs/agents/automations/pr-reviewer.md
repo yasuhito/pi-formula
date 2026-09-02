@@ -77,6 +77,14 @@ PR #<PR> のブランチ <headRefName> が main と衝突しています。解�
 
 worker の完了後、reviewer が `npm run check` を実行してから push する。解消できない場合は `agent:blocked` を付け、衝突の内容を PR へ書いて終了する。
 
+`DIRTY` でなくても、対象 PR の base が main より古い場合は先に main を取り込む。この repository の CI は外部 repository の現在の状態を参照するため、古い base のままだと**その PR の変更と無関係な理由で CI が落ちる**（2026-09-02 に、#60 マージ前の main から切られた PR が、マクロ定義の突き合わせで落ちた）。
+
+```bash
+gh pr update-branch <PR> -R yasuhito/pi-formula
+```
+
+衝突なく取り込めた場合はそのままレビューへ進む。衝突した場合は上の worker 手順で解消する。
+
 完了条件: 対象 PR が main と衝突していない、または衝突を解消できない理由が PR に記録されている。
 
 ### 2. Draft gate: draft PR なら ready にする
