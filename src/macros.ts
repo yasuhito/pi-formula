@@ -21,6 +21,12 @@ interface MacroArgument {
 const MAX_INLINE_MACRO_EXPANSIONS = 1_000;
 const MAX_INLINE_EXPANDED_LENGTH = 16_384;
 
+function skipControlWordSpace(source: string, start: number): number {
+  let index = start;
+  while (/\s/u.test(source[index] ?? "")) index += 1;
+  return index;
+}
+
 function macroArgument(
   source: string,
   start: number,
@@ -35,9 +41,12 @@ function macroArgument(
     }
     const controlSequence = /^\\(?:[A-Za-z]+|.)/u.exec(source.slice(index));
     if (!controlSequence) return undefined;
+    const end = index + controlSequence[0].length;
     return {
       value: controlSequence[0],
-      end: index + controlSequence[0].length,
+      end: /^\\[A-Za-z]+$/u.test(controlSequence[0])
+        ? skipControlWordSpace(source, end)
+        : end,
     };
   }
 
@@ -65,26 +74,41 @@ function escapedAt(source: string, index: number): boolean {
   return backslashes % 2 === 1;
 }
 
+function endsWithControlWord(value: string): boolean {
+  const match = /\\[A-Za-z]+$/u.exec(value);
+  return match?.index !== undefined && !escapedAt(value, match.index);
+}
+
+function appendTex(value: string, fragment: string): string {
+  const boundary = endsWithControlWord(value) && /^[A-Za-z]/u.test(fragment);
+  return `${value}${boundary ? "{}" : ""}${fragment}`;
+}
+
 function substituteArguments(
   replacement: string,
   arguments_: readonly string[],
 ): string {
   let substituted = "";
+  let literalStart = 0;
   for (let index = 0; index < replacement.length; index += 1) {
     const argumentIndex = Number.parseInt(replacement[index + 1] ?? "", 10);
     if (
-      replacement[index] === "#" &&
-      !escapedAt(replacement, index) &&
-      argumentIndex >= 1 &&
-      argumentIndex <= arguments_.length
+      replacement[index] !== "#" ||
+      escapedAt(replacement, index) ||
+      argumentIndex < 1 ||
+      argumentIndex > arguments_.length
     ) {
-      substituted += `{${arguments_[argumentIndex - 1]}}`;
-      index += 1;
-    } else {
-      substituted += replacement[index];
+      continue;
     }
+    substituted = appendTex(
+      substituted,
+      replacement.slice(literalStart, index),
+    );
+    substituted = appendTex(substituted, arguments_[argumentIndex - 1]);
+    index += 1;
+    literalStart = index + 1;
   }
-  return substituted;
+  return appendTex(substituted, replacement.slice(literalStart));
 }
 
 function expandMacros(
@@ -92,16 +116,30 @@ function expandMacros(
   macros: FormulaMacros,
   active: ReadonlySet<string>,
   budget: { remaining: number },
+  replacementContext: boolean,
 ): string | undefined {
   let expanded = "";
   for (let index = 0; index < source.length; ) {
-    const command = /^\\([A-Za-z]+)/u.exec(source.slice(index));
-    const name = command?.[1];
-    const definition =
-      name && Object.hasOwn(macros, name) ? macros[name] : undefined;
-    if (!command || !name || definition === undefined || active.has(name)) {
-      expanded += source[index];
+    if (source[index] !== "\\") {
+      expanded = appendTex(expanded, source[index]);
       index += 1;
+      continue;
+    }
+
+    const command = /^\\([A-Za-z]+)/u.exec(source.slice(index));
+    if (!command) {
+      const controlSymbol = source.slice(index, index + 2);
+      expanded = appendTex(expanded, controlSymbol);
+      index += controlSymbol.length;
+      continue;
+    }
+
+    const name = command[1];
+    const definition = Object.hasOwn(macros, name) ? macros[name] : undefined;
+    if (definition === undefined || active.has(name)) {
+      expanded = appendTex(expanded, command[0]);
+      index += command[0].length;
+      if (replacementContext) index = skipControlWordSpace(source, index);
       continue;
     }
 
@@ -109,6 +147,7 @@ function expandMacros(
       typeof definition === "string" ? ([definition, 0] as const) : definition;
     const arguments_: string[] = [];
     let end = index + command[0].length;
+    if (argumentsCount === 0) end = skipControlWordSpace(source, end);
     for (let argument = 0; argument < argumentsCount; argument += 1) {
       const parsed = macroArgument(source, end);
       if (!parsed) break;
@@ -116,7 +155,7 @@ function expandMacros(
       end = parsed.end;
     }
     if (arguments_.length !== argumentsCount) {
-      expanded += command[0];
+      expanded = appendTex(expanded, command[0]);
       index += command[0].length;
       continue;
     }
@@ -128,9 +167,10 @@ function expandMacros(
       macros,
       new Set([...active, name]),
       budget,
+      true,
     );
     if (nested === undefined) return undefined;
-    expanded += nested;
+    expanded = appendTex(expanded, nested);
     if (expanded.length > MAX_INLINE_EXPANDED_LENGTH) return undefined;
     index = end;
   }
@@ -143,9 +183,13 @@ export function expandFormulaMacros(
 ): string {
   if (Object.keys(macros).length === 0) return source;
   return (
-    expandMacros(source, macros, new Set(), {
-      remaining: MAX_INLINE_MACRO_EXPANSIONS,
-    }) ?? source
+    expandMacros(
+      source,
+      macros,
+      new Set(),
+      { remaining: MAX_INLINE_MACRO_EXPANSIONS },
+      false,
+    ) ?? source
   );
 }
 

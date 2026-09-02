@@ -81,8 +81,65 @@ test("登録済みの追加マクロを両方のインライン数式区切り�
 
   assert.equal(
     rendered,
-    String.raw`$\left|{s}\right\rangle$ and \(\left\langle{s|\psi}\right\rangle\)`,
+    String.raw`$\left|s\right\rangle$ and \(\left\langle{}s|\psi\right\rangle\)`,
   );
+});
+
+test("追加マクロの引数と制御綴の境界を TeX と同じく保つ", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    sq: ["#1^2", 1],
+    groupedSq: ["{#1}^2", 1],
+    alpha: String.raw`\alpha`,
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`$\ket{x}y$`,
+    String.raw`$\sq{a+b}$`,
+    String.raw`$\groupedSq{a+b}$`,
+    String.raw`$\alpha x$`,
+    String.raw`$\\ket{x}$`,
+  ].join(" / ");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(
+    rendered,
+    [
+      String.raw`$\left|x\right\rangle{}y$`,
+      "$a+b^2$",
+      "$" + "{a+b}^2$",
+      String.raw`$\alpha{}x$`,
+      String.raw`$\\ket{x}$`,
+    ].join(" / "),
+  );
+});
+
+test("Markdown URL の構造内では追加マクロを展開しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`[ket]: /guide/$\ket{s}$`,
+    String.raw`[doc](/guide/(v1)/$\ket{s}$)`,
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
 });
 
 test("テキスト経路でも登録済みの追加マクロを展開する", async () => {
@@ -99,7 +156,7 @@ test("テキスト経路でも登録済みの追加マクロを展開する", as
     availableWidth: 80,
   });
 
-  assert.equal(rendered, String.raw`$\left|{s}\right\rangle$`);
+  assert.equal(rendered, String.raw`$\left|s\right\rangle$`);
 });
 
 test("展開後に Pi が描けないインライン数式は原文を残す", async () => {

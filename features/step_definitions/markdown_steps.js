@@ -77,6 +77,20 @@ Given("braket の利用者マクロを設定した画像経路の Pi がある",
   this.started = await startWithKitty(this.pi);
 });
 
+Given(
+  "置換境界を確認する追加マクロを登録した画像経路の Pi がある",
+  async function () {
+    this.pi = fakePi();
+    require("../../dist/api.js").registerFormula(this.pi.api, {
+      ket: [String.raw`\left|#1\right\rangle`, 1],
+      sq: ["#1^2", 1],
+      groupedSq: ["{#1}^2", 1],
+      alpha: String.raw`\alpha`,
+    });
+    this.started = await startWithKitty(this.pi);
+  },
+);
+
 When("ket 追加マクロを含むドル区切りのインライン数式を描く", function () {
   transform(this, String.raw`$\ket{s}$`);
   this.unicode = renderUnicode(this.rendered);
@@ -127,6 +141,41 @@ When(
   },
 );
 
+When("ket 追加マクロの直後に英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{x}y$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("グループを持たない二乗追加マクロを変換する", function () {
+  transform(this, String.raw`$\sq{a+b}$ / $\groupedSq{a+b}$`);
+});
+
+When("0 引数追加マクロの後に空白と英字があるインライン数式を描く", function () {
+  transform(this, String.raw`$\alpha x$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When(
+  "バックスラッシュ制御記号の後に ket と同じ英字がある本文を変換する",
+  function () {
+    transform(this, String.raw`$\\ket{x}$`);
+  },
+);
+
+When(
+  "参照リンク定義に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[ket]: /guide/$\ket{s}$`);
+  },
+);
+
+When(
+  "丸括弧を含む相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する",
+  function () {
+    transform(this, String.raw`[doc](/guide/(v1)/$\ket{s}$)`);
+  },
+);
+
 When("未登録の ket を含むインライン数式を変換する", function () {
   transform(this, String.raw`$\ket{s}$`);
 });
@@ -169,7 +218,7 @@ Then("braket 利用者マクロが Unicode で描かれる", function () {
 Then("Object prototype 名は残り ket 追加マクロだけが展開される", function () {
   assert.equal(
     this.rendered,
-    String.raw`$\constructor{x}$ and $\left|{s}\right\rangle$`,
+    String.raw`$\constructor{x}$ and $\left|s\right\rangle$`,
   );
 });
 
@@ -185,6 +234,30 @@ Then("相対 Markdown URL は変更されない", function () {
 });
 
 Then("スキームなし URL は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("ket 追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|x⟩y");
+});
+
+Then("二乗追加マクロの引数は自動でグループ化されない", function () {
+  assert.equal(this.rendered, "$a+b^2$ / $" + "{a+b}^2$");
+});
+
+Then("0 引数追加マクロと後続英字が Unicode で描かれる", function () {
+  assert.equal(this.unicode, "αx");
+});
+
+Then("バックスラッシュ制御記号の後は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("参照リンク定義は変更されない", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("丸括弧を含む相対 Markdown URL は変更されない", function () {
   assert.equal(this.rendered, this.source);
 });
 

@@ -173,6 +173,58 @@ function isEscaped(source: string, index: number): boolean {
   return backslashes % 2 === 1;
 }
 
+function matchingParenthesis(source: string, opening: number): number {
+  let depth = 1;
+  for (let index = opening + 1; index < source.length; index += 1) {
+    if (source[index] === "\n") return -1;
+    if (source[index] === "(" && !isEscaped(source, index)) depth += 1;
+    if (source[index] !== ")" || isEscaped(source, index)) continue;
+    depth -= 1;
+    if (depth === 0) return index;
+  }
+  return -1;
+}
+
+function protectUrls(markdown: string): ProtectedMarkdown {
+  const parts: string[] = [];
+  const token = (value: string): string =>
+    `\u{e002}${parts.push(value) - 1}\u{e003}`;
+  const withoutReferences = markdown.replace(
+    /^ {0,3}\[[^\]\n]+\]:[^\n]*(?:\n|$)/gmu,
+    (definition) => token(definition),
+  );
+  let protectedMarkdown = "";
+
+  for (let index = 0; index < withoutReferences.length; ) {
+    if (
+      withoutReferences[index] !== "(" ||
+      withoutReferences[index - 1] !== "]"
+    ) {
+      protectedMarkdown += withoutReferences[index];
+      index += 1;
+      continue;
+    }
+    const closing = matchingParenthesis(withoutReferences, index);
+    if (closing < 0) {
+      protectedMarkdown += withoutReferences[index];
+      index += 1;
+      continue;
+    }
+    protectedMarkdown += token(withoutReferences.slice(index, closing + 1));
+    index = closing + 1;
+  }
+
+  return {
+    markdown: protectedMarkdown,
+    restore(value) {
+      return value.replace(
+        /\u{e002}(\d+)\u{e003}/gu,
+        (match, index: string) => parts[Number.parseInt(index, 10)] ?? match,
+      );
+    },
+  };
+}
+
 function closingIndex(
   source: string,
   delimiter: string,
@@ -195,10 +247,6 @@ function hierarchyContinuation(source: string, openingIndex: number): string {
 }
 
 function isUrlDollar(source: string, openingIndex: number): boolean {
-  const lineStart = source.lastIndexOf("\n", openingIndex - 1) + 1;
-  const linePrefix = source.slice(lineStart, openingIndex);
-  if (/!?\[[^\]\n]*\]\([^\s)\n]*$/u.test(linePrefix)) return true;
-
   const tokenStart =
     Math.max(
       source.lastIndexOf(" ", openingIndex - 1),
@@ -302,7 +350,8 @@ export function transformInlineMath(
 ): string {
   if (Object.keys(macros).length === 0) return markdown;
   const protectedMarkdown = protectCode(markdown);
-  const source = protectedMarkdown.markdown;
+  const protectedUrls = protectUrls(protectedMarkdown.markdown);
+  const source = protectedUrls.markdown;
   let transformed = "";
 
   for (let index = 0; index < source.length; ) {
@@ -352,7 +401,7 @@ export function transformInlineMath(
     index = end;
   }
 
-  return protectedMarkdown.restore(transformed);
+  return protectedMarkdown.restore(protectedUrls.restore(transformed));
 }
 
 export function transformDisplayMath(
