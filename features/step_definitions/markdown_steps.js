@@ -5,6 +5,7 @@ const http = require("node:http");
 const https = require("node:https");
 const net = require("node:net");
 const { resolve } = require("node:path");
+const { performance } = require("node:perf_hooks");
 const { Given, Then, When } = require("@cucumber/cucumber");
 const { Markdown } = require("@earendil-works/pi-tui");
 
@@ -361,6 +362,58 @@ When("未完成な数式まで届いたストリーミング本文を変換す�
   transform(this, "途中\n$$\\frac{1}{2}", { isStreaming: true });
 });
 
+When("数式でない $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(
+    this,
+    [
+      "閉じていない $$ は数式になりません。",
+      "",
+      "## 行列指数",
+      "",
+      "$$e^{-i H t} = \\sum_{n=0}^{\\infty} \\frac{(-iHt)^n}{n!}$$",
+      "",
+      "以上です。",
+    ].join("\n"),
+  );
+});
+
+When("$$ を含む金額を変換する", function () {
+  transform(this, "価格は $$100 です。");
+});
+
+When("通常の表示数式を変換する", function () {
+  transform(this, "$$a = b$$");
+});
+
+When("$$ を含む URL を変換する", function () {
+  transform(this, "https://example.com/a$$b$$c");
+});
+
+When("シェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$; kill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
+When("改行を含むシェルの $$ と後続の表示数式を含む本文を変換する", function () {
+  transform(this, "run echo $$;\nkill $$ after 2 seconds.\n\n$$x = 1$$");
+});
+
+When("行頭の $$ を含む通常本文と後続の表示数式を変換する", function () {
+  transform(
+    this,
+    "前置き $$ は数式ではありません。\n$$100 です。\n\n$$x = 1$$",
+  );
+});
+
+When("数式でない $$ とラベル付き表示数式を含む本文を変換する", function () {
+  transform(this, "閉じていない $$ は数式になりません。\n\n式: $$\nx = 1\n$$");
+});
+
+When("数式でない $$ を一万個含む本文を変換する", function () {
+  const started = performance.now();
+  transform(this, "$$通常本文\n".repeat(10_000));
+  this.scanDuration = performance.now() - started;
+});
+
 When("不正な表示数式と正しい表示数式を含む本文を変換する", function () {
   transform(this, "$$\\notacommand{$$\n次の本文\n$$x$$");
 });
@@ -443,6 +496,71 @@ Then("閉じた表示数式は原文のまま残る", function () {
 
 Then("未完成な数式は原文のまま残る", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then("後続の表示数式だけが画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+});
+
+Then("見送った本文は入力どおり一度だけ残る", function () {
+  const skipped = "閉じていない $$ は数式になりません。\n\n## 行列指数\n\n";
+  assert.equal(this.rendered.split(skipped).length - 1, 1);
+});
+
+Then("金額は入力どおり残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("一つの表示数式が画像になる", function () {
+  assert.equal(imageCount(this.rendered), 1);
+});
+
+Then("URL は入力どおり残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("シェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$; kill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("シェルに続く表示数式だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
+});
+
+Then("改行を含むシェルの通常本文は入力どおり残る", function () {
+  const shellText = "run echo $$;\nkill $$ after 2 seconds.";
+  assert.equal(this.rendered.split(shellText).length - 1, 1);
+});
+
+Then("行頭の $$ を含む通常本文は入力どおり残る", function () {
+  const text = "前置き $$ は数式ではありません。\n$$100 です。";
+  assert.equal(this.rendered.split(text).length - 1, 1);
+});
+
+Then("後続の x = 1 だけが画像になる", function () {
+  assert.deepEqual(
+    {
+      imageCount: imageCount(this.rendered),
+      formulaRemains: this.rendered.includes("x = 1"),
+    },
+    { imageCount: 1, formulaRemains: false },
+  );
+});
+
+Then("ラベル付き表示数式の前の本文は入力どおり一度だけ残る", function () {
+  const text = "閉じていない $$ は数式になりません。\n\n式: ";
+  assert.equal(this.rendered.split(text).length - 1, 1);
+});
+
+Then("走査は一秒以内に終わる", function () {
+  assert.ok(this.scanDuration < 1_000, `${this.scanDuration}ms`);
 });
 
 Then("不正な数式は残り、正しい数式だけが画像になる", function () {
