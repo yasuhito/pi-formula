@@ -534,6 +534,16 @@ When(
   },
 );
 
+When(
+  "数式でない $$ と閉じ区切りを後続行に置いた数値表示数式を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    this.expectedMultilineNumericFormulaImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$");
+    this.actualMultilineNumericFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
 When("通常の表示数式を変換する", function () {
   transform(this, "$$a = b$$");
 });
@@ -672,6 +682,13 @@ Then("画像経路で描かれる式は 100 だけになる", function () {
   assert.deepEqual(
     this.actualNumericFormulaImages,
     this.expectedNumericFormulaImages,
+  );
+});
+
+Then("画像経路で描かれる複数行区切りの式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualMultilineNumericFormulaImages,
+    this.expectedMultilineNumericFormulaImages,
   );
 });
 

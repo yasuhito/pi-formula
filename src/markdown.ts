@@ -289,17 +289,28 @@ function looksLikeDollarDisplay(latex: string): boolean {
 function looksLikeReconsideredDollarDisplay(
   latex: string,
   reachesLaterLine: boolean,
+  closingEndsLine: boolean,
 ): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
   if (
     reachesLaterLine &&
+    !closingEndsLine &&
     /^\d/u.test(latex) &&
     /^\d+(?:[.,]\d+)*$/u.test(value)
   )
     return false;
   if (/[_^=+*/<>|&±≤≥≠≈∈→⇒∞∫∑√]/u.test(value)) return true;
   return !/\p{L}{2,}/u.test(value);
+}
+
+function delimiterEndsLine(
+  source: string,
+  closing: number,
+  delimiter: string,
+): boolean {
+  const remainder = source.slice(closing + delimiter.length).split("\n", 1)[0];
+  return remainder.trim().length === 0;
 }
 
 function removeContinuation(latex: string, continuation: string): string {
@@ -512,7 +523,11 @@ export function transformDisplayMath(
       (isDisplayUrlDollar(source, index) ||
         !looksLikeDollarDisplay(latex) ||
         (reconsidered &&
-          !looksLikeReconsideredDollarDisplay(latex, reachesLaterLine)))
+          !looksLikeReconsideredDollarDisplay(
+            latex,
+            reachesLaterLine,
+            delimiterEndsLine(source, closing, closingDelimiter),
+          )))
     ) {
       transformed += reachesLaterLine ? opening : original;
       index = reachesLaterLine
