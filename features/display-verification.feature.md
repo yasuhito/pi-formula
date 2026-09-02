@@ -115,6 +115,11 @@ pi-formula の worker として
 - Given Issue 48 の Grover コーパスがある
 - Then bra と braket を含む表示数式を組版できる
 
+## Scenario: Issue 52 の幅掃引コーパスを組版する
+
+- Given Issue 52 の幅掃引コーパスがある
+- Then 項数3から15までの7つの表示数式を組版できる
+
 ## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
 
 - Given 検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある
