@@ -51,6 +51,7 @@ export default function (pi: ExtensionAPI) {
 
   let readyFormula: string | undefined;
   let captureStarted = false;
+  let finalCaptureStarted = false;
   let targetInCurrentMessage = false;
 
   const gateWhenFormulaIsRendered = async (message: unknown) => {
@@ -106,6 +107,36 @@ export default function (pi: ExtensionAPI) {
       );
     }
     return transformed;
+  });
+  pi.on("tool_call", async () => {
+    const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
+    const captureMarker = process.env.PI_FORMULA_VERIFY_FINAL_CAPTURE_MARKER;
+    const acknowledgement = process.env.PI_FORMULA_VERIFY_FINAL_CAPTURE_ACK;
+    if (
+      process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
+      !captureStarted ||
+      finalCaptureStarted ||
+      !finalMarker ||
+      !captureMarker ||
+      !acknowledgement
+    )
+      return;
+
+    finalCaptureStarted = true;
+    const deadline = Date.now() + STREAM_GATE_TIMEOUT_MS;
+    await waitForMarker(
+      finalMarker,
+      undefined,
+      "対象式の確定描画を確認できませんでした",
+      deadline,
+    );
+    fs.writeFileSync(captureMarker, "ready\n");
+    await waitForMarker(
+      acknowledgement,
+      undefined,
+      "対象式の確定キャプチャ確認が timeout しました",
+      deadline,
+    );
   });
   pi.on("message_start", (event) => {
     if (event.message.role === "assistant" && !captureStarted) {

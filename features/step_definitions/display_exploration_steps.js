@@ -249,6 +249,74 @@ Then(
   },
 );
 
+Given(
+  "対象式の後に画面高を超える tool 出力と回答が続く探索応答がある",
+  async function () {
+    this.harness = fs.readFileSync(
+      path.join(root, "scripts/verify-display"),
+      "utf8",
+    );
+    this.promptExtension = fs.readFileSync(
+      path.join(root, "scripts/verify-extensions/pi-formula-verify-prompt.ts"),
+      "utf8",
+    );
+    this.followingOutput = "tool の長い出力\n".repeat(16_001);
+    this.targetFormula = "$$x^2+y^2=1$$";
+    this.explorationPi = fakePi();
+    registerFormula(this.explorationPi.api);
+    await startWithKitty(this.explorationPi);
+  },
+);
+
+When("対象式の確定キャプチャと後続処理の順序を調べる", function () {
+  const targetFrame = this.explorationPi.transformer()(
+    markTargetFormula(
+      `計算します。\n\n${this.targetFormula}`,
+      this.targetFormula,
+    ),
+    { messageType: "assistant", isStreaming: false, availableWidth: 80 },
+  );
+  const targetRendering = inspectTargetFormulaRendering(targetFrame);
+  const overflowViewport = this.followingOutput
+    .split("\n")
+    .slice(-16_000)
+    .join("\n");
+  this.finalCaptureInspection = {
+    afterOverflowLosesTarget: !overflowViewport.includes(this.targetFormula),
+    capturedTargetUsesImage: targetRendering.renderedAsImage,
+    exceedsOutputHeight: this.followingOutput.split("\n").length > 16_000,
+    extensionGate: markersAppearInOrder(
+      this.promptExtension,
+      'pi.on("tool_call"',
+      "await waitForMarker(\n      finalMarker",
+      'fs.writeFileSync(captureMarker, "ready\\n")',
+      "await waitForMarker(\n      acknowledgement",
+    ),
+    harnessGate: markersAppearInOrder(
+      this.harness,
+      '[[ -s "$FINAL_CAPTURE_MARKER" ]]',
+      'run sleep "$CAPTURE_READY_INTERVAL"',
+      'run kill -STOP "$stream_process_pid"',
+      '"--different-from=$STREAM_CAPTURE_FILE"',
+      'run_inside grim "$CAPTURE_FILE"',
+      "detector detect-display-bands",
+      'run kill -CONT "$stream_process_pid"',
+      'run touch "$FINAL_CAPTURE_ACK"',
+      "for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1))",
+    ),
+  };
+});
+
+Then("長い後続出力を始める前に対象式の確定画面を判定する", function () {
+  assert.deepEqual(this.finalCaptureInspection, {
+    afterOverflowLosesTarget: true,
+    capturedTargetUsesImage: true,
+    exceedsOutputHeight: true,
+    extensionGate: true,
+    harnessGate: true,
+  });
+});
+
 When("tool 前の検査対象をコーパスファイルへ保存する", function () {
   const session = path.join(this.directory, "session.jsonl");
   const marker = path.join(this.directory, "formula.md");

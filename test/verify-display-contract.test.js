@@ -239,6 +239,35 @@ test("対象messageの確定結果を後続messageで上書きしない", () => 
   );
 });
 
+test("tool実行を対象式の確定キャプチャ完了まで待たせる", () => {
+  assert.ok(
+    markersAppearInOrder(
+      promptExtension,
+      'pi.on("tool_call"',
+      "await waitForMarker(\n      finalMarker",
+      'fs.writeFileSync(captureMarker, "ready\\n")',
+      "await waitForMarker(\n      acknowledgement",
+    ),
+  );
+});
+
+test("対象式の確定画面を判定してからtool実行を再開する", () => {
+  assert.ok(
+    markersAppearInOrder(
+      harness,
+      '[[ -s "$FINAL_CAPTURE_MARKER" ]]',
+      'run sleep "$CAPTURE_READY_INTERVAL"',
+      'run kill -STOP "$stream_process_pid"',
+      '"--different-from=$STREAM_CAPTURE_FILE"',
+      'run_inside grim "$CAPTURE_FILE"',
+      "detector detect-display-bands",
+      'run kill -CONT "$stream_process_pid"',
+      'run touch "$FINAL_CAPTURE_ACK"',
+      "for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1))",
+    ),
+  );
+});
+
 test("探索モードはストリーミング画面の後で確定画面も判定する", () => {
   assert.ok(
     markersAppearInOrder(
