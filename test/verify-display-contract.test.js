@@ -250,6 +250,31 @@ test("tool後のassistant応答を待ってから撮影不能を確定する", (
   );
 });
 
+test("確定後だけの検査へ切り替えたら遅い撮影ゲートを解除する", () => {
+  assert.deepEqual(
+    {
+      harnessCancels: markersAppearInOrder(
+        harness,
+        "final_only=true",
+        'run touch "$STREAM_CANCEL_MARKER"',
+      ),
+      transformerStopsMarkers:
+        /streamCaptureCancelled\(\)[\s\S]*return markdown[\s\S]*fs\.writeFileSync\(marker, readyFormula\)/u.test(
+          promptExtension,
+        ),
+      messageEndSkipsAck:
+        /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker/u.test(
+          promptExtension,
+        ),
+    },
+    {
+      harnessCancels: true,
+      transformerStopsMarkers: true,
+      messageEndSkipsAck: true,
+    },
+  );
+});
+
 test("確定後だけの検査は再試行でも基準画面との差分を求める", () => {
   assert.match(
     harness,

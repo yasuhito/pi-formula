@@ -55,6 +55,11 @@ export default function (pi: ExtensionAPI) {
   let finalCaptureStarted = false;
   let targetInCurrentMessage = false;
 
+  const streamCaptureCancelled = () => {
+    const marker = process.env.PI_FORMULA_VERIFY_STREAM_CANCEL_MARKER;
+    return Boolean(marker && fs.existsSync(marker));
+  };
+
   const observeDisplayFormula = (message: unknown) => {
     if (process.env.PI_FORMULA_VERIFY_MODE !== "exploration" || captureStarted)
       return;
@@ -104,6 +109,7 @@ export default function (pi: ExtensionAPI) {
     const acknowledgement = process.env.PI_FORMULA_VERIFY_FINAL_CAPTURE_ACK;
     if (
       process.env.PI_FORMULA_VERIFY_MODE !== "exploration" ||
+      streamCaptureCancelled() ||
       !captureStarted ||
       finalCaptureStarted ||
       !finalMarker ||
@@ -152,7 +158,7 @@ export default function (pi: ExtensionAPI) {
       !captureStarted
     )
       recordUnavailableReason(event.message);
-    if (captureStarted) {
+    if (captureStarted && !streamCaptureCancelled()) {
       const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
       if (acknowledgement)
         await waitForMarker(
@@ -173,6 +179,7 @@ export default function (pi: ExtensionAPI) {
       return markdown;
 
     if (context.isStreaming) {
+      if (streamCaptureCancelled()) return markdown;
       const renderedMarker =
         process.env.PI_FORMULA_VERIFY_STREAM_RENDERED_MARKER;
       const marker = process.env.PI_FORMULA_VERIFY_STREAM_MARKER;

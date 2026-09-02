@@ -211,6 +211,46 @@ Then(
   },
 );
 
+Given(
+  "確定後のみ検査へ切り替えた後に表示数式が現れる探索応答がある",
+  function () {
+    this.harness = fs.readFileSync(
+      path.join(root, "scripts/verify-display"),
+      "utf8",
+    );
+    this.promptExtension = fs.readFileSync(
+      path.join(root, "scripts/verify-extensions/pi-formula-verify-prompt.ts"),
+      "utf8",
+    );
+  },
+);
+
+When("遅れて始まるストリーミング撮影の解除を調べる", function () {
+  this.lateStreamingInspection = {
+    cancellationIsSent: markersAppearInOrder(
+      this.harness,
+      "final_only=true",
+      'run touch "$STREAM_CANCEL_MARKER"',
+    ),
+    markerIsSkipped:
+      /streamCaptureCancelled\(\)[\s\S]*return markdown[\s\S]*fs\.writeFileSync\(marker, readyFormula\)/u.test(
+        this.promptExtension,
+      ),
+    acknowledgementIsSkipped:
+      /if \(captureStarted && !streamCaptureCancelled\(\)\)[\s\S]*await waitForMarker/u.test(
+        this.promptExtension,
+      ),
+  };
+});
+
+Then("撮影 marker と ACK 待ちを作らず確定後のみ検査する", function () {
+  assert.deepEqual(this.lateStreamingInspection, {
+    cancellationIsSent: true,
+    markerIsSkipped: true,
+    acknowledgementIsSkipped: true,
+  });
+});
+
 Given(/^対象式が `([^`]+)` になる探索応答がある$/u, function (example) {
   if (example === "上限超過") {
     this.targetFormula = "$$\\rule{1em}{500ex}$$";
