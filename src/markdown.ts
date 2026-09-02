@@ -265,8 +265,8 @@ export function transformDisplayMath(
       opening === "$$" &&
       (isUrlDollar(source, index) || !looksLikeDollarDisplay(latex))
     ) {
-      transformed += original;
-      index = closing + closingDelimiter.length;
+      transformed += opening;
+      index = contentStart;
       continue;
     }
     const rendered = render(latex, original);
