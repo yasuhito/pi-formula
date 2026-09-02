@@ -239,6 +239,13 @@ test("未完了フレームを撮れない理由を記録する", () => {
   );
 });
 
+test("tool後のassistant応答を待ってから撮影不能を確定する", () => {
+  assert.match(
+    promptExtension,
+    /event\.message\.stopReason !== "toolUse"[\s\S]*recordUnavailableReason/u,
+  );
+});
+
 test("確定後だけの検査を出力と終了コード3で区別する", () => {
   assert.deepEqual(
     {

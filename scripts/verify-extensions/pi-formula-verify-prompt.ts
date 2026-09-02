@@ -146,7 +146,11 @@ export default function (pi: ExtensionAPI) {
     )
       fs.writeFileSync(finalMarker, "text\n");
 
-    if (event.message.role === "assistant" && !captureStarted)
+    if (
+      event.message.role === "assistant" &&
+      event.message.stopReason !== "toolUse" &&
+      !captureStarted
+    )
       recordUnavailableReason(event.message);
     if (captureStarted) {
       const acknowledgement = process.env.PI_FORMULA_VERIFY_STREAM_ACK;
