@@ -17,6 +17,7 @@ const {
   resetFormulaState,
   startSession,
   startWithKitty,
+  startWithText,
 } = require("./support/fake-pi");
 
 test.beforeEach(() => resetFormulaState());
@@ -54,6 +55,88 @@ test("inline formulas stay in Pi Markdown without image transfer", async () => {
   const rendered = pi.transformer()(markdown, {
     messageType: "assistant",
     isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("登録済みの追加マクロを両方のインライン数式区切りで展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()(
+    String.raw`$\ket{s}$ and \(\braket{s|\psi}\)`,
+    {
+      messageType: "assistant",
+      isStreaming: false,
+      availableWidth: 80,
+    },
+  );
+
+  assert.equal(
+    rendered,
+    String.raw`$\left|{s}\right\rangle$ and \(\left\langle{s|\psi}\right\rangle\)`,
+  );
+});
+
+test("テキスト経路でも登録済みの追加マクロを展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithText(pi);
+
+  const rendered = pi.transformer()(String.raw`$\ket{s}$`, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, String.raw`$\left|{s}\right\rangle$`);
+});
+
+test("展開後に Pi が描けないインライン数式は原文を残す", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = String.raw`$\ket{\notacommand{x}}$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("追加マクロを表示数式とコードと URL では展開しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`$$\ket{s}$$`,
+    String.raw`\[\ket{s}\]`,
+    "code: `$\\ket{s}$`",
+    String.raw`https://example.com/$\ket{s}$`,
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
     availableWidth: 80,
   });
 

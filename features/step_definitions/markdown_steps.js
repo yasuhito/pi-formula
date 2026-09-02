@@ -6,6 +6,7 @@ const https = require("node:https");
 const net = require("node:net");
 const { resolve } = require("node:path");
 const { Given, Then, When } = require("@cucumber/cucumber");
+const { Markdown } = require("@earendil-works/pi-tui");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
@@ -34,6 +35,11 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function renderUnicode(markdown) {
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+  return new Markdown(markdown, 0, 0, passthroughTheme).render(80)[0].trimEnd();
+}
+
 function cacheImage(bytes) {
   return {
     svg: "s".repeat(bytes),
@@ -50,6 +56,70 @@ Given("画像経路で数式を描ける Pi がある", async function () {
   this.pi = fakePi();
   registerFormula(this.pi.api);
   this.started = await startWithKitty(this.pi);
+});
+
+Given("ket と braket の追加マクロを登録する", function () {
+  require("../../dist/api.js").registerFormula(this.pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+});
+
+When("ket 追加マクロを含むドル区切りのインライン数式を描く", function () {
+  transform(this, String.raw`$\ket{s}$`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("braket 追加マクロを含む丸括弧区切りのインライン数式を描く", function () {
+  transform(this, String.raw`\(\braket{s|\psi}\)`);
+  this.unicode = renderUnicode(this.rendered);
+});
+
+When("未登録の ket を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{s}$`);
+});
+
+When("展開後も描けない命令を含むインライン数式を変換する", function () {
+  transform(this, String.raw`$\ket{\notacommand{x}}$`);
+});
+
+When(
+  "コードと金額と URL とシェル変数に追加マクロがある本文を変換する",
+  function () {
+    transform(
+      this,
+      [
+        "```text",
+        String.raw`$\ket{s}$`,
+        "```",
+        "inline: `$\\ket{s}$`",
+        "$5 and $10",
+        String.raw`https://example.com/$\ket{s}$`,
+        "$HOME and $" + "{PATH}",
+        String.raw`escaped: \$\ket{s}$`,
+      ].join("\n"),
+    );
+  },
+);
+
+Then("ket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "|s⟩");
+});
+
+Then("braket 追加マクロが Unicode で描かれる", function () {
+  assert.equal(this.unicode, "⟨s|ψ⟩");
+});
+
+Then("未登録の ket は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("描けないインライン数式は原文のまま残る", function () {
+  assert.equal(this.rendered, this.source);
+});
+
+Then("追加マクロがある保護対象は変更されない", function () {
+  assert.equal(this.rendered, this.source);
 });
 
 When("4 種類の数式区切りを含む本文を変換する", function () {

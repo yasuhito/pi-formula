@@ -21,7 +21,7 @@ import {
   type MacroDefinition,
   validateAdditionalMacros,
 } from "./macros";
-import { transformDisplayMath } from "./markdown";
+import { transformDisplayMath, transformInlineMath } from "./markdown";
 import type { PngSource } from "./png-source";
 import { formulaSerifStatus } from "./system-font";
 import {
@@ -275,18 +275,16 @@ export function registerFormula(
   });
 
   pi.registerMarkdownTransformer((markdown, context) => {
-    if (
-      context.isStreaming ||
-      context.messageType === "assistant-thinking" ||
-      state.path === "text"
-    )
-      return markdown;
+    if (context.messageType === "assistant-thinking") return markdown;
+    const macros = effectiveMacros(state);
+    const withInlineMacros = transformInlineMath(markdown, macros);
+    if (context.isStreaming || state.path === "text") return withInlineMacros;
     const renderFormula = state.imageRenderer.createMarkdownRenderer({
       availableWidth: context.availableWidth,
       color: state.textColor(),
-      macros: effectiveMacros(state),
+      macros,
     });
-    return transformDisplayMath(markdown, renderFormula);
+    return transformDisplayMath(withInlineMacros, renderFormula);
   });
 
   pi.registerCommand("formula", {

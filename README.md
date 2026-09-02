@@ -22,7 +22,7 @@ The Ghostty capture below shows Unicode inline formulas in the prose and MathJax
 
 ## What it does
 
-- **Inline formulas** (`$...$` and `\(...\)`) stay in Pi's Unicode text renderer. They remain selectable, searchable, and aligned with surrounding text.
+- **Inline formulas** (`$...$` and `\(...\)`) expand registered user and additional macros, then use Pi's Unicode text renderer. They remain selectable, searchable, and aligned with surrounding text. If Pi cannot render the expanded formula, the original LaTeX remains.
 - **Display formulas** (`$$...$$` and `\[...\]`) use transparent MathJax PNG images on the image path.
 - If images are unavailable, display formulas use Pi's Unicode text path too.
 - Only displayed Markdown changes. Saved messages and model context retain the original LaTeX.

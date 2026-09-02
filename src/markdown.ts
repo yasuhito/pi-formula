@@ -1,3 +1,11 @@
+import type * as PiTui from "@earendil-works/pi-tui" with {
+  "resolution-mode": "import",
+};
+
+import { expandFormulaMacros, type FormulaMacros } from "./macros";
+
+const { renderLatex } = require("@earendil-works/pi-tui") as typeof PiTui;
+
 interface ProtectedMarkdown {
   markdown: string;
   restore(value: string): string;
@@ -225,6 +233,118 @@ function keepHierarchy(rendered: string, continuation: string): string {
     .split("\n")
     .map((line) => `${continuation}${line}`)
     .join("\n");
+}
+
+function piRejectsDollarInline(
+  source: string,
+  content: string,
+  closing: number,
+): boolean {
+  return (
+    /\s$/u.test(content) ||
+    /^\d/u.test(source.slice(closing + 1)) ||
+    (/^[A-Z_][A-Z0-9_]*(?:[^A-Za-z0-9_\s])?$/u.test(content) &&
+      /^[A-Za-z_][A-Za-z0-9_]*/u.test(source.slice(closing + 1))) ||
+    content.includes("`")
+  );
+}
+
+function displayFormulaEnd(source: string, index: number): number | undefined {
+  const opening = source.startsWith("$$", index)
+    ? "$$"
+    : source.startsWith("\\[", index)
+      ? "\\["
+      : undefined;
+  if (!opening || isEscaped(source, index)) return undefined;
+  const delimiter = opening === "$$" ? "$$" : "\\]";
+  const closing = closingIndex(source, delimiter, index + opening.length);
+  return closing < 0 ? index + opening.length : closing + delimiter.length;
+}
+
+function inlineOpeningAt(
+  source: string,
+  index: number,
+): "$" | "\\(" | undefined {
+  if (source.startsWith("\\(", index) && !isEscaped(source, index)) {
+    return "\\(";
+  }
+  if (
+    source[index] === "$" &&
+    source[index + 1] !== "$" &&
+    !isEscaped(source, index) &&
+    !/^\$\s/u.test(source.slice(index))
+  ) {
+    return "$";
+  }
+  return undefined;
+}
+
+function expandedInline(
+  original: string,
+  opening: "$" | "\\(",
+  content: string,
+  macros: FormulaMacros,
+): string {
+  const expanded = expandFormulaMacros(content, macros);
+  if (expanded === content || renderLatex(expanded) === undefined) {
+    return original;
+  }
+  return `${opening}${expanded}${opening === "$" ? "$" : "\\)"}`;
+}
+
+export function transformInlineMath(
+  markdown: string,
+  macros: FormulaMacros,
+): string {
+  if (Object.keys(macros).length === 0) return markdown;
+  const protectedMarkdown = protectCode(markdown);
+  const source = protectedMarkdown.markdown;
+  let transformed = "";
+
+  for (let index = 0; index < source.length; ) {
+    const displayEnd = displayFormulaEnd(source, index);
+    if (displayEnd !== undefined) {
+      transformed += source.slice(index, displayEnd);
+      index = displayEnd;
+      continue;
+    }
+
+    const opening = inlineOpeningAt(source, index);
+    if (!opening) {
+      transformed += source[index];
+      index += 1;
+      continue;
+    }
+
+    const closingDelimiter = opening === "$" ? "$" : "\\)";
+    const contentStart = index + opening.length;
+    const closing = closingIndex(source, closingDelimiter, contentStart);
+    if (closing < 0) {
+      transformed += opening;
+      index = contentStart;
+      continue;
+    }
+
+    const end = closing + closingDelimiter.length;
+    const original = source.slice(index, end);
+    const content = source.slice(contentStart, closing);
+    if (
+      !content ||
+      content.includes("\n") ||
+      (opening === "$" &&
+        (isUrlDollar(source, index) ||
+          piRejectsDollarInline(source, content, closing)))
+    ) {
+      transformed += original;
+      index = end;
+      continue;
+    }
+
+    transformed += expandedInline(original, opening, content, macros);
+    index = end;
+  }
+
+  return protectedMarkdown.restore(transformed);
 }
 
 export function transformDisplayMath(

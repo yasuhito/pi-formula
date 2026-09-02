@@ -10,6 +10,40 @@ Formula for Pi の利用者として
 - When 4 種類の数式区切りを含む本文を変換する
 - Then インライン数式は残り、2 つの表示数式だけが画像になる
 
+## Scenario: ket 追加マクロをドル区切りのインライン数式で使う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When ket 追加マクロを含むドル区切りのインライン数式を描く
+- Then ket 追加マクロが Unicode で描かれる
+
+## Scenario: braket 追加マクロを丸括弧区切りのインライン数式で使う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When braket 追加マクロを含む丸括弧区切りのインライン数式を描く
+- Then braket 追加マクロが Unicode で描かれる
+
+## Scenario: 追加マクロがなければインライン数式を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- When 未登録の ket を含むインライン数式を変換する
+- Then 未登録の ket は原文のまま残る
+
+## Scenario: 展開後に描けないインライン数式を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 展開後も描けない命令を含むインライン数式を変換する
+- Then 描けないインライン数式は原文のまま残る
+
+## Scenario: 追加マクロがあっても保護対象を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When コードと金額と URL とシェル変数に追加マクロがある本文を変換する
+- Then 追加マクロがある保護対象は変更されない
+
 ## Scenario: コード内の数式を変換しない
 
 - Given 画像経路で数式を描ける Pi がある
