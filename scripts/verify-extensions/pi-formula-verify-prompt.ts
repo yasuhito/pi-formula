@@ -5,6 +5,7 @@ const {
   advanceDisplayFormulaGate,
   hasCompleteDisplayFormula,
   inspectTargetFormulaRendering,
+  targetFitsViewport,
 } = require("../display-stream-formula");
 const { transformDisplayPrompt } = require("../transform-display-prompt");
 
@@ -181,11 +182,22 @@ export default function (pi: ExtensionAPI) {
 
     const result = inspectTargetFormulaRendering(markdown);
     const finalMarker = process.env.PI_FORMULA_VERIFY_FINAL_FORMULA_MARKER;
-    if (finalMarker && result.foundTarget && !fs.existsSync(finalMarker))
-      fs.writeFileSync(
-        finalMarker,
-        result.renderedAsImage ? "image\n" : "text\n",
+    if (finalMarker && result.foundTarget && !fs.existsSync(finalMarker)) {
+      const fallbackRows = Math.floor(
+        Number(process.env.PI_FORMULA_VERIFY_HEIGHT) / 16,
       );
+      const fitsViewport = targetFitsViewport(
+        markdown,
+        context.availableWidth,
+        process.stdout.rows ?? fallbackRows,
+      );
+      const finalPath = result.renderedAsImage
+        ? fitsViewport
+          ? "image\n"
+          : "offscreen\n"
+        : "text\n";
+      fs.writeFileSync(finalMarker, finalPath);
+    }
     return result.markdown;
   });
 }

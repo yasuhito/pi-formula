@@ -63,6 +63,15 @@ test("確定本文で対象式が通常のコードになった場合は拒否�
   fs.rmSync(files.directory, { recursive: true, force: true });
 });
 
+test("対象式が確定キャプチャの外へ流れる場合は拒否する", () => {
+  const files = fixture("$$x^2$$\n長い本文", "$$x^2$$", "offscreen");
+  assert.throws(
+    () => verifyStreamedFormula(files.session, files.marker, files.finalMarker),
+    /確定キャプチャ内に保持できません/u,
+  );
+  fs.rmSync(files.directory, { recursive: true, force: true });
+});
+
 test("対象式が原文へ戻り後続の別の式だけ画像になった場合は拒否する", () => {
   const files = fixture("$$\\bad$$\n\n$$x^2$$", "$$\\bad$$", "text");
   assert.throws(

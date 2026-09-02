@@ -11,6 +11,7 @@ const {
   findCompleteDisplayFormula,
   inspectTargetFormulaRendering,
   markTargetFormula,
+  targetFitsViewport,
 } = require("../../scripts/display-stream-formula");
 const {
   DISPLAY_PROMPT_PREFIX,
@@ -314,6 +315,35 @@ Then("長い後続出力を始める前に対象式の確定画面を判定す�
     exceedsOutputHeight: true,
     extensionGate: true,
     harnessGate: true,
+  });
+});
+
+Given(
+  "対象式の後に画面高を超える本文が同じ探索応答内で続く",
+  async function () {
+    this.targetFormula = "$$x^2+y^2=1$$";
+    this.longFinalMarkdown = `${this.targetFormula}\n${"長い本文です。\n".repeat(1_001)}`;
+    this.explorationPi = fakePi();
+    registerFormula(this.explorationPi.api);
+    await startWithKitty(this.explorationPi);
+  },
+);
+
+When("対象式の確定画面への収まりを調べる", function () {
+  const rendered = this.explorationPi.transformer()(
+    markTargetFormula(this.longFinalMarkdown, this.targetFormula),
+    { messageType: "assistant", isStreaming: false, availableWidth: 80 },
+  );
+  this.finalViewportInspection = {
+    targetUsesImage: inspectTargetFormulaRendering(rendered).renderedAsImage,
+    targetFitsViewport: targetFitsViewport(rendered, 80, 1_000),
+  };
+});
+
+Then("画面外になる対象式の確定応答は検証不能にする", function () {
+  assert.deepEqual(this.finalViewportInspection, {
+    targetUsesImage: true,
+    targetFitsViewport: false,
   });
 });
 

@@ -36,6 +36,8 @@ function verifyStreamedFormula(session, marker, finalMarker) {
       "確定した assistant message でストリーミング中の式が表示数式として認識されません",
     );
   const finalPath = fs.readFileSync(finalMarker, "utf8").trim();
+  if (finalPath === "offscreen")
+    throw new Error("対象の表示数式を確定キャプチャ内に保持できません");
   if (finalPath !== "image")
     throw new Error(
       "対象の assistant message で表示数式が画像経路を通りません",

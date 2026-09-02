@@ -239,6 +239,13 @@ test("対象messageの確定結果を後続messageで上書きしない", () => 
   );
 });
 
+test("対象式から応答末尾が画面に収まらなければ検証不能を記録する", () => {
+  assert.match(
+    promptExtension,
+    /targetFitsViewport\([\s\S]*fitsViewport[\s\S]*"offscreen\\n"/u,
+  );
+});
+
 test("tool実行を対象式の確定キャプチャ完了まで待たせる", () => {
   assert.ok(
     markersAppearInOrder(

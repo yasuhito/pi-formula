@@ -4,6 +4,8 @@ const test = require("node:test");
 const {
   advanceDisplayFormulaGate,
   findCompleteDisplayFormula,
+  markTargetFormula,
+  targetFitsViewport,
 } = require("../scripts/display-stream-formula");
 
 function assistant(text) {
@@ -46,6 +48,19 @@ test("対象式が確定messageの表示数式でなくなったことを識別�
       .hasReadyFormula,
     false,
   );
+});
+
+test("短い確定本文では対象式をキャプチャ内に保持できる", () => {
+  const marked = markTargetFormula("$$x^2$$\n\n結論です。", "$$x^2$$");
+  assert.equal(targetFitsViewport(marked, 80, 100), true);
+});
+
+test("対象式後の長い本文が画面高を超える場合は拒否する", () => {
+  const marked = markTargetFormula(
+    `$$x^2$$\n${"長い本文です。\n".repeat(1_001)}`,
+    "$$x^2$$",
+  );
+  assert.equal(targetFitsViewport(marked, 80, 1_000), false);
 });
 
 test("コードフェンス内のドル記号を表示数式とみなさない", () => {
