@@ -32,6 +32,14 @@ Given("組版できる式と組版できない式を含むコーパスがある"
   );
 });
 
+Given("組版できない表示数式だけのコーパスがある", function () {
+  createPlanCorpus(
+    this,
+    "all-typesetting-failures.md",
+    "$$\\undefinedcommandhere$$",
+  );
+});
+
 Given("読み取れないコーパスのパスがある", function () {
   this.directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
@@ -66,6 +74,28 @@ Then("verify-display は組版に失敗した表示数式の数を出す", funct
       ),
     },
     { status: 0, failedFormulas: 1, reportsFailures: true },
+  );
+});
+
+Then("画像行がなくても組版失敗を報告して計画を続ける", function () {
+  assert.deepEqual(
+    {
+      status: this.planResult.status,
+      plan: JSON.parse(this.planResult.stdout),
+      reportsFailures: /組版に失敗した表示数式: 1/u.test(
+        this.planResult.stderr,
+      ),
+    },
+    {
+      status: 0,
+      plan: {
+        height: 8000,
+        imageRows: 0,
+        displayFormulas: 1,
+        failedFormulas: 1,
+      },
+      reportsFailures: true,
+    },
   );
 });
 

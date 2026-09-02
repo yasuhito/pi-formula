@@ -10,10 +10,17 @@ function validatePlan(plan) {
   ) {
     throw new Error("表示計画の出力高が不正です");
   }
-  if (!Number.isSafeInteger(plan.imageRows) || plan.imageRows < 1) {
-    throw new Error("コーパスに表示数式の画像行がありません");
+  if (!Number.isSafeInteger(plan.displayFormulas) || plan.displayFormulas < 1) {
+    throw new Error("コーパスに表示数式がありません");
   }
-  if (!Number.isSafeInteger(plan.failedFormulas) || plan.failedFormulas < 0) {
+  if (!Number.isSafeInteger(plan.imageRows) || plan.imageRows < 0) {
+    throw new Error("表示計画の画像行数が不正です");
+  }
+  if (
+    !Number.isSafeInteger(plan.failedFormulas) ||
+    plan.failedFormulas < 0 ||
+    plan.failedFormulas > plan.displayFormulas
+  ) {
     throw new Error("表示計画の組版失敗数が不正です");
   }
   return plan;
