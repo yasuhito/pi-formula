@@ -94,6 +94,47 @@ Pi の画面部品に依存せず PNG を配置したい
 - When テーマの文字色を変えて同じ表示数式の PNG を作る
 - Then 変更後の文字色で新しい PNG が作られる
 
+## Scenario Outline: 動的字形を含む表示数式を画像にする
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When "<latex>" を含む表示数式の PNG を公開 API で作る
+- Then 動的字形を含む表示数式の PNG が返る
+
+### Examples:
+
+  | latex            |
+  | `\\mathcal{H}`  |
+  | `\\mathscr{F}`  |
+  | `\\mathbb{R}`   |
+  | `\\mathfrak{g}` |
+  | `\\mathsf{T}`   |
+  | `\\mathtt{x}`   |
+
+## Scenario Outline: 既存の字形を含む表示数式を引き続き画像にする
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When "<latex>" を含む表示数式の PNG を公開 API で作る
+- Then 既存の字形を含む表示数式の PNG が返る
+
+### Examples:
+
+  | latex                 |
+  | `\\mathbf{v}`        |
+  | `\\mathrm{d}x`       |
+  | `a^2 + b^2 = c^2`    |
+
+## Scenario: 表示数式の PNG を同期的に作る
+
+- Given 画像経路を使う試験用の連携拡張がある
+- When 動的字形を含む表示数式の PNG を公開 API で作る
+- Then 公開 API は同期的に PNG を返す
+
+## Scenario: 動的字形を読み込めないときは表示数式をテキストへ戻す
+
+- Given 動的字形を読み込めない画像経路がある
+- When 動的字形を含む表示数式を描く
+- Then 例外を出さずその表示数式だけテキストへ戻る
+
 ## Scenario: テキスト経路では PNG を返さない
 
 - Given テキスト経路を使う試験用の連携拡張がある
