@@ -11,9 +11,10 @@ BASELINE_READY_TIMEOUT=30
 BASELINE_CAPTURE_TIMEOUT=30
 STREAM_CAPTURE_TIMEOUT=30
 FINAL_FORMULA_TIMEOUT=60
-IMAGE_PATH_TIMEOUT=15
-WINDOW_LIFETIME=240
-EXPLORATION_WINDOW_LIFETIME=600
+IMAGE_PATH_TIMEOUT=30
+IMAGE_PATH_INTERVAL_MS=1000
+WINDOW_LIFETIME=270
+EXPLORATION_WINDOW_LIFETIME=630
 SESSION_READY_TIMEOUT=30
 WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
@@ -367,11 +368,10 @@ if [[ "$MODE" == exploration ]]; then
   run touch "$BASELINE_CAPTURE_ACK"
 fi
 
-for ((elapsed = 0; elapsed < IMAGE_PATH_TIMEOUT; elapsed += 1)); do
-  [[ -s "$IMAGE_MARKER" ]] && break
-  run sleep 1
-done
-run node "$ROOT/scripts/verify-image-path.js" "$IMAGE_MARKER" \
+"$ROOT/scripts/run-display-command" infrastructure wait-for-image-path \
+  timeout --signal=TERM "$((IMAGE_PATH_TIMEOUT + COMMAND_TIMEOUT))" \
+  node "$ROOT/scripts/wait-for-image-path.js" "$IMAGE_MARKER" \
+  "$((IMAGE_PATH_TIMEOUT * 1000))" "$IMAGE_PATH_INTERVAL_MS" \
   || fail "現在の pi-formula が画像経路を選べませんでした"
 
 rendered_options=(--background=250,248,240 --background=238,235,224)

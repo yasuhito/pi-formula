@@ -10,6 +10,142 @@ Formula for Pi の利用者として
 - When 4 種類の数式区切りを含む本文を変換する
 - Then インライン数式は残り、2 つの表示数式だけが画像になる
 
+## Scenario: ket 追加マクロをドル区切りのインライン数式で使う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When ket 追加マクロを含むドル区切りのインライン数式を描く
+- Then ket 追加マクロが Unicode で描かれる
+
+## Scenario: braket 追加マクロを丸括弧区切りのインライン数式で使う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When braket 追加マクロを含む丸括弧区切りのインライン数式を描く
+- Then braket 追加マクロが Unicode で描かれる
+
+## Scenario: braket 利用者マクロをドル区切りのインライン数式で使う
+
+- Given braket の利用者マクロを設定した画像経路の Pi がある
+- When braket 利用者マクロを含むドル区切りのインライン数式を描く
+- Then braket 利用者マクロが Unicode で描かれる
+
+## Scenario: Object prototype 名を未登録マクロとして扱う
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When Object prototype 名と ket 追加マクロを含む本文を変換する
+- Then Object prototype 名は残り ket 追加マクロだけが展開される
+
+## Scenario: 金額とシェル変数の後にあるインライン数式を描く
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 金額とシェル変数の後に ket 追加マクロがある本文を描く
+- Then 金額とシェル変数は残り後続の ket 追加マクロが Unicode で描かれる
+
+## Scenario: 相対 Markdown URL のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する
+- Then 相対 Markdown URL は変更されない
+
+## Scenario: スキームなし URL のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When スキームなし URL に ket 追加マクロ風文字列がある本文を変換する
+- Then スキームなし URL は変更されない
+
+## Scenario: 引数付き追加マクロの直後に英字を置く
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When ket 追加マクロの直後に英字があるインライン数式を描く
+- Then ket 追加マクロと後続英字が Unicode で描かれる
+
+## Scenario: 追加マクロの置換本体どおりに引数を展開する
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When グループを持たない二乗追加マクロを変換する
+- Then 二乗追加マクロの引数は自動でグループ化されない
+
+## Scenario: 0 引数追加マクロの後の空白を TeX と同じく扱う
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When 0 引数追加マクロの後に空白と英字があるインライン数式を描く
+- Then 0 引数追加マクロと後続英字が Unicode で描かれる
+
+## Scenario: 制御記号の後を追加マクロとして展開しない
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When バックスラッシュ制御記号の後に ket と同じ英字がある本文を変換する
+- Then バックスラッシュ制御記号の後は変更されない
+
+## Scenario: 参照リンク定義のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 参照リンク定義に ket 追加マクロ風文字列がある本文を変換する
+- Then 参照リンク定義は変更されない
+
+## Scenario: 丸括弧を含む相対 Markdown URL のマクロ風文字列を変換しない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 丸括弧を含む相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する
+- Then 丸括弧を含む相対 Markdown URL は変更されない
+
+## Scenario: Markdown 表のインライン数式で ket 追加マクロを使う
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When ket 追加マクロを含む Markdown 表を描く
+- Then 表の列を保ったまま ket 追加マクロが Unicode で描かれる
+
+## Scenario: 同じ追加マクロを引数内で入れ子にする
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When 入れ子の ket 追加マクロを含むインライン数式を描く
+- Then 入れ子の ket 追加マクロが Unicode で描かれる
+
+## Scenario: 自分自身を呼ぶ追加マクロを原文のまま残す
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When 自分自身を呼ぶ追加マクロを含むインライン数式を変換する
+- Then 再帰する追加マクロは原文のまま残る
+
+## Scenario: 空文字列へ展開する利用者マクロを原文のまま残す
+
+- Given 空文字列の利用者マクロを設定した画像経路の Pi がある
+- When 空文字列の利用者マクロを含むインライン数式を変換する
+- Then 空のインライン数式にせず原文のまま残る
+
+## Scenario: 丸括弧区切りを含む bare URL を変換しない
+
+- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
+- When 丸括弧区切りの ket 追加マクロ風文字列を含む bare URL を変換する
+- Then 丸括弧区切りを含む bare URL は変更されない
+
+## Scenario: 追加マクロがなければインライン数式を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- When 未登録の ket を含むインライン数式を変換する
+- Then 未登録の ket は原文のまま残る
+
+## Scenario: 展開後に描けないインライン数式を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When 展開後も描けない命令を含むインライン数式を変換する
+- Then 描けないインライン数式は原文のまま残る
+
+## Scenario: 追加マクロがあっても保護対象を変えない
+
+- Given 画像経路で数式を描ける Pi がある
+- Given ket と braket の追加マクロを登録する
+- When コードと金額と URL とシェル変数に追加マクロがある本文を変換する
+- Then 追加マクロがある保護対象は変更されない
+
 ## Scenario: コード内の数式を変換しない
 
 - Given 画像経路で数式を描ける Pi がある

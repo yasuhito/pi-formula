@@ -21,6 +21,10 @@ const targetExtension = fs.readFileSync(
   ),
   "utf8",
 );
+const operationsGuide = fs.readFileSync(
+  path.resolve(__dirname, "../docs/agents/verify-display.md"),
+  "utf8",
+);
 const runFunction = harness.slice(
   harness.indexOf("run()"),
   harness.indexOf("cleanup()"),
@@ -118,7 +122,7 @@ test("表示数式の画像行数で出力高を決めてから検証セッシ�
 
 test("画像経路を確認してからキャプチャする", () => {
   assert.ok(
-    markersAppearInOrder(harness, "verify-image-path.js", "run_inside grim"),
+    markersAppearInOrder(harness, "wait-for-image-path.js", "run_inside grim"),
   );
 });
 
@@ -463,7 +467,45 @@ test("ビルドへ独立した長い時間上限を使う", () => {
 });
 
 test("Ghosttyの寿命に各段の期限とキャプチャの余裕を含める", () => {
-  assert.match(harness, /WINDOW_LIFETIME=240/u);
+  const seconds = (name) =>
+    Number(new RegExp(`^${name}=([0-9]+)$`, "mu").exec(harness)?.[1]);
+  const boundedStages =
+    seconds("SESSION_READY_TIMEOUT") +
+    seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("SESSION_TIMEOUT") +
+    seconds("CAPTURE_READY_TIMEOUT");
+  assert.ok(seconds("WINDOW_LIFETIME") > boundedStages);
+});
+
+test("実表示検証の運用文書に現在の画像経路期限と寿命を記す", () => {
+  const seconds = (name, source = harness) =>
+    Number(
+      new RegExp(`^${name}=(?:([0-9]+)|([0-9_]+))$`, "mu").exec(source)?.[1],
+    );
+  const milliseconds = Number(
+    /^const STREAM_GATE_TIMEOUT_MS = ([0-9_]+);$/mu
+      .exec(promptExtension)?.[1]
+      .replaceAll("_", ""),
+  );
+  const explorationDeadline =
+    seconds("SESSION_READY_TIMEOUT") +
+    seconds("IMAGE_PATH_TIMEOUT") +
+    seconds("BASELINE_READY_TIMEOUT") +
+    seconds("BASELINE_CAPTURE_TIMEOUT") +
+    seconds("STREAM_CAPTURE_TIMEOUT") +
+    2 * (milliseconds / 1000) +
+    seconds("FINAL_FORMULA_TIMEOUT") +
+    seconds("SESSION_TIMEOUT") +
+    2 * seconds("CAPTURE_READY_TIMEOUT") +
+    2 * seconds("DETECTOR_TIMEOUT") +
+    seconds("COMMAND_TIMEOUT");
+  assert.match(
+    operationsGuide,
+    new RegExp(
+      `Ghostty の寿命は、コーパスモードでは${seconds("WINDOW_LIFETIME")}秒、探索モードでは${seconds("EXPLORATION_WINDOW_LIFETIME")}秒[\\s\\S]*画像経路${seconds("IMAGE_PATH_TIMEOUT")}秒[\\s\\S]*合計${explorationDeadline}秒`,
+      "u",
+    ),
+  );
 });
 
 test("セッション待機だけ未完了の終了コード1を保つ", () => {

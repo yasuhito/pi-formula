@@ -17,6 +17,7 @@ const {
   resetFormulaState,
   startSession,
   startWithKitty,
+  startWithText,
 } = require("./support/fake-pi");
 
 test.beforeEach(() => resetFormulaState());
@@ -54,6 +55,209 @@ test("inline formulas stay in Pi Markdown without image transfer", async () => {
   const rendered = pi.transformer()(markdown, {
     messageType: "assistant",
     isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("登録済みの追加マクロを両方のインライン数式区切りで展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()(
+    String.raw`$\ket{s}$ and \(\braket{s|\psi}\)`,
+    {
+      messageType: "assistant",
+      isStreaming: false,
+      availableWidth: 80,
+    },
+  );
+
+  assert.equal(
+    rendered,
+    String.raw`$\left\vert{}s\right\rangle$ and \(\left\langle{}s\vert{}\psi\right\rangle\)`,
+  );
+});
+
+test("追加マクロの引数と制御綴の境界を TeX と同じく保つ", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    sq: ["#1^2", 1],
+    groupedSq: ["{#1}^2", 1],
+    alpha: String.raw`\alpha`,
+    loop: String.raw`\loop`,
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`$\ket{x}y$`,
+    String.raw`$\sq{a+b}$`,
+    String.raw`$\groupedSq{a+b}$`,
+    String.raw`$\alpha x$`,
+    String.raw`$\\ket{x}$`,
+    String.raw`$\loop$`,
+  ].join(" / ");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(
+    rendered,
+    [
+      String.raw`$\left\vert{}x\right\rangle{}y$`,
+      "$a+b^2$",
+      "$" + "{a+b}^2$",
+      String.raw`$\alpha{}x$`,
+      String.raw`$\\ket{x}$`,
+      String.raw`$\loop$`,
+    ].join(" / "),
+  );
+});
+
+test("同じ追加マクロを引数内でも展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()(String.raw`$\ket{\ket{x}}$`, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(
+    rendered,
+    String.raw`$\left\vert{}\left\vert{}x\right\rangle\right\rangle$`,
+  );
+});
+
+test("空文字列へ展開する利用者マクロは原文を残す", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, { empty: "" });
+  await startWithKitty(pi);
+  const markdown = String.raw`$\empty$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("Markdown 表内でも追加マクロを一つの列で描く", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = ["| 状態 |", "| --- |", String.raw`| $\ket{s}$ |`].join(
+    "\n",
+  );
+  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+
+  const transformed = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+  const row = new Markdown(transformed, 0, 0, passthroughTheme)
+    .render(80)
+    .find((line) => line.includes("|s⟩"));
+
+  assert.equal((row?.match(/│/gu) ?? []).length, 2);
+});
+
+test("Markdown URL の構造内では追加マクロを展開しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`[ket]: /guide/$\ket{s}$`,
+    String.raw`[doc](/guide/(v1)/$\ket{s}$)`,
+    String.raw`https://example.com/\(\ket{s}\)`,
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("テキスト経路でも登録済みの追加マクロを展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithText(pi);
+
+  const rendered = pi.transformer()(String.raw`$\ket{s}$`, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, String.raw`$\left\vert{}s\right\rangle$`);
+});
+
+test("展開後に Pi が描けないインライン数式は原文を残す", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = String.raw`$\ket{\notacommand{x}}$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("追加マクロを表示数式とコードと URL では展開しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`$$\ket{s}$$`,
+    String.raw`\[\ket{s}\]`,
+    "code: `$\\ket{s}$`",
+    String.raw`https://example.com/$\ket{s}$`,
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
     availableWidth: 80,
   });
 
