@@ -16,6 +16,12 @@ pi-formula の worker として
 - When プロトコル検査の入口を実行する
 - Then 環境変数で指定した vt-pty が実行される
 
+## Scenario: pin と隔離した prefix のビルド計画を得る
+
+- Given ホーム側の native prefix を指定する
+- When libghostty-vt のビルド計画を出力する
+- Then pin と指定 prefix だけを使うビルド計画が得られる
+
 `@native-vt`
 ## Scenario: pty の子プロセス出力からプロトコル状態を得る
 
@@ -23,26 +29,23 @@ pi-formula の worker として
 - When 子プロセスの出力が落ち着くまで待つ
 - Then libghostty-vt が解析したプロトコル状態が出力される
 
-## Scenario: pin した commit だけをビルド入力にする
+`@native-vt`
+## Scenario: 長い grapheme cluster を安全に解析する
 
-- Given libghostty-vt のビルド定義がある
-- When ビルド入力を調べる
-- Then 一行の pin を指定 prefix のビルドへ使う
+- Given vt-pty で16 codepointを超える grapheme cluster を出力する
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 長い grapheme cluster のプロトコル状態が出力される
 
-## Scenario: native 成果物をシステム領域へ入れない
+`@native-vt`
+## Scenario: 子プロセスの timeout を失敗として返す
 
-- Given libghostty-vt のビルド定義がある
-- When native 成果物の出力先を調べる
-- Then ヘッダとライブラリを指定 prefix だけから使う
+- Given vt-pty の期限を超えて動く子プロセスがある
+- When プロトコル検査の入口を実行する
+- Then timeout は成功として扱われない
 
-## Scenario: 専用 CI で pin ごとの native 成果物を作る
+`@native-vt`
+## Scenario: 子プロセスの起動失敗を返す
 
-- Given CI の native 専用 job がある
-- When native job のビルドとキャッシュを調べる
-- Then Linux と macOS で pin ごとの vt-pty を検査する
-
-## Scenario: pin 更新時の確認事項を残す
-
-- Given libghostty-vt の運用文書がある
-- When pin の更新手順を調べる
-- Then API 差分と検査と資源量の変化を確認できる
+- Given vt-pty から起動できない子プロセスがある
+- When プロトコル検査の入口を実行する
+- Then 子プロセスの起動失敗は成功として扱われない

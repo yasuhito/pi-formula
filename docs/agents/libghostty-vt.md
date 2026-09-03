@@ -29,7 +29,9 @@ scripts/build-vt-pty --prefix "$HOME/.local/state/pi-formula-native"
 zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix <dir>
 ```
 
-`vt-pty` のコンパイルでは `<dir>/include` と `<dir>/lib` を明示する。システムの libghostty-vt や `pkg-config` は使わない。
+`vt-pty` のコンパイルでは `<dir>/include` と `<dir>/lib` を明示する。システムの libghostty-vt や `pkg-config` は使わない。ビルド計画だけを確認する場合は `--print-plan` を付ける。この場合は clone、ビルド、ファイル作成を行わない。
+
+CI は高価な libghostty-vt のヘッダとライブラリだけを pin ごとに cache する。`native/vt-pty.c` と `native/diacritics.h` から作る実行ファイルは cache に含めず、現在の checkout から毎回コンパイルする。
 
 ## 実行と skip
 
@@ -38,6 +40,8 @@ scripts/run-vt-pty.js -- <command> [args...]
 ```
 
 入口は `PI_FORMULA_VT_TOOL`、既定の cache 内にある `vt-pty` の順で探す。どちらにも実行可能なファイルがなければ、プロトコル検査を成功として skip し、その旨を標準出力へ出す。通常の `npm run check` は native 成果物を必要としない。
+
+子プロセスの出力が落ち着いた場合だけプロトコル状態を出す。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
