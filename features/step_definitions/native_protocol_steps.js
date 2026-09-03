@@ -57,6 +57,46 @@ Given("ホーム側の native prefix を指定する", function () {
   );
 });
 
+Given("ビルド成果物がない検査用 checkout がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-encoder-checkout-"),
+  );
+  for (const file of ["package.json", "tsconfig.json"]) {
+    fs.copyFileSync(
+      path.join(root, file),
+      path.join(this.nativeTestDirectory, file),
+    );
+  }
+  for (const directory of ["src", "test/support"]) {
+    fs.cpSync(
+      path.join(root, directory),
+      path.join(this.nativeTestDirectory, directory),
+      { recursive: true },
+    );
+  }
+  fs.mkdirSync(path.join(this.nativeTestDirectory, "scripts"));
+  for (const file of [
+    "clean-dist.js",
+    "verify-encoder-protocol.js",
+    "vt-tool.js",
+  ]) {
+    fs.copyFileSync(
+      path.join(root, "scripts", file),
+      path.join(this.nativeTestDirectory, "scripts", file),
+    );
+  }
+  fs.mkdirSync(path.join(this.nativeTestDirectory, "native"));
+  fs.copyFileSync(
+    path.join(root, "native/libghostty-vt.commit"),
+    path.join(this.nativeTestDirectory, "native/libghostty-vt.commit"),
+  );
+  fs.symlinkSync(
+    path.join(root, "node_modules"),
+    path.join(this.nativeTestDirectory, "node_modules"),
+    "dir",
+  );
+});
+
 Given("vt-pty で文字を出力する子プロセスを起動する", function () {
   this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
 });
@@ -241,6 +281,19 @@ When("エンコーダ層の storage を検査する", function () {
   inspectEncoderProtocol(this, "storage");
 });
 
+When("文書化されたエンコーダ層の検査入口を実行する", function () {
+  this.nativeResult = spawnSync(
+    "npm",
+    ["run", "verify:encoder-protocol", "--", "--check", "storage"],
+    {
+      cwd: this.nativeTestDirectory,
+      encoding: "utf8",
+      env: { ...process.env, PI_FORMULA_VT_TOOL: this.vtTool },
+      timeout: 30_000,
+    },
+  );
+});
+
 When("エンコーダ層の仮想配置を検査する", function () {
   inspectEncoderProtocol(this, "placement");
 });
@@ -337,6 +390,16 @@ function assertEncoderCheck(world, message) {
 
 Then("storage に計画どおりの PNG 画像が一件ある", function () {
   assertEncoderCheck(this, "encoder-protocol: storage ok");
+});
+
+Then("現在のエンコーダをビルドしてプロトコル状態を検査する", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("encoder-protocol: storage ok") &&
+      fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
 });
 
 Then("仮想配置の列数と行数が計画と一致する", function () {

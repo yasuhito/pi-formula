@@ -64,7 +64,7 @@
     "test": "npm run coverage && npm run test:cucumber",
     "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
     "verify:vt": "node scripts/run-vt-pty.js",
-    "verify:encoder-protocol": "node scripts/verify-encoder-protocol.js",
+    "verify:encoder-protocol": "npm run build && node scripts/verify-encoder-protocol.js",
     "verify:pi-protocol": "node scripts/verify-pi-protocol.js",
     "verify:session-record": "node scripts/verify-session-tools.js",
     "release:prepare": "npm run check && node scripts/prepare-release.js"
