@@ -2,7 +2,8 @@
 // Tier B の spike。Pi を通した出力でしか再現しない不具合（#21 / #22 の APC 断片、#52 の SGR 汚染）を狙う。
 //
 // 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
-//                [--settle-ms N] [--timeout-ms N] [--raw <file>] -- <command> [args...]
+//                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
+//                [--raw <file>] -- <command> [args...]
 #define _GNU_SOURCE
 #include <ghostty/vt.h>
 #include <errno.h>
@@ -67,6 +68,26 @@ static int diacritic_index(uint32_t cp) {
 
 static const char *tag_name(GhosttyStyleColorTag t) {
   return t == GHOSTTY_STYLE_COLOR_RGB ? "rgb" : t == GHOSTTY_STYLE_COLOR_PALETTE ? "palette" : "none";
+}
+
+static bool kitty_placement_count(GhosttyTerminal term, int *count) {
+  GhosttyKittyGraphics gfx = NULL;
+  if (ghostty_terminal_get(term, GHOSTTY_TERMINAL_DATA_KITTY_GRAPHICS, &gfx) != GHOSTTY_SUCCESS) {
+    fprintf(stderr, "vt-pty: kitty graphics query failed\n"); return false;
+  }
+  *count = 0;
+  if (!gfx) return true;
+  GhosttyKittyGraphicsPlacementIterator it = NULL;
+  if (ghostty_kitty_graphics_placement_iterator_new(NULL, &it) != GHOSTTY_SUCCESS) {
+    fprintf(stderr, "vt-pty: kitty iterator allocation failed\n"); return false;
+  }
+  GhosttyKittyPlacementLayer layer = GHOSTTY_KITTY_PLACEMENT_LAYER_ALL;
+  bool ok = ghostty_kitty_graphics_placement_iterator_set(it, GHOSTTY_KITTY_GRAPHICS_PLACEMENT_ITERATOR_OPTION_LAYER, &layer) == GHOSTTY_SUCCESS &&
+    ghostty_kitty_graphics_get(gfx, GHOSTTY_KITTY_GRAPHICS_DATA_PLACEMENT_ITERATOR, &it) == GHOSTTY_SUCCESS;
+  if (ok) while (ghostty_kitty_graphics_placement_next(it)) (*count)++;
+  ghostty_kitty_graphics_placement_iterator_free(it);
+  if (!ok) fprintf(stderr, "vt-pty: kitty iterator setup failed\n");
+  return ok;
 }
 
 static bool dump_kitty(GhosttyTerminal term) {
@@ -200,7 +221,7 @@ static long now_ms(void) {
 
 int main(int argc, char **argv) {
   int cols = 120, rows = 40, cell_w = 9, cell_h = 18;
-  int settle_ms = 2000, timeout_ms = 60000;
+  int settle_ms = 2000, timeout_ms = 60000, wait_for_placements = 0;
   const char *raw_path = NULL;
   int i = 1;
   for (; i < argc; i++) {
@@ -211,10 +232,12 @@ int main(int argc, char **argv) {
     else if (strcmp(argv[i], "--cell-h") == 0 && i + 1 < argc) cell_h = atoi(argv[++i]);
     else if (strcmp(argv[i], "--settle-ms") == 0 && i + 1 < argc) settle_ms = atoi(argv[++i]);
     else if (strcmp(argv[i], "--timeout-ms") == 0 && i + 1 < argc) timeout_ms = atoi(argv[++i]);
+    else if (strcmp(argv[i], "--wait-for-placements") == 0 && i + 1 < argc) wait_for_placements = atoi(argv[++i]);
     else if (strcmp(argv[i], "--raw") == 0 && i + 1 < argc) raw_path = argv[++i];
     else { fprintf(stderr, "unknown option: %s\n", argv[i]); return 2; }
   }
   if (i >= argc) { fprintf(stderr, "usage: vt-pty [options] -- <command> [args...]\n"); return 2; }
+  if (wait_for_placements < 0) { fprintf(stderr, "vt-pty: --wait-for-placements must not be negative\n"); return 2; }
 
   if (ghostty_sys_set(GHOSTTY_SYS_OPT_DECODE_PNG, (const void *)decode_png_stub) != GHOSTTY_SUCCESS) {
     fprintf(stderr, "vt-pty: PNG decoder setup failed\n"); return 2;
@@ -256,12 +279,20 @@ int main(int argc, char **argv) {
 
   long start = now_ms(), last_data = start;
   bool saw_data = false, settled = false;
-  int result = 0;
+  int result = 0, observed_placements = 0;
   uint8_t buf[65536];
   for (;;) {
     long now = now_ms();
-    if (now - start > timeout_ms) { fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms); result = 2; break; }
-    if (saw_data && now - last_data > settle_ms) { settled = true; break; }
+    if (now - start > timeout_ms) {
+      if (wait_for_placements > 0) fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
+      else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
+      result = 2; break;
+    }
+    if (saw_data && now - last_data > settle_ms) {
+      if (wait_for_placements <= 0) { settled = true; break; }
+      if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
+      if (observed_placements >= wait_for_placements) { settled = true; break; }
+    }
     struct pollfd p = {.fd = master_fd, .events = POLLIN};
     int rc = poll(&p, 1, 200);
     if (rc < 0) { if (errno == EINTR) continue; perror("poll"); result = 2; break; }
