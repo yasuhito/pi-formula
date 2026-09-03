@@ -289,28 +289,19 @@ function looksLikeDollarDisplay(latex: string): boolean {
 function looksLikeReconsideredDollarDisplay(
   latex: string,
   reachesLaterLine: boolean,
-  closingEndsLine: boolean,
+  closingStartsDisplay: boolean,
 ): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
   if (
     reachesLaterLine &&
-    !closingEndsLine &&
+    closingStartsDisplay &&
     /^\d/u.test(latex) &&
     /^\d+(?:[.,]\d+)*$/u.test(value)
   )
     return false;
   if (/[_^=+*/<>|&±≤≥≠≈∈→⇒∞∫∑√]/u.test(value)) return true;
   return !/\p{L}{2,}/u.test(value);
-}
-
-function delimiterEndsLine(
-  source: string,
-  closing: number,
-  delimiter: string,
-): boolean {
-  const remainder = source.slice(closing + delimiter.length).split("\n", 1)[0];
-  return remainder.trim().length === 0;
 }
 
 function removeContinuation(latex: string, continuation: string): string {
@@ -323,6 +314,21 @@ function removeContinuation(latex: string, continuation: string): string {
         : line,
     )
     .join("\n");
+}
+
+function dollarDelimiterStartsDisplay(
+  source: string,
+  opening: number,
+): boolean {
+  const contentStart = opening + 2;
+  const closing = closingIndex(source, "$$", contentStart);
+  if (closing < 0 || closing === contentStart) return false;
+  const continuation = hierarchyContinuation(source, opening);
+  const latex = removeContinuation(
+    source.slice(contentStart, closing),
+    continuation,
+  );
+  return !isDisplayUrlDollar(source, opening) && looksLikeDollarDisplay(latex);
 }
 
 function keepHierarchy(rendered: string, continuation: string): string {
@@ -526,7 +532,7 @@ export function transformDisplayMath(
           !looksLikeReconsideredDollarDisplay(
             latex,
             reachesLaterLine,
-            delimiterEndsLine(source, closing, closingDelimiter),
+            dollarDelimiterStartsDisplay(source, closing),
           )))
     ) {
       transformed += reachesLaterLine ? opening : original;

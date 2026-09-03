@@ -525,6 +525,19 @@ When("再走査される金額と後続の表示数式を含む本文を変換�
 });
 
 When(
+  "再走査される金額と独立した区切り行の表示数式を含む本文を変換する",
+  function () {
+    transform(this, "$$\nx = 1\n$$");
+    this.expectedIndependentFormulaImages = imageIdentities(this.rendered);
+    transform(
+      this,
+      "前置き $$ は数式ではありません。\n価格は $$100\n\n$$\nx = 1\n$$",
+    );
+    this.actualIndependentFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When(
   "数式でない $$ と後続の数値だけの表示数式を含む本文を変換する",
   function () {
     transform(this, "$$100$$");
@@ -676,6 +689,19 @@ Then("金額は入力どおり残る", function () {
 
 Then("画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
+});
+
+Then("金額は一度だけ残り画像経路で描かれる式は x = 1 だけになる", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualIndependentFormulaImages,
+      amountOccurrences: this.rendered.split("価格は $$100").length - 1,
+    },
+    {
+      formulaImages: this.expectedIndependentFormulaImages,
+      amountOccurrences: 1,
+    },
+  );
 });
 
 Then("画像経路で描かれる式は 100 だけになる", function () {
