@@ -39,7 +39,7 @@ if [[ "$PRINT_PLAN" == true ]]; then
   printf 'include=%s/include\n' "$PREFIX"
   printf 'library=%s/lib\n' "$PREFIX"
   printf 'vt-tool=%s\n' "$VT_TOOL"
-  printf 'zig-command=zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix %s\n' "$PREFIX"
+  printf 'zig-command=zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix %s\n' "$PREFIX"
   exit 0
 fi
 
@@ -72,7 +72,7 @@ if [[ ! -f "$PREFIX/include/ghostty/vt.h" ]] || ! compgen -G "$PREFIX/lib/libgho
   mkdir -p "$PREFIX"
   (
     cd "$SOURCE"
-    zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix "$PREFIX"
+    zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix "$PREFIX"
   )
 fi
 
