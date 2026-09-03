@@ -92,7 +92,13 @@ jobs:
         run: scripts/build-vt-pty
 
       - name: Select vt-pty
-        run: echo "PI_FORMULA_VT_TOOL=$(node -e 'process.stdout.write(require(\"./scripts/vt-tool\").resolveVtTool())')" >> "$GITHUB_ENV"
+        run: |
+          tool=$(node -p 'require("./scripts/vt-tool").resolveVtTool() || ""')
+          if [ -z "$tool" ]; then
+            echo "vt-pty を解決できませんでした。ビルドが成功しているか確認してください。" >&2
+            exit 1
+          fi
+          echo "PI_FORMULA_VT_TOOL=$tool" >> "$GITHUB_ENV"
 
       - name: Inspect protocol state through a pty
         run: npm run test:native-vt
