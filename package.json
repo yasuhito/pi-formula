@@ -60,8 +60,10 @@
     "test:unit": "npm run build && node --test test/*.test.js",
     "coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-include=\"dist/*.js\" --test-coverage-lines=80 --test-coverage-branches=70 --test-coverage-functions=80 test/*.test.js",
     "test:cucumber": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress \"features/**/*.feature.md\"",
+    "test:native-vt": "npm run build && cucumber-js --require \"features/step_definitions/**/*.js\" --format progress --tags \"@native-vt\" \"features/native-protocol.feature.md\"",
     "test": "npm run coverage && npm run test:cucumber",
     "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
+    "verify:vt": "node scripts/run-vt-pty.js",
     "verify:session-record": "node scripts/verify-session-tools.js",
     "release:prepare": "npm run check && node scripts/prepare-release.js"
   },
