@@ -45,6 +45,24 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
+## Pi を通したプロトコル検査
+
+```sh
+npm run verify:pi-protocol
+```
+
+この検査は `docs/agents/verify-corpus/issue-52.md` から一時セッションを作り、`pi --session` で開く。Pi は `--offline` で起動し、保存済み assistant message を描くだけなのでモデルを呼ばない。拡張の自動探索、tool、skill、prompt template、context file、theme を無効にする。設定は一時 `XDG_CONFIG_HOME` へ隔離し、`PI_FORMULA_MACROS='{}'` で利用者マクロを空にする。
+
+pty の出力が1.5秒止まった時点の状態を検査し、全体の期限は15秒とする。期限内に落ち着かなければ、`vt-pty: timeout 15000ms` を出して終了コード2で失敗する。
+
+次のどれかに該当すると終了コード1で失敗する。
+
+- placeholder セルに `faint`、背景色、`inverse` のいずれかがある
+- 本文セルに APC の ESC または ST が残る
+- 表示数式の数と、storage に image がある仮想配置の数が一致しない
+
+`vt-pty` がなければ通常のプロトコル検査と同様に成功として skip する。実装契約の回帰シナリオは `npm run test:native-vt` で実行する。
+
 ## pin の更新
 
 pin の更新は独立した PR にする。更新前後で次を確認する。

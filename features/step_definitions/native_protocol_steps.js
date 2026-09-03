@@ -95,6 +95,69 @@ Given("vt-pty から起動できない子プロセスがある", function () {
   this.entranceArguments = ["--", "pi-formula-command-that-does-not-exist"];
 });
 
+Given("本文セルに APC の断片を返す vt-pty がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-apc-test-"),
+  );
+  const tool = path.join(this.nativeTestDirectory, "apc-vt-pty");
+  const placements = Array.from(
+    { length: 7 },
+    (_, index) =>
+      `placement: image_id=${index} virtual=1 image={1x1 format=100 bytes=4}`,
+  ).join("\\n");
+  fs.writeFileSync(
+    tool,
+    `#!/bin/sh\nprintf '%s\\n' '${placements}' 'kitty.placements=7' 'cells.dirty_placeholders=0 cells.apc_leak=1'\n`,
+  );
+  fs.chmodSync(tool, 0o755);
+  this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
+});
+
+Given("描画が落ち着かない vt-pty がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-unsettled-test-"),
+  );
+  const tool = path.join(this.nativeTestDirectory, "unsettled-vt-pty");
+  fs.writeFileSync(
+    tool,
+    "#!/bin/sh\nprintf 'vt-pty: timeout 15000ms\\n' >&2\nexit 2\n",
+  );
+  fs.chmodSync(tool, 0o755);
+  this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
+});
+
+Given("保存済みコーパスセッションを Pi で開く", function () {
+  this.nativeEnvironment = {
+    ...process.env,
+    PI_FORMULA_VT_TOOL: this.vtTool,
+  };
+});
+
+Given("下線色をセミコロン形式へ戻した pi-formula がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(root, ".pi-formula-dirty-placeholder-test-"),
+  );
+  const source = path.join(this.nativeTestDirectory, "src");
+  fs.cpSync(path.join(root, "src"), source, { recursive: true });
+  fs.copyFileSync(
+    path.join(root, "package.json"),
+    path.join(this.nativeTestDirectory, "package.json"),
+  );
+  const kittyPath = path.join(source, "kitty.ts");
+  const kitty = fs.readFileSync(kittyPath, "utf8");
+  fs.writeFileSync(
+    kittyPath,
+    kitty.replace(/\[58:2::\$\{red\}:\$\{green\}:\$\{blue\}m/u, (value) =>
+      value.replace(":2::", ";2;").replaceAll(":", ";"),
+    ),
+  );
+  this.nativeEnvironment = {
+    ...process.env,
+    PI_FORMULA_VT_TOOL: this.vtTool,
+    PI_FORMULA_PROTOCOL_EXTENSION: path.join(source, "extension.ts"),
+  };
+});
+
 When("プロトコル検査の入口を実行する", function () {
   this.nativeResult = spawnSync(
     process.execPath,
@@ -133,12 +196,36 @@ When("子プロセスの出力が落ち着くまで待つ", function () {
   });
 });
 
+When("Pi を通したプロトコル検査を実行する", function () {
+  this.nativeResult = spawnSync(
+    process.execPath,
+    ["scripts/verify-pi-protocol.js"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: this.nativeEnvironment,
+      timeout: 30_000,
+    },
+  );
+});
+
 Then("成功として skip したことが出力される", function () {
   assert.deepEqual(
     { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
     {
       status: 0,
       stdout: "SKIP: libghostty-vt のプロトコル検査（vt-pty がありません）\n",
+    },
+    this.nativeResult.stderr,
+  );
+});
+
+Then("Pi を通した検査を成功として skip したことが出力される", function () {
+  assert.deepEqual(
+    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
+    {
+      status: 0,
+      stdout: "SKIP: Pi を通したプロトコル検査（vt-pty がありません）\n",
     },
     this.nativeResult.stderr,
   );
@@ -212,6 +299,64 @@ Then("子プロセスの起動失敗は成功として扱われない", function
   assert.equal(
     this.nativeResult.status !== 0 &&
       this.nativeResult.stderr.includes("child exited with status 127"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("本文セルの APC 断片を検出して失敗する", function () {
+  assert.equal(
+    this.nativeResult.status === 1 &&
+      /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("描画が落ち着かない理由が出力される", function () {
+  assert.deepEqual(
+    {
+      status: this.nativeResult.status,
+      reason: this.nativeResult.stderr.trim(),
+    },
+    { status: 2, reason: "vt-pty: timeout 15000ms" },
+    this.nativeResult.stdout,
+  );
+});
+
+Then("placeholder セルの汚れがないと報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("cells.dirty_placeholders=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("本文セルに APC の断片がないと報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("表示数式と storage 付き仮想配置の数が一致する", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      /pi-protocol: display_formulas=(\d+) virtual_images=\1/u.test(
+        this.nativeResult.stdout,
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("placeholder セルの汚れを検出して失敗する", function () {
+  assert.equal(
+    this.nativeResult.status === 1 &&
+      /Pi を通した placeholder セルに汚れ/u.test(this.nativeResult.stderr),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );

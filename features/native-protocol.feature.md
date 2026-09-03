@@ -10,6 +10,12 @@ pi-formula の worker として
 - When プロトコル検査の入口を実行する
 - Then 成功として skip したことが出力される
 
+## Scenario: Pi を通した検査も native ツールがない環境では skip する
+
+- Given vt-pty がない環境がある
+- When Pi を通したプロトコル検査を実行する
+- Then Pi を通した検査を成功として skip したことが出力される
+
 ## Scenario: 環境変数で指定した vt-pty を優先する
 
 - Given 環境変数で指定した vt-pty がある
@@ -49,3 +55,43 @@ pi-formula の worker として
 - Given vt-pty から起動できない子プロセスがある
 - When プロトコル検査の入口を実行する
 - Then 子プロセスの起動失敗は成功として扱われない
+
+## Scenario: Pi を通した本文セルの APC 断片を検出する
+
+- Given 本文セルに APC の断片を返す vt-pty がある
+- When Pi を通したプロトコル検査を実行する
+- Then 本文セルの APC 断片を検出して失敗する
+
+## Scenario: Pi の描画が落ち着かない場合は理由を返す
+
+- Given 描画が落ち着かない vt-pty がある
+- When Pi を通したプロトコル検査を実行する
+- Then 描画が落ち着かない理由が出力される
+
+`@native-vt`
+## Scenario: Pi を通した表示数式の placeholder セルは汚れていない
+
+- Given 保存済みコーパスセッションを Pi で開く
+- When Pi を通したプロトコル検査を実行する
+- Then placeholder セルの汚れがないと報告される
+
+`@native-vt`
+## Scenario: Pi を通した本文セルに APC の断片がない
+
+- Given 保存済みコーパスセッションを Pi で開く
+- When Pi を通したプロトコル検査を実行する
+- Then 本文セルに APC の断片がないと報告される
+
+`@native-vt`
+## Scenario: 表示数式ごとに storage の image を持つ仮想配置がある
+
+- Given 保存済みコーパスセッションを Pi で開く
+- When Pi を通したプロトコル検査を実行する
+- Then 表示数式と storage 付き仮想配置の数が一致する
+
+`@native-vt`
+## Scenario: placeholder セルの SGR 汚染を退行として検出する
+
+- Given 下線色をセミコロン形式へ戻した pi-formula がある
+- When Pi を通したプロトコル検査を実行する
+- Then placeholder セルの汚れを検出して失敗する
