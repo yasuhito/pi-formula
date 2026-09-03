@@ -557,6 +557,25 @@ When(
   },
 );
 
+When(
+  "数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    const numericImages = imageIdentities(this.rendered);
+    transform(this, "$$y = 1$$");
+    const followingImages = imageIdentities(this.rendered);
+    this.expectedSeparatedFormulaImages = [
+      ...numericImages,
+      ...followingImages,
+    ];
+    transform(
+      this,
+      "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$y = 1$$",
+    );
+    this.actualSeparatedFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
 When("通常の表示数式を変換する", function () {
   transform(this, "$$a = b$$");
 });
@@ -715,6 +734,19 @@ Then("画像経路で描かれる複数行区切りの式は 100 だけになる
   assert.deepEqual(
     this.actualMultilineNumericFormulaImages,
     this.expectedMultilineNumericFormulaImages,
+  );
+});
+
+Then("100 と y = 1 だけが画像になり単一英字は一度だけ残る", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualSeparatedFormulaImages,
+      textOccurrences: this.rendered.split("\nx\n").length - 1,
+    },
+    {
+      formulaImages: this.expectedSeparatedFormulaImages,
+      textOccurrences: 1,
+    },
   );
 });
 
