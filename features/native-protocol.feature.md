@@ -99,6 +99,20 @@ pi-formula の worker として
 - Then 必要な仮想配置を受け取ってからプロトコル状態が出力される
 
 `@native-vt`
+## Scenario: 仮想配置が揃えば子プロセスの出力が続いていても検査する
+
+- Given 必要な仮想配置の後も出力を続ける子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 出力の静止を待たずにプロトコル状態が出力される
+
+`@native-vt`
+## Scenario: timeout 時に実際に観測した仮想配置数を報告する
+
+- Given 一部の仮想配置を出した後も出力を続ける子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then timeout 時点の仮想配置数が出力される
+
+`@native-vt`
 ## Scenario: 長い grapheme cluster を安全に解析する
 
 - Given vt-pty で16 codepointを超える grapheme cluster を出力する

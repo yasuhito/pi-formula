@@ -286,8 +286,10 @@ int main(int argc, char **argv) {
   for (;;) {
     long now = now_ms();
     if (now - start > timeout_ms) {
-      if (wait_for_placements > 0) fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
-      else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
+      if (wait_for_placements > 0) {
+        if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
+        fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
+      } else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
       result = 2; break;
     }
     if (saw_data && now - last_data > settle_ms) {
@@ -309,6 +311,10 @@ int main(int argc, char **argv) {
     ghostty_terminal_vt_write(term, buf, (size_t)n);
     if (pty_write_failed) {
       fprintf(stderr, "vt-pty: terminal response write failed\n"); result = 2; break;
+    }
+    if (wait_for_placements > 0) {
+      if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
+      if (observed_placements >= wait_for_placements) { settled = true; break; }
     }
     saw_data = true;
     last_data = now_ms();

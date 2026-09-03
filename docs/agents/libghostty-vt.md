@@ -41,7 +41,7 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 入口は `PI_FORMULA_VT_TOOL`、既定の cache 内にある `vt-pty` の順で探す。どちらにも実行可能なファイルがなければ、プロトコル検査を成功として skip し、その旨を標準出力へ出す。通常の `npm run check` は native 成果物を必要としない。
 
-子プロセスの出力が落ち着いた場合だけプロトコル状態を出す。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
+配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。配置数を指定した場合は、必要な仮想配置が揃い次第、出力の静止を待たずに状態を出す。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
@@ -65,7 +65,7 @@ npm run verify:pi-protocol
 
 この検査は `docs/agents/verify-corpus/issue-52.md` から一時セッションを作り、`pi --session` で開く。Pi は `--offline` で起動し、保存済み assistant message を描くだけなのでモデルを呼ばない。拡張の自動探索、tool、skill、prompt template、context file、theme を無効にする。設定は一時 `XDG_CONFIG_HOME` へ隔離し、`PI_FORMULA_MACROS='{}'` で利用者マクロを空にする。
 
-全表示数式の仮想配置を受け取った後、pty の出力が1.5秒止まった時点の状態を検査する。初回組版の途中に無出力時間があっても確定しない。全体の期限は15秒とし、期限内に配置が揃わなければ、必要数と観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。
+全表示数式の仮想配置を受け取り次第、pty の出力が止まるのを待たずに状態を検査する。初回組版の途中に無出力時間があっても、配置が揃うまでは確定しない。全体の期限は15秒とし、期限内に配置が揃わなければ、timeout 時点でもう一度配置を数え、必要数と実際の観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。
 
 次のどれかに該当すると終了コード1で失敗する。
 

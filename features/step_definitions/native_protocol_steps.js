@@ -149,6 +149,41 @@ setTimeout(() => {
   },
 );
 
+function placementFollowedByContinuousOutput(waitForPlacements) {
+  const program = `
+const png = Buffer.alloc(24);
+png.set([137, 80, 78, 71]);
+png.writeUInt32BE(1, 16);
+png.writeUInt32BE(1, 20);
+process.stdout.write(
+  "\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
+    png.toString("base64") +
+    "\\x1b\\\\",
+);
+setInterval(() => process.stdout.write("."), 5);
+`;
+  return [
+    "--settle-ms",
+    "20",
+    "--timeout-ms",
+    "300",
+    "--wait-for-placements",
+    String(waitForPlacements),
+    "--",
+    process.execPath,
+    "-e",
+    program,
+  ];
+}
+
+Given("必要な仮想配置の後も出力を続ける子プロセスがある", function () {
+  this.nativeCommand = placementFollowedByContinuousOutput(1);
+});
+
+Given("一部の仮想配置を出した後も出力を続ける子プロセスがある", function () {
+  this.nativeCommand = placementFollowedByContinuousOutput(2);
+});
+
 Given("vt-pty で16 codepointを超える grapheme cluster を出力する", function () {
   this.nativeCommand = [
     "--settle-ms",
@@ -501,6 +536,26 @@ Then("必要な仮想配置を受け取ってからプロトコル状態が出�
   assert.equal(
     this.nativeResult.status === 0 &&
       this.nativeResult.stdout.includes("kitty.placements=1"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("出力の静止を待たずにプロトコル状態が出力される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("kitty.placements=1"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("timeout 時点の仮想配置数が出力される", function () {
+  assert.equal(
+    this.nativeResult.status !== 0 &&
+      this.nativeResult.stderr.includes(
+        "waiting for 2 placements (observed 1)",
+      ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
