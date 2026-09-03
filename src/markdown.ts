@@ -289,13 +289,13 @@ function looksLikeDollarDisplay(latex: string): boolean {
 function looksLikeReconsideredDollarDisplay(
   latex: string,
   reachesLaterLine: boolean,
-  closingStartsDisplay: boolean,
+  openingAtLineStart: boolean,
 ): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
   if (
     reachesLaterLine &&
-    closingStartsDisplay &&
+    !openingAtLineStart &&
     /^\d/u.test(latex) &&
     /^\d+(?:[.,]\d+)*$/u.test(value)
   )
@@ -316,54 +316,10 @@ function removeContinuation(latex: string, continuation: string): string {
     .join("\n");
 }
 
-function delimiterIsAloneOnLine(
-  source: string,
-  index: number,
-  delimiter: string,
-): boolean {
-  const lineStart = source.lastIndexOf("\n", index - 1) + 1;
-  const followingLineBreak = source.indexOf("\n", index + delimiter.length);
-  const lineEnd = followingLineBreak < 0 ? source.length : followingLineBreak;
-  return (
-    source.slice(lineStart, index).trim().length === 0 &&
-    source.slice(index + delimiter.length, lineEnd).trim().length === 0
-  );
-}
-
-function pairedDollarDelimiterStarts(source: string): Set<number> {
-  const delimiters: number[] = [];
-  for (
-    let index = closingIndex(source, "$$", 0);
-    index >= 0;
-    index = closingIndex(source, "$$", index + 2)
-  ) {
-    delimiters.push(index);
-  }
-  return new Set(
-    delimiters.filter((_, index) => (delimiters.length - index) % 2 === 0),
-  );
-}
-
-function dollarDelimiterStartsDisplay(
-  source: string,
-  opening: number,
-  hasPairedSuffix: boolean,
-): boolean {
-  if (!hasPairedSuffix) return false;
-  const contentStart = opening + 2;
-  const closing = closingIndex(source, "$$", contentStart);
-  if (closing < 0 || closing === contentStart) return false;
-  if (
-    delimiterIsAloneOnLine(source, opening, "$$") &&
-    !delimiterIsAloneOnLine(source, closing, "$$")
-  )
-    return false;
-  const continuation = hierarchyContinuation(source, opening);
-  const latex = removeContinuation(
-    source.slice(contentStart, closing),
-    continuation,
-  );
-  return !isDisplayUrlDollar(source, opening) && looksLikeDollarDisplay(latex);
+function openingAtDisplayLineStart(source: string, opening: number): boolean {
+  const lineStart = source.lastIndexOf("\n", opening - 1) + 1;
+  const prefix = source.slice(lineStart, opening);
+  return markdownHierarchy(prefix).consumed === prefix.length;
 }
 
 function keepHierarchy(rendered: string, continuation: string): string {
@@ -527,7 +483,6 @@ export function transformDisplayMath(
 ): string {
   const protectedMarkdown = protectCode(markdown);
   const source = protectedMarkdown.markdown;
-  const pairedDollarStarts = pairedDollarDelimiterStarts(source);
   let transformed = "";
   let reconsideredOpening = -1;
 
@@ -568,11 +523,7 @@ export function transformDisplayMath(
           !looksLikeReconsideredDollarDisplay(
             latex,
             reachesLaterLine,
-            dollarDelimiterStartsDisplay(
-              source,
-              closing,
-              pairedDollarStarts.has(closing),
-            ),
+            openingAtDisplayLineStart(source, index),
           )))
     ) {
       transformed += reachesLaterLine ? opening : original;

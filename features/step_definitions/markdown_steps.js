@@ -524,6 +524,16 @@ When("再走査される金額と後続の表示数式を含む本文を変換�
   this.actualFormulaImages = imageIdentities(this.rendered);
 });
 
+When("再走査される金額と表示数式と末尾のシェルの $$ を変換する", function () {
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaBeforeShellImages = imageIdentities(this.rendered);
+  transform(
+    this,
+    "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$\nrun echo $$",
+  );
+  this.actualFormulaBeforeShellImages = imageIdentities(this.rendered);
+});
+
 When(
   "再走査される金額と独立した区切り行の表示数式を含む本文を変換する",
   function () {
@@ -573,6 +583,16 @@ When(
       "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$y = 1$$",
     );
     this.actualSeparatedFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When(
+  "数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    this.expectedNumericBeforeUnclosedImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$");
+    this.actualNumericBeforeUnclosedImages = imageIdentities(this.rendered);
   },
 );
 
@@ -710,6 +730,24 @@ Then("画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
 });
 
+Then(
+  "金額とシェルは一度だけ残り画像経路で描かれる式は x = 1 だけになる",
+  function () {
+    assert.deepEqual(
+      {
+        formulaImages: this.actualFormulaBeforeShellImages,
+        amountOccurrences: this.rendered.split("価格は $$100").length - 1,
+        shellOccurrences: this.rendered.split("run echo $$").length - 1,
+      },
+      {
+        formulaImages: this.expectedFormulaBeforeShellImages,
+        amountOccurrences: 1,
+        shellOccurrences: 1,
+      },
+    );
+  },
+);
+
 Then("金額は一度だけ残り画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(
     {
@@ -746,6 +784,21 @@ Then("100 と y = 1 だけが画像になり単一英字は一度だけ残る", 
     {
       formulaImages: this.expectedSeparatedFormulaImages,
       textOccurrences: 1,
+    },
+  );
+});
+
+Then("100 だけが画像になり単一英字と末尾区切りは残る", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualNumericBeforeUnclosedImages,
+      textOccurrences: this.rendered.split("\nx\n").length - 1,
+      delimiterRemains: this.rendered.endsWith("$$"),
+    },
+    {
+      formulaImages: this.expectedNumericBeforeUnclosedImages,
+      textOccurrences: 1,
+      delimiterRemains: true,
     },
   );
 });
