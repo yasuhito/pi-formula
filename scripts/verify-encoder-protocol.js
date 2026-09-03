@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { resolveVtTool } = require("./vt-tool");
 const { fakePi, startWithKitty } = require("../test/support/fake-pi");
@@ -59,17 +61,40 @@ function transferPlan(encoded) {
   };
 }
 
-async function encoderOutputs() {
-  const pi = fakePi();
-  require("../dist/extension.js").default(pi.api);
-  await startWithKitty(pi);
-  const render = () =>
-    pi.transformer()(markdown, {
-      messageType: "assistant",
-      isStreaming: false,
-      availableWidth: 80,
-    });
-  return [render(), render()];
+async function withIsolatedFormulaEnvironment(task) {
+  const names = ["TMUX", "TERM", "XDG_CONFIG_HOME", "PI_FORMULA_MACROS"];
+  const original = new Map(names.map((name) => [name, process.env[name]]));
+  const configHome = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-encoder-config-"),
+  );
+  delete process.env.TMUX;
+  process.env.TERM = "xterm-ghostty";
+  process.env.XDG_CONFIG_HOME = configHome;
+  process.env.PI_FORMULA_MACROS = "{}";
+  try {
+    return await task();
+  } finally {
+    for (const [name, value] of original) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    fs.rmSync(configHome, { recursive: true, force: true });
+  }
+}
+
+function encoderOutputs() {
+  return withIsolatedFormulaEnvironment(async () => {
+    const pi = fakePi();
+    require("../dist/extension.js").default(pi.api);
+    await startWithKitty(pi);
+    const render = () =>
+      pi.transformer()(markdown, {
+        messageType: "assistant",
+        isStreaming: false,
+        availableWidth: 80,
+      });
+    return [render(), render()];
+  });
 }
 
 function runVt(tool, encoded, waitForPlacement = true) {

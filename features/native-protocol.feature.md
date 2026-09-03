@@ -41,11 +41,12 @@ pi-formula の worker として
 - Then storage に計画どおりの PNG 画像が一件ある
 
 `@native-vt`
-## Scenario: ビルド成果物がない checkout の現在のエンコーダを検査する
+## Scenario: 利用者設定から隔離して現在のエンコーダを検査する
 
 - Given ビルド成果物がない検査用 checkout がある
+- Given テキスト経路の利用者設定と tmux 端末環境がある
 - When 文書化されたエンコーダ層の検査入口を実行する
-- Then 現在のエンコーダをビルドしてプロトコル状態を検査する
+- Then 利用者設定を使わず現在のエンコーダをビルドしてプロトコル状態を検査する
 
 `@native-vt`
 ## Scenario: 仮想配置を検査する

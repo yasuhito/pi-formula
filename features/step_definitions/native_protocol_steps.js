@@ -97,6 +97,24 @@ Given("ビルド成果物がない検査用 checkout がある", function () {
   );
 });
 
+Given("テキスト経路の利用者設定と tmux 端末環境がある", function () {
+  const configHome = path.join(this.nativeTestDirectory, "user-config");
+  const formulaConfig = path.join(configHome, "pi-formula");
+  fs.mkdirSync(formulaConfig, { recursive: true });
+  fs.writeFileSync(
+    path.join(formulaConfig, "config.json"),
+    JSON.stringify({ path: "text", macros: { usermacro: String.raw`\beta` } }),
+  );
+  this.encoderEnvironment = {
+    ...process.env,
+    PI_FORMULA_VT_TOOL: this.vtTool,
+    PI_FORMULA_MACROS: JSON.stringify({ environmentmacro: String.raw`\gamma` }),
+    TERM: "tmux-256color",
+    TMUX: "1",
+    XDG_CONFIG_HOME: configHome,
+  };
+});
+
 Given("vt-pty で文字を出力する子プロセスを起動する", function () {
   this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
 });
@@ -288,7 +306,10 @@ When("文書化されたエンコーダ層の検査入口を実行する", funct
     {
       cwd: this.nativeTestDirectory,
       encoding: "utf8",
-      env: { ...process.env, PI_FORMULA_VT_TOOL: this.vtTool },
+      env: this.encoderEnvironment ?? {
+        ...process.env,
+        PI_FORMULA_VT_TOOL: this.vtTool,
+      },
       timeout: 30_000,
     },
   );
@@ -392,15 +413,18 @@ Then("storage に計画どおりの PNG 画像が一件ある", function () {
   assertEncoderCheck(this, "encoder-protocol: storage ok");
 });
 
-Then("現在のエンコーダをビルドしてプロトコル状態を検査する", function () {
-  assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("encoder-protocol: storage ok") &&
-      fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
+Then(
+  "利用者設定を使わず現在のエンコーダをビルドしてプロトコル状態を検査する",
+  function () {
+    assert.equal(
+      this.nativeResult.status === 0 &&
+        this.nativeResult.stdout.includes("encoder-protocol: storage ok") &&
+        fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
 
 Then("仮想配置の列数と行数が計画と一致する", function () {
   assertEncoderCheck(this, "encoder-protocol: placement ok");
