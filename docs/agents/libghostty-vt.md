@@ -53,7 +53,7 @@ npm run verify:pi-protocol
 
 この検査は `docs/agents/verify-corpus/issue-52.md` から一時セッションを作り、`pi --session` で開く。Pi は `--offline` で起動し、保存済み assistant message を描くだけなのでモデルを呼ばない。拡張の自動探索、tool、skill、prompt template、context file、theme を無効にする。設定は一時 `XDG_CONFIG_HOME` へ隔離し、`PI_FORMULA_MACROS='{}'` で利用者マクロを空にする。
 
-pty の出力が1.5秒止まった時点の状態を検査し、全体の期限は15秒とする。期限内に落ち着かなければ、`vt-pty: timeout 15000ms` を出して終了コード2で失敗する。
+全表示数式の仮想配置を受け取った後、pty の出力が1.5秒止まった時点の状態を検査する。初回組版の途中に無出力時間があっても確定しない。全体の期限は15秒とし、期限内に配置が揃わなければ、必要数と観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。
 
 次のどれかに該当すると終了コード1で失敗する。
 

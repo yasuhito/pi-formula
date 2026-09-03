@@ -116,6 +116,8 @@ function run(tool, directory, markdown, expected) {
     "1500",
     "--timeout-ms",
     "15000",
+    "--wait-for-placements",
+    String(expected),
     "--",
     pi,
     "--session",

@@ -61,6 +61,36 @@ Given("vt-pty で文字を出力する子プロセスを起動する", function 
   this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
 });
 
+Given(
+  "vt-pty の収束時間より遅れて仮想配置を出力する子プロセスがある",
+  function () {
+    const program = `
+const png = Buffer.alloc(24);
+png.set([137, 80, 78, 71]);
+png.writeUInt32BE(1, 16);
+png.writeUInt32BE(1, 20);
+process.stdout.write("start");
+setTimeout(() => {
+  process.stdout.write(
+    "\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
+      png.toString("base64") +
+      "\\x1b\\\\",
+  );
+}, 350);
+`;
+    this.nativeCommand = [
+      "--settle-ms",
+      "20",
+      "--wait-for-placements",
+      "1",
+      "--",
+      process.execPath,
+      "-e",
+      program,
+    ];
+  },
+);
+
 Given("vt-pty で16 codepointを超える grapheme cluster を出力する", function () {
   this.nativeCommand = [
     "--settle-ms",
@@ -80,10 +110,12 @@ Given("vt-pty の期限を超えて動く子プロセスがある", function () 
   this.entranceArguments = [
     "--timeout-ms",
     "20",
+    "--wait-for-placements",
+    "1",
     "--",
     process.execPath,
     "-e",
-    "setTimeout(() => {}, 1000)",
+    'process.stdout.write("start"); setTimeout(() => {}, 1000)',
   ];
 });
 
@@ -276,6 +308,15 @@ Then("libghostty-vt が解析したプロトコル状態が出力される", fun
   );
 });
 
+Then("必要な仮想配置を受け取ってからプロトコル状態が出力される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("kitty.placements=1"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
 Then("長い grapheme cluster のプロトコル状態が出力される", function () {
   assert.equal(
     this.nativeResult.status === 0 &&
@@ -289,7 +330,9 @@ Then("長い grapheme cluster のプロトコル状態が出力される", funct
 Then("timeout は成功として扱われない", function () {
   assert.equal(
     this.nativeResult.status !== 0 &&
-      this.nativeResult.stderr.includes("vt-pty: timeout"),
+      this.nativeResult.stderr.includes(
+        "waiting for 1 placements (observed 0)",
+      ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );

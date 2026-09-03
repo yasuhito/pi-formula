@@ -36,6 +36,13 @@ pi-formula の worker として
 - Then libghostty-vt が解析したプロトコル状態が出力される
 
 `@native-vt`
+## Scenario: 無出力時間があっても必要な仮想配置を待つ
+
+- Given vt-pty の収束時間より遅れて仮想配置を出力する子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 必要な仮想配置を受け取ってからプロトコル状態が出力される
+
+`@native-vt`
 ## Scenario: 長い grapheme cluster を安全に解析する
 
 - Given vt-pty で16 codepointを超える grapheme cluster を出力する
