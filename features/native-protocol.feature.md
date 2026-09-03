@@ -28,6 +28,54 @@ pi-formula の worker として
 - When libghostty-vt のビルド計画を出力する
 - Then pin と指定 prefix だけを使うビルド計画が得られる
 
+## Scenario: native ツールがない環境ではエンコーダ層の検査を skip する
+
+- Given vt-pty がない環境がある
+- When エンコーダ層のプロトコル検査を実行する
+- Then エンコーダ層の検査を成功として skip したことが出力される
+
+`@native-vt`
+## Scenario: storage の画像を検査する
+
+- When エンコーダ層の storage を検査する
+- Then storage に計画どおりの PNG 画像が一件ある
+
+`@native-vt`
+## Scenario: 仮想配置を検査する
+
+- When エンコーダ層の仮想配置を検査する
+- Then 仮想配置の列数と行数が計画と一致する
+
+`@native-vt`
+## Scenario: placeholder セルの画像 ID を検査する
+
+- When エンコーダ層の placeholder の画像 ID を検査する
+- Then foreground RGB から復元した画像 ID が計画と一致する
+
+`@native-vt`
+## Scenario: placeholder セルの座標を検査する
+
+- When エンコーダ層の placeholder の座標を検査する
+- Then diacritics から復元した座標が欠けも余りもなく並ぶ
+
+`@native-vt`
+## Scenario: placeholder セルの下線色タグを検査する
+
+- When エンコーダ層の placeholder の下線色タグを検査する
+- Then すべての placeholder セルの下線色タグが RGB である
+
+`@native-vt`
+## Scenario: 一時保存済み画像を再び描く
+
+- When 同じ Markdown の二回目のエンコーダ出力を検査する
+- Then 二回目も storage に画像がある
+
+`@native-vt`
+## Scenario: 転送のない placeholder を退行として検出する
+
+- When 画像転送を省いたエンコーダ出力を検査する
+- Then placeholder が指す画像 ID に仮想配置がないと報告される
+
 `@native-vt`
 ## Scenario: pty の子プロセス出力からプロトコル状態を得る
 

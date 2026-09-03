@@ -220,6 +220,51 @@ When("libghostty-vt のビルド計画を出力する", function () {
   );
 });
 
+function inspectEncoderProtocol(world, check, environment = process.env) {
+  world.nativeResult = spawnSync(
+    process.execPath,
+    ["scripts/verify-encoder-protocol.js", "--check", check],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...environment, PI_FORMULA_VT_TOOL: world.vtTool },
+      timeout: 30_000,
+    },
+  );
+}
+
+When("エンコーダ層のプロトコル検査を実行する", function () {
+  inspectEncoderProtocol(this, "storage", this.nativeEnvironment);
+});
+
+When("エンコーダ層の storage を検査する", function () {
+  inspectEncoderProtocol(this, "storage");
+});
+
+When("エンコーダ層の仮想配置を検査する", function () {
+  inspectEncoderProtocol(this, "placement");
+});
+
+When("エンコーダ層の placeholder の画像 ID を検査する", function () {
+  inspectEncoderProtocol(this, "image-id");
+});
+
+When("エンコーダ層の placeholder の座標を検査する", function () {
+  inspectEncoderProtocol(this, "coordinates");
+});
+
+When("エンコーダ層の placeholder の下線色タグを検査する", function () {
+  inspectEncoderProtocol(this, "underline");
+});
+
+When("同じ Markdown の二回目のエンコーダ出力を検査する", function () {
+  inspectEncoderProtocol(this, "cached");
+});
+
+When("画像転送を省いたエンコーダ出力を検査する", function () {
+  inspectEncoderProtocol(this, "missing-transfer");
+});
+
 When("子プロセスの出力が落ち着くまで待つ", function () {
   this.nativeResult = spawnSync(this.vtTool, this.nativeCommand, {
     cwd: root,
@@ -268,6 +313,63 @@ Then("環境変数で指定した vt-pty が実行される", function () {
     { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
     { status: 0, stdout: "selected vt-pty\n" },
     this.nativeResult.stderr,
+  );
+});
+
+Then("エンコーダ層の検査を成功として skip したことが出力される", function () {
+  assert.deepEqual(
+    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
+    {
+      status: 0,
+      stdout: "SKIP: エンコーダ層のプロトコル検査（vt-pty がありません）\n",
+    },
+    this.nativeResult.stderr,
+  );
+});
+
+function assertEncoderCheck(world, message) {
+  assert.deepEqual(
+    { status: world.nativeResult.status, stdout: world.nativeResult.stdout },
+    { status: 0, stdout: `${message}\n` },
+    world.nativeResult.stderr,
+  );
+}
+
+Then("storage に計画どおりの PNG 画像が一件ある", function () {
+  assertEncoderCheck(this, "encoder-protocol: storage ok");
+});
+
+Then("仮想配置の列数と行数が計画と一致する", function () {
+  assertEncoderCheck(this, "encoder-protocol: placement ok");
+});
+
+Then("foreground RGB から復元した画像 ID が計画と一致する", function () {
+  assertEncoderCheck(this, "encoder-protocol: image-id ok");
+});
+
+Then("diacritics から復元した座標が欠けも余りもなく並ぶ", function () {
+  assertEncoderCheck(this, "encoder-protocol: coordinates ok");
+});
+
+Then("すべての placeholder セルの下線色タグが RGB である", function () {
+  assertEncoderCheck(this, "encoder-protocol: underline ok");
+});
+
+Then("二回目も storage に画像がある", function () {
+  assertEncoderCheck(this, "encoder-protocol: cached ok");
+});
+
+Then("placeholder が指す画像 ID に仮想配置がないと報告される", function () {
+  assert.deepEqual(
+    {
+      status: this.nativeResult.status,
+      problem: this.nativeResult.stderr.trim(),
+    },
+    {
+      status: 1,
+      problem: "placeholder が指す id に仮想配置がない",
+    },
+    this.nativeResult.stdout,
   );
 });
 
