@@ -106,6 +106,13 @@ pi-formula の worker として
 - Then 出力の静止を待たずにプロトコル状態が出力される
 
 `@native-vt`
+## Scenario: 仮想配置の後に分かれて届く検査対象も読み取る
+
+- Given 仮想配置の後に placeholder と本文を分けて出力し続ける子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 仮想配置に続く placeholder と本文のプロトコル状態が出力される
+
+`@native-vt`
 ## Scenario: timeout 時に実際に観測した仮想配置数を報告する
 
 - Given 一部の仮想配置を出した後も出力を続ける子プロセスがある

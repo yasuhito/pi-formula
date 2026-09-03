@@ -25,6 +25,8 @@
 #include <unistd.h>
 #include "diacritics.h"
 
+#define PLACEMENT_DRAIN_MS 200
+
 static int master_fd = -1;
 static FILE *raw_sink = NULL;
 static bool pty_write_failed = false;
@@ -279,23 +281,27 @@ int main(int argc, char **argv) {
     _exit(127);
   }
 
-  long start = now_ms(), last_data = start;
+  long start = now_ms(), last_data = start, placement_drain_until = 0;
   bool saw_data = false, settled = false;
   int result = 0, observed_placements = 0;
   uint8_t buf[65536];
   for (;;) {
     long now = now_ms();
-    if (now - start > timeout_ms) {
+    if (placement_drain_until > 0 && now >= placement_drain_until) {
+      settled = true; break;
+    }
+    if (placement_drain_until == 0 && now - start > timeout_ms) {
       if (wait_for_placements > 0) {
         if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
         fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
       } else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
       result = 2; break;
     }
-    if (saw_data && now - last_data > settle_ms) {
+    if (placement_drain_until == 0 && saw_data && now - last_data > settle_ms) {
       if (wait_for_placements <= 0) { settled = true; break; }
       if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
-      if (observed_placements >= wait_for_placements) { settled = true; break; }
+      if (observed_placements >= wait_for_placements)
+        placement_drain_until = now + PLACEMENT_DRAIN_MS;
     }
     struct pollfd p = {.fd = master_fd, .events = POLLIN};
     int rc = poll(&p, 1, 200);
@@ -314,7 +320,10 @@ int main(int argc, char **argv) {
     }
     if (wait_for_placements > 0) {
       if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
-      if (observed_placements >= wait_for_placements) { settled = true; break; }
+      // 配置 APC の後ろにある placeholder や本文が別の read へ分かれても、
+      // 順序どおり libghostty-vt へ渡せるよう、配置到着後も有界に読み続ける。
+      if (placement_drain_until == 0 && observed_placements >= wait_for_placements)
+        placement_drain_until = now_ms() + PLACEMENT_DRAIN_MS;
     }
     saw_data = true;
     last_data = now_ms();

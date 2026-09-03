@@ -149,7 +149,7 @@ setTimeout(() => {
   },
 );
 
-function placementFollowedByContinuousOutput(waitForPlacements) {
+function placementFollowedByContinuousOutput(waitForPlacements, tail = "") {
   const program = `
 const png = Buffer.alloc(24);
 png.set([137, 80, 78, 71]);
@@ -160,11 +160,12 @@ process.stdout.write(
     png.toString("base64") +
     "\\x1b\\\\",
 );
+setTimeout(() => process.stdout.write(${JSON.stringify(tail)}), 30);
 setInterval(() => process.stdout.write("."), 5);
 `;
   return [
     "--settle-ms",
-    "20",
+    "1000",
     "--timeout-ms",
     "300",
     "--wait-for-placements",
@@ -179,6 +180,17 @@ setInterval(() => process.stdout.write("."), 5);
 Given("必要な仮想配置の後も出力を続ける子プロセスがある", function () {
   this.nativeCommand = placementFollowedByContinuousOutput(1);
 });
+
+Given(
+  "仮想配置の後に placeholder と本文を分けて出力し続ける子プロセスがある",
+  function () {
+    const placeholder =
+      "\x1b[38;2;0;0;1m\x1b[58:2::0:0:1m" +
+      `${String.fromCodePoint(0x10eeee)}\u0305\u0305` +
+      "\x1b[39;59mafter-placement";
+    this.nativeCommand = placementFollowedByContinuousOutput(1, placeholder);
+  },
+);
 
 Given("一部の仮想配置を出した後も出力を続ける子プロセスがある", function () {
   this.nativeCommand = placementFollowedByContinuousOutput(2);
@@ -549,6 +561,21 @@ Then("出力の静止を待たずにプロトコル状態が出力される", fu
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
+
+Then(
+  "仮想配置に続く placeholder と本文のプロトコル状態が出力される",
+  function () {
+    assert.equal(
+      this.nativeResult.status === 0 &&
+        this.nativeResult.stdout.includes(
+          "placeholder: image_id=0x000001 row=0 col=0",
+        ) &&
+        this.nativeResult.stdout.includes("after-placement"),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
 
 Then("timeout 時点の仮想配置数が出力される", function () {
   assert.equal(
