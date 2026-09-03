@@ -289,13 +289,13 @@ function looksLikeDollarDisplay(latex: string): boolean {
 function looksLikeReconsideredDollarDisplay(
   latex: string,
   reachesLaterLine: boolean,
-  openingAtLineStart: boolean,
+  openingAtDisplayPosition: boolean,
 ): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
   if (
     reachesLaterLine &&
-    !openingAtLineStart &&
+    !openingAtDisplayPosition &&
     /^\d/u.test(latex) &&
     /^\d+(?:[.,]\d+)*$/u.test(value)
   )
@@ -316,10 +316,14 @@ function removeContinuation(latex: string, continuation: string): string {
     .join("\n");
 }
 
-function openingAtDisplayLineStart(source: string, opening: number): boolean {
+function openingAtDisplayPosition(source: string, opening: number): boolean {
   const lineStart = source.lastIndexOf("\n", opening - 1) + 1;
   const prefix = source.slice(lineStart, opening);
-  return markdownHierarchy(prefix).consumed === prefix.length;
+  const hierarchy = markdownHierarchy(prefix);
+  return (
+    hierarchy.consumed === prefix.length ||
+    /[:：][ \t]*$/u.test(prefix.slice(hierarchy.consumed))
+  );
 }
 
 function keepHierarchy(rendered: string, continuation: string): string {
@@ -523,7 +527,7 @@ export function transformDisplayMath(
           !looksLikeReconsideredDollarDisplay(
             latex,
             reachesLaterLine,
-            openingAtDisplayLineStart(source, index),
+            openingAtDisplayPosition(source, index),
           )))
     ) {
       transformed += reachesLaterLine ? opening : original;

@@ -567,6 +567,13 @@ When(
   },
 );
 
+When("数式でない $$ と行内ラベル付きの数値表示数式を変換する", function () {
+  transform(this, "$$100\n$$");
+  this.expectedLabeledNumericFormulaImages = imageIdentities(this.rendered);
+  transform(this, "前置き $$ は数式ではありません。\n式: $$100\n$$");
+  this.actualLabeledNumericFormulaImages = imageIdentities(this.rendered);
+});
+
 When(
   "数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する",
   function () {
@@ -772,6 +779,13 @@ Then("画像経路で描かれる複数行区切りの式は 100 だけになる
   assert.deepEqual(
     this.actualMultilineNumericFormulaImages,
     this.expectedMultilineNumericFormulaImages,
+  );
+});
+
+Then("画像経路で描かれるラベル付きの式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualLabeledNumericFormulaImages,
+    this.expectedLabeledNumericFormulaImages,
   );
 });
 
