@@ -45,6 +45,18 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
+## エンコーダ層のプロトコル検査
+
+```sh
+npm run verify:encoder-protocol
+```
+
+この入口は最初に現在の checkout をビルドする。その後、`test/support/fake-pi.js` で画像経路を選び、Markdown transformer が出したバイト列を `vt-pty` へ直接流す。Pi とモデルは起動しない。利用者の設定と端末環境に左右されないよう、検査中は `XDG_CONFIG_HOME` を一時ディレクトリへ向け、`PI_FORMULA_MACROS` を空にし、`TMUX` を外して `TERM` を画像経路用の値へ固定する。storage の画像、仮想配置、placeholder セルの画像 ID・座標・下線色タグを検査する。同じ Markdown を二度変換し、二度目の出力も新しい端末の storage に画像を作ることも確かめる。
+
+PNG の転送形式 `f=100` と IHDR の寸法を転送計画として読み、libghostty-vt の storage と照合する。libghostty-vt は PNG decoder を通した画像を RGBA として保存するため、storage 側では RGBA へ正規化された形式を期待する。`vt-pty` は各 U+10EEEE セルについて foreground RGB から復元した画像 ID と、diacritics から復元した行・列を出力する。
+
+`--check` へ `storage`、`placement`、`image-id`、`coordinates`、`underline`、`cached` のいずれかを渡すと、その項目だけを検査できる。`missing-transfer` は画像転送を除いた退行確認用で、「placeholder が指す id に仮想配置がない」として失敗する。`vt-pty` がなければ成功として skip する。実装契約のシナリオは `npm run test:native-vt` で実行する。
+
 ## Pi を通したプロトコル検査
 
 ```sh

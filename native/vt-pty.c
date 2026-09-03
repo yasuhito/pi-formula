@@ -1,5 +1,5 @@
 // vt-pty: pty で子プロセスを起動し、その出力を libghostty-vt へ流してプロトコル状態を dump する。
-// Tier B の spike。Pi を通した出力でしか再現しない不具合（#21 / #22 の APC 断片、#52 の SGR 汚染）を狙う。
+// エンコーダ層（Tier A）と Pi を通した出力（Tier B）のプロトコル状態を検査する。
 //
 // 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
 //                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
@@ -185,12 +185,14 @@ static bool dump_cells(GhosttyTerminal term) {
           ghostty_render_state_row_cells_get(cells, GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_STYLE, &style) == GHOSTTY_SUCCESS;
         if (!ok) { fprintf(stderr, "vt-pty: placeholder style query failed\n"); free(cp); break; }
         uint32_t id = ((uint32_t)fg.r << 16) | ((uint32_t)fg.g << 8) | fg.b;
+        int row = glen > 1 ? diacritic_index(cp[1]) : -1;
+        int col = glen > 2 ? diacritic_index(cp[2]) : -1;
+        printf("placeholder: image_id=0x%06x row=%d col=%d fg=rgb(%u,%u,%u) underline_color=%s\n",
+               id, row, col, fg.r, fg.g, fg.b, tag_name(style.underline_color.tag));
         if (style.underline_color.tag != GHOSTTY_STYLE_COLOR_RGB) bad_underline++;
         bool dirty = style.bg_color.tag != GHOSTTY_STYLE_COLOR_NONE || style.faint || style.inverse;
         if (dirty) {
           dirty_placeholder++;
-          int row = glen > 1 ? diacritic_index(cp[1]) : -1;
-          int col = glen > 2 ? diacritic_index(cp[2]) : -1;
           printf("cell[%d,%d]: DIRTY-PLACEHOLDER image_id=0x%06x row=%d col=%d bg=%s faint=%d inverse=%d underline_color=%s\n",
                  r, c, id, row, col, tag_name(style.bg_color.tag), style.faint, style.inverse, tag_name(style.underline_color.tag));
         }
