@@ -286,9 +286,20 @@ function looksLikeDollarDisplay(latex: string): boolean {
   return /[\d_^=+*/<>()[\]|&±≤≥≠≈∈→⇒∞∫∑√-]/u.test(value);
 }
 
-function looksLikeReconsideredDollarDisplay(latex: string): boolean {
+function looksLikeReconsideredDollarDisplay(
+  latex: string,
+  reachesLaterLine: boolean,
+  openingAtDisplayPosition: boolean,
+): boolean {
   const value = latex.trim();
   if (/\\[A-Za-z]/u.test(value)) return true;
+  if (
+    reachesLaterLine &&
+    !openingAtDisplayPosition &&
+    /^\d/u.test(latex) &&
+    /^\d+(?:[.,]\d+)*$/u.test(value)
+  )
+    return false;
   if (/[_^=+*/<>|&±≤≥≠≈∈→⇒∞∫∑√]/u.test(value)) return true;
   return !/\p{L}{2,}/u.test(value);
 }
@@ -303,6 +314,16 @@ function removeContinuation(latex: string, continuation: string): string {
         : line,
     )
     .join("\n");
+}
+
+function openingAtDisplayPosition(source: string, opening: number): boolean {
+  const lineStart = source.lastIndexOf("\n", opening - 1) + 1;
+  const prefix = source.slice(lineStart, opening);
+  const hierarchy = markdownHierarchy(prefix);
+  return (
+    hierarchy.consumed === prefix.length ||
+    /[:：][ \t]*$/u.test(prefix.slice(hierarchy.consumed))
+  );
 }
 
 function keepHierarchy(rendered: string, continuation: string): string {
@@ -495,19 +516,20 @@ export function transformDisplayMath(
     }
     const original = source.slice(index, closing + closingDelimiter.length);
     const continuation = hierarchyContinuation(source, index);
-    const latex = removeContinuation(
-      source.slice(contentStart, closing),
-      continuation,
-    );
+    const rawLatex = source.slice(contentStart, closing);
+    const reachesLaterLine = rawLatex.includes("\n");
+    const latex = removeContinuation(rawLatex, continuation);
     if (
       opening === "$$" &&
       (isDisplayUrlDollar(source, index) ||
         !looksLikeDollarDisplay(latex) ||
-        (reconsidered && !looksLikeReconsideredDollarDisplay(latex)))
+        (reconsidered &&
+          !looksLikeReconsideredDollarDisplay(
+            latex,
+            reachesLaterLine,
+            openingAtDisplayPosition(source, index),
+          )))
     ) {
-      const reachesLaterLine = source
-        .slice(contentStart, closing)
-        .includes("\n");
       transformed += reachesLaterLine ? opening : original;
       index = reachesLaterLine
         ? contentStart

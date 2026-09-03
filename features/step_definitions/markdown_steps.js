@@ -36,6 +36,13 @@ function imageCount(markdown) {
   return (markdown.match(/\x1b_Ga=T,f=100/gu) ?? []).length;
 }
 
+function imageIdentities(markdown) {
+  return Array.from(
+    markdown.matchAll(/\x1b_Ga=T,f=100[^;]*\bi=(\d+)/gu),
+    ([, identity]) => identity,
+  );
+}
+
 function renderUnicode(markdown) {
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });
   return new Markdown(markdown, 0, 0, passthroughTheme)
@@ -509,6 +516,93 @@ When("$$ を含む金額を変換する", function () {
   transform(this, "価格は $$100 です。");
 });
 
+When("再走査される金額と後続の表示数式を含む本文を変換する", function () {
+  const source = "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$";
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaImages = imageIdentities(this.rendered);
+  transform(this, source);
+  this.actualFormulaImages = imageIdentities(this.rendered);
+});
+
+When("再走査される金額と表示数式と末尾のシェルの $$ を変換する", function () {
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaBeforeShellImages = imageIdentities(this.rendered);
+  transform(
+    this,
+    "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$\nrun echo $$",
+  );
+  this.actualFormulaBeforeShellImages = imageIdentities(this.rendered);
+});
+
+When(
+  "再走査される金額と独立した区切り行の表示数式を含む本文を変換する",
+  function () {
+    transform(this, "$$\nx = 1\n$$");
+    this.expectedIndependentFormulaImages = imageIdentities(this.rendered);
+    transform(
+      this,
+      "前置き $$ は数式ではありません。\n価格は $$100\n\n$$\nx = 1\n$$",
+    );
+    this.actualIndependentFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When(
+  "数式でない $$ と後続の数値だけの表示数式を含む本文を変換する",
+  function () {
+    transform(this, "$$100$$");
+    this.expectedNumericFormulaImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100$$");
+    this.actualNumericFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When(
+  "数式でない $$ と閉じ区切りを後続行に置いた数値表示数式を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    this.expectedMultilineNumericFormulaImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$");
+    this.actualMultilineNumericFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When("数式でない $$ と行内ラベル付きの数値表示数式を変換する", function () {
+  transform(this, "$$100\n$$");
+  this.expectedLabeledNumericFormulaImages = imageIdentities(this.rendered);
+  transform(this, "前置き $$ は数式ではありません。\n式: $$100\n$$");
+  this.actualLabeledNumericFormulaImages = imageIdentities(this.rendered);
+});
+
+When(
+  "数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    const numericImages = imageIdentities(this.rendered);
+    transform(this, "$$y = 1$$");
+    const followingImages = imageIdentities(this.rendered);
+    this.expectedSeparatedFormulaImages = [
+      ...numericImages,
+      ...followingImages,
+    ];
+    transform(
+      this,
+      "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$y = 1$$",
+    );
+    this.actualSeparatedFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
+When(
+  "数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する",
+  function () {
+    transform(this, "$$100\n$$");
+    this.expectedNumericBeforeUnclosedImages = imageIdentities(this.rendered);
+    transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$");
+    this.actualNumericBeforeUnclosedImages = imageIdentities(this.rendered);
+  },
+);
+
 When("通常の表示数式を変換する", function () {
   transform(this, "$$a = b$$");
 });
@@ -637,6 +731,90 @@ Then("見送った本文は入力どおり一度だけ残る", function () {
 
 Then("金額は入力どおり残る", function () {
   assert.equal(this.rendered, this.source);
+});
+
+Then("画像経路で描かれる式は x = 1 だけになる", function () {
+  assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
+});
+
+Then(
+  "金額とシェルは一度だけ残り画像経路で描かれる式は x = 1 だけになる",
+  function () {
+    assert.deepEqual(
+      {
+        formulaImages: this.actualFormulaBeforeShellImages,
+        amountOccurrences: this.rendered.split("価格は $$100").length - 1,
+        shellOccurrences: this.rendered.split("run echo $$").length - 1,
+      },
+      {
+        formulaImages: this.expectedFormulaBeforeShellImages,
+        amountOccurrences: 1,
+        shellOccurrences: 1,
+      },
+    );
+  },
+);
+
+Then("金額は一度だけ残り画像経路で描かれる式は x = 1 だけになる", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualIndependentFormulaImages,
+      amountOccurrences: this.rendered.split("価格は $$100").length - 1,
+    },
+    {
+      formulaImages: this.expectedIndependentFormulaImages,
+      amountOccurrences: 1,
+    },
+  );
+});
+
+Then("画像経路で描かれる式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualNumericFormulaImages,
+    this.expectedNumericFormulaImages,
+  );
+});
+
+Then("画像経路で描かれる複数行区切りの式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualMultilineNumericFormulaImages,
+    this.expectedMultilineNumericFormulaImages,
+  );
+});
+
+Then("画像経路で描かれるラベル付きの式は 100 だけになる", function () {
+  assert.deepEqual(
+    this.actualLabeledNumericFormulaImages,
+    this.expectedLabeledNumericFormulaImages,
+  );
+});
+
+Then("100 と y = 1 だけが画像になり単一英字は一度だけ残る", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualSeparatedFormulaImages,
+      textOccurrences: this.rendered.split("\nx\n").length - 1,
+    },
+    {
+      formulaImages: this.expectedSeparatedFormulaImages,
+      textOccurrences: 1,
+    },
+  );
+});
+
+Then("100 だけが画像になり単一英字と末尾区切りは残る", function () {
+  assert.deepEqual(
+    {
+      formulaImages: this.actualNumericBeforeUnclosedImages,
+      textOccurrences: this.rendered.split("\nx\n").length - 1,
+      delimiterRemains: this.rendered.endsWith("$$"),
+    },
+    {
+      formulaImages: this.expectedNumericBeforeUnclosedImages,
+      textOccurrences: 1,
+      delimiterRemains: true,
+    },
+  );
 });
 
 Then("一つの表示数式が画像になる", function () {
