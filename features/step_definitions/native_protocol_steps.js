@@ -171,7 +171,7 @@ Then("pin と指定 prefix だけを使うビルド計画が得られる", funct
       library: path.join(this.nativeTestDirectory, "lib"),
       vtTool: path.join(this.nativeTestDirectory, "bin/vt-pty"),
       zigCommand:
-        "zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix " +
+        "zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix " +
         this.nativeTestDirectory,
     },
     this.nativeResult.stderr,

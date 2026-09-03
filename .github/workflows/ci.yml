@@ -83,7 +83,7 @@ jobs:
             ~/.cache/pi-formula/libghostty-vt/*/prefix/include
             ~/.cache/pi-formula/libghostty-vt/*/prefix/lib
             ~/.cache/pi-formula/libghostty-vt/*/prefix/share
-          key: ${{ runner.os }}-${{ runner.arch }}-libghostty-vt-${{ hashFiles('native/libghostty-vt.commit') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-libghostty-vt-${{ hashFiles('native/libghostty-vt.commit', 'scripts/build-vt-pty') }}
 
       - name: Install dependencies
         run: npm ci
