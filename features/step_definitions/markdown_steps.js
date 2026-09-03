@@ -524,6 +524,20 @@ When("再走査される金額と後続の表示数式を含む本文を変換�
   this.actualFormulaImages = imageIdentities(this.rendered);
 });
 
+When(
+  "コロン付きラベル「{word}」の再走査される金額と後続の表示数式を含む本文を変換する",
+  function (label) {
+    transform(this, "$$x = 1$$");
+    this.expectedLabeledAmountFormulaImages = imageIdentities(this.rendered);
+    this.labeledAmount = `${label} $$100`;
+    transform(
+      this,
+      `前置き $$ は数式ではありません。\n${this.labeledAmount}\n\n$$x = 1$$`,
+    );
+    this.actualLabeledAmountFormulaImages = imageIdentities(this.rendered);
+  },
+);
+
 When("再走査される金額と表示数式と末尾のシェルの $$ を変換する", function () {
   transform(this, "$$x = 1$$");
   this.expectedFormulaBeforeShellImages = imageIdentities(this.rendered);
@@ -736,6 +750,22 @@ Then("金額は入力どおり残る", function () {
 Then("画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
 });
+
+Then(
+  "コロン付きラベルの金額が一度だけ残り画像経路で描かれる式は x = 1 だけになる",
+  function () {
+    assert.deepEqual(
+      {
+        formulaImages: this.actualLabeledAmountFormulaImages,
+        amountOccurrences: this.rendered.split(this.labeledAmount).length - 1,
+      },
+      {
+        formulaImages: this.expectedLabeledAmountFormulaImages,
+        amountOccurrences: 1,
+      },
+    );
+  },
+);
 
 Then(
   "金額とシェルは一度だけ残り画像経路で描かれる式は x = 1 だけになる",
