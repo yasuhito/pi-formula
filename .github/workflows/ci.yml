@@ -46,3 +46,53 @@ jobs:
         env:
           QNI_CLI_TYPESETTER: ${{ github.workspace }}/.qni-cli-reference/src/qni-math/typesetter.ts
         run: npm run check
+
+  native-vt:
+    name: ${{ matrix.os }} / libghostty-vt
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Restore pinned libghostty-vt
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/pi-formula/libghostty-vt/*/prefix/include
+            ~/.cache/pi-formula/libghostty-vt/*/prefix/lib
+            ~/.cache/pi-formula/libghostty-vt/*/prefix/share
+          key: ${{ runner.os }}-${{ runner.arch }}-libghostty-vt-${{ hashFiles('native/libghostty-vt.commit') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build vt-pty
+        run: scripts/build-vt-pty
+
+      - name: Select vt-pty
+        run: echo "PI_FORMULA_VT_TOOL=$(node -e 'process.stdout.write(require(\"./scripts/vt-tool\").resolveVtTool())')" >> "$GITHUB_ENV"
+
+      - name: Inspect protocol state through a pty
+        run: npm run test:native-vt
