@@ -322,7 +322,7 @@ function openingAtDisplayPosition(source: string, opening: number): boolean {
   const hierarchy = markdownHierarchy(prefix);
   return (
     hierarchy.consumed === prefix.length ||
-    /[:：][ \t]*$/u.test(prefix.slice(hierarchy.consumed))
+    /^(?:数式|式)[:：][ \t]*$/u.test(prefix.slice(hierarchy.consumed))
   );
 }
 
