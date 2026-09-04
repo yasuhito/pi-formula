@@ -8,7 +8,7 @@ precheck がその terminal を閉じないようにしたい
 
 - Given terminal の最終出力が「<状態>」である
 - When 「<precheck>」precheck を実行する
-- Then terminal close の呼び出しは「<呼び出し>」である
+- Then precheck は正常終了し terminal close は「<呼び出し>」だけ呼ばれる
 
 ### Examples:
 

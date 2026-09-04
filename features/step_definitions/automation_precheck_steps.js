@@ -55,7 +55,16 @@ if (args[0] === "terminal" && args[1] === "list") {
   );
   writeExecutable(
     join(world.fakeCommandDirectory, "gh"),
-    "#!/usr/bin/env node\nconsole.log(JSON.stringify([]));\n",
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === "pr" && args[1] === "list") {
+  console.log(JSON.stringify([{ number: 104, isDraft: false, labels: [{ name: "agent:review" }], statusCheckRollup: [], reviewRequests: [] }]));
+} else if (args[0] === "issue" && args[1] === "list") {
+  console.log(JSON.stringify([{ number: 103, labels: [{ name: "ready-for-agent" }, { name: "agent:implement" }] }]));
+} else {
+  process.exitCode = 2;
+}
+`,
   );
 }
 
@@ -71,7 +80,7 @@ Given("terminal の最終出力が「{string}」である", function (state) {
 });
 
 When("「{string}」precheck を実行する", function (precheck) {
-  spawnSync("bash", [prechecks[precheck]], {
+  const result = spawnSync("bash", [prechecks[precheck]], {
     cwd: root,
     encoding: "utf8",
     env: {
@@ -82,15 +91,33 @@ When("「{string}」precheck を実行する", function (precheck) {
       FAKE_TERMINAL_STATE: this.terminalState,
     },
   });
-  this.closedTerminals = readFileSync(this.closeLog, {
+  const closedTerminals = readFileSync(this.closeLog, {
     encoding: "utf8",
     flag: "a+",
   })
     .trim()
     .split("\n")
     .filter(Boolean);
+  this.precheckObservation = {
+    error: result.error?.message ?? null,
+    status: result.status,
+    signal: result.signal,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    closedTerminals,
+  };
 });
 
-Then("terminal close の呼び出しは「{string}」である", function (expected) {
-  assert.deepEqual(this.closedTerminals, expected === "なし" ? [] : [expected]);
-});
+Then(
+  "precheck は正常終了し terminal close は「{string}」だけ呼ばれる",
+  function (expected) {
+    assert.deepEqual(this.precheckObservation, {
+      error: null,
+      status: 0,
+      signal: null,
+      stdout: "",
+      stderr: "",
+      closedTerminals: expected === "なし" ? [] : [expected],
+    });
+  },
+);
