@@ -192,14 +192,37 @@ CI checks が1件も無い場合（workflow が main に入っていない、な
 
 ### 6. Read-only review: 独立レビューだけを委任する
 
-CI と bot review が落ち着いたら、PR branch worktree に新しい Pi review worker を起動する。Coordinator と review worker はコードを編集しない。
+CI と bot review が落ち着いたら、まず現 HEAD の結果ファイルを確かめる。使えるものが残っていればそれを判定として使い、無いときだけ PR branch worktree に新しい Pi review worker を起動する。Coordinator と review worker はコードを編集しない。
+
+結果ファイルは HEAD の SHA をキーにしているので、その HEAD の差分に対する判定として再利用できる。run が判定を書いた後に終了しても、次の run が同じレビューを最初からやり直さずに済む（2026-09-04 に PR #98 で、review worker が `VERDICT: PASS` を書き終えた直後に run が終わり、45 分の self-heal を挟んで同じ 11 分のレビューをやり直す状態になった）。
 
 ```bash
 cd <worktreePath>
 review_base_head=$(git rev-parse HEAD)
 review_report_path="/tmp/pi-formula-review-<PR>-$review_base_head.md"
-rm -f "$review_report_path"
 
+# 使える結果ファイルの条件。再開の判定と worker 完了後の検証で同じものを使う。
+review_report_valid() {
+  test -s "$review_report_path" \
+    && grep -Fxq "HEAD: $review_base_head" "$review_report_path" \
+    && grep -Eq '^VERDICT: (PASS|CHANGES_REQUIRED)$' "$review_report_path" \
+    && grep -Fxq '<promise>COMPLETE</promise>' "$review_report_path"
+}
+
+if review_report_valid; then
+  review_report=$(cat "$review_report_path")
+  # worker を起こさず 6.2 へ進む。
+else
+  rm -f "$review_report_path"
+  # 下の worker 起動へ進む。
+fi
+```
+
+再利用した判定でも 7.5 のゲートは毎回そのまま実行する。ゲートは HEAD に対して都度確かめるため、判定を再利用しても緩まない。
+
+結果ファイルが使えなかった場合だけ、review worker を起動する。
+
+```bash
 terminal_json=$(orca-ide terminal create \
   --worktree path:"<worktreePath>" \
   --title "read-only-review-pr-<PR>" \
@@ -269,15 +292,12 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 # 判定の情報源は結果ファイルなので、ファイルの出現を期限まで繰り返し確かめる。
 report_deadline=$(( $(date +%s) + 900 ))
 while [ "$(date +%s)" -lt "$report_deadline" ]; do
-  test -s "$review_report_path" && break
+  review_report_valid && break
   orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
   sleep 5
 done
 
-test -s "$review_report_path"
-grep -Fx "HEAD: $review_base_head" "$review_report_path"
-grep -Eq '^VERDICT: (PASS|CHANGES_REQUIRED)$' "$review_report_path"
-grep -Fx '<promise>COMPLETE</promise>' "$review_report_path"
+review_report_valid
 review_report=$(cat "$review_report_path")
 ```
 
