@@ -3,7 +3,7 @@
 //
 // 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
 //                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
-//                [--raw <file>] -- <command> [args...]
+//                [--wait-for-render-boundary] [--raw <file>] -- <command> [args...]
 #define _GNU_SOURCE
 #include <ghostty/vt.h>
 #include <errno.h>
@@ -221,9 +221,49 @@ static long now_ms(void) {
   return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
+typedef struct {
+  uint64_t offset, last_kitty_end, last_sync_end;
+  size_t kitty_prefix, sync_prefix;
+  bool in_kitty, kitty_escape;
+} OutputBoundary;
+
+static void observe_output_boundary(OutputBoundary *state, const uint8_t *data, size_t len) {
+  static const uint8_t kitty_start[] = {0x1b, '_', 'G'};
+  static const uint8_t sync_end[] = {0x1b, '[', '?', '2', '0', '2', '6', 'l'};
+  for (size_t i = 0; i < len; i++) {
+    uint8_t byte = data[i];
+    state->offset++;
+    if (state->in_kitty) {
+      if (state->kitty_escape && byte == '\\') {
+        state->in_kitty = false;
+        state->kitty_escape = false;
+        state->last_kitty_end = state->offset;
+      } else state->kitty_escape = byte == 0x1b;
+    } else if (byte == kitty_start[state->kitty_prefix]) {
+      if (++state->kitty_prefix == sizeof(kitty_start)) {
+        state->in_kitty = true;
+        state->kitty_escape = false;
+        state->kitty_prefix = 0;
+      }
+    } else state->kitty_prefix = byte == kitty_start[0] ? 1 : 0;
+
+    if (byte == sync_end[state->sync_prefix]) {
+      if (++state->sync_prefix == sizeof(sync_end)) {
+        state->last_sync_end = state->offset;
+        state->sync_prefix = 0;
+      }
+    } else state->sync_prefix = byte == sync_end[0] ? 1 : 0;
+  }
+}
+
+static bool render_boundary_after_kitty(const OutputBoundary *state) {
+  return state->last_kitty_end > 0 && state->last_sync_end > state->last_kitty_end;
+}
+
 int main(int argc, char **argv) {
   int cols = 120, rows = 40, cell_w = 9, cell_h = 18;
   int settle_ms = 2000, timeout_ms = 60000, wait_for_placements = 0;
+  bool wait_for_render_boundary = false;
   const char *raw_path = NULL;
   int i = 1;
   for (; i < argc; i++) {
@@ -235,11 +275,15 @@ int main(int argc, char **argv) {
     else if (strcmp(argv[i], "--settle-ms") == 0 && i + 1 < argc) settle_ms = atoi(argv[++i]);
     else if (strcmp(argv[i], "--timeout-ms") == 0 && i + 1 < argc) timeout_ms = atoi(argv[++i]);
     else if (strcmp(argv[i], "--wait-for-placements") == 0 && i + 1 < argc) wait_for_placements = atoi(argv[++i]);
+    else if (strcmp(argv[i], "--wait-for-render-boundary") == 0) wait_for_render_boundary = true;
     else if (strcmp(argv[i], "--raw") == 0 && i + 1 < argc) raw_path = argv[++i];
     else { fprintf(stderr, "unknown option: %s\n", argv[i]); return 2; }
   }
   if (i >= argc) { fprintf(stderr, "usage: vt-pty [options] -- <command> [args...]\n"); return 2; }
   if (wait_for_placements < 0) { fprintf(stderr, "vt-pty: --wait-for-placements must not be negative\n"); return 2; }
+  if (wait_for_render_boundary && wait_for_placements <= 0) {
+    fprintf(stderr, "vt-pty: --wait-for-render-boundary requires --wait-for-placements\n"); return 2;
+  }
 
   if (ghostty_sys_set(GHOSTTY_SYS_OPT_DECODE_PNG, (const void *)decode_png_stub) != GHOSTTY_SUCCESS) {
     fprintf(stderr, "vt-pty: PNG decoder setup failed\n"); return 2;
@@ -282,18 +326,26 @@ int main(int argc, char **argv) {
   long start = now_ms(), last_data = start;
   bool saw_data = false, settled = false;
   int result = 0, observed_placements = 0;
+  OutputBoundary output_boundary = {0};
   uint8_t buf[65536];
   for (;;) {
     long now = now_ms();
     if (now - start > timeout_ms) {
-      if (wait_for_placements > 0) fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
-      else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
+      if (wait_for_placements > 0) {
+        if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
+        if (wait_for_render_boundary && observed_placements >= wait_for_placements)
+          fprintf(stderr, "vt-pty: timeout %dms waiting for render boundary after %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
+        else fprintf(stderr, "vt-pty: timeout %dms waiting for %d placements (observed %d)\n", timeout_ms, wait_for_placements, observed_placements);
+      } else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
       result = 2; break;
     }
     if (saw_data && now - last_data > settle_ms) {
       if (wait_for_placements <= 0) { settled = true; break; }
       if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
-      if (observed_placements >= wait_for_placements) { settled = true; break; }
+      if (observed_placements >= wait_for_placements &&
+          (!wait_for_render_boundary || render_boundary_after_kitty(&output_boundary))) {
+        settled = true; break;
+      }
     }
     struct pollfd p = {.fd = master_fd, .events = POLLIN};
     int rc = poll(&p, 1, 200);
@@ -306,9 +358,17 @@ int main(int argc, char **argv) {
     if (raw_sink && fwrite(buf, 1, (size_t)n, raw_sink) != (size_t)n) {
       perror("write raw output"); result = 2; break;
     }
+    observe_output_boundary(&output_boundary, buf, (size_t)n);
     ghostty_terminal_vt_write(term, buf, (size_t)n);
     if (pty_write_failed) {
       fprintf(stderr, "vt-pty: terminal response write failed\n"); result = 2; break;
+    }
+    if (wait_for_placements > 0) {
+      if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
+      if (wait_for_render_boundary && observed_placements >= wait_for_placements &&
+          render_boundary_after_kitty(&output_boundary)) {
+        settled = true; break;
+      }
     }
     saw_data = true;
     last_data = now_ms();

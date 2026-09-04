@@ -149,6 +149,65 @@ setTimeout(() => {
   },
 );
 
+function placementFollowedByContinuousOutput(
+  waitForPlacements,
+  tail = "",
+  padding = 0,
+) {
+  const timeout = padding > 0 ? 2000 : 300;
+  const program = `
+const png = Buffer.alloc(24);
+png.set([137, 80, 78, 71]);
+png.writeUInt32BE(1, 16);
+png.writeUInt32BE(1, 20);
+const placement = Buffer.from(
+  "\\x1b[?2026h\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
+    png.toString("base64") +
+    "\\x1b\\\\",
+);
+process.stdout.write(Buffer.concat([placement, Buffer.alloc(${padding})]), () => {
+  process.stdout.write(${JSON.stringify(`${tail}\x1b[?2026l`)});
+  setInterval(() => process.stdout.write("."), 5);
+});
+`;
+  return [
+    "--settle-ms",
+    String(timeout + 1000),
+    "--timeout-ms",
+    String(timeout),
+    "--wait-for-placements",
+    String(waitForPlacements),
+    "--wait-for-render-boundary",
+    "--",
+    process.execPath,
+    "-e",
+    program,
+  ];
+}
+
+Given("必要な仮想配置の後も出力を続ける子プロセスがある", function () {
+  this.nativeCommand = placementFollowedByContinuousOutput(1);
+});
+
+Given(
+  "仮想配置の後に placeholder と本文を分けて出力し続ける子プロセスがある",
+  function () {
+    const placeholder =
+      "\x1b[38;2;0;0;1m\x1b[58:2::0:0:1m" +
+      `${String.fromCodePoint(0x10eeee)}\u0305\u0305` +
+      "\x1b[39;59mafter-placement";
+    this.nativeCommand = placementFollowedByContinuousOutput(
+      1,
+      placeholder,
+      65536,
+    );
+  },
+);
+
+Given("一部の仮想配置を出した後も出力を続ける子プロセスがある", function () {
+  this.nativeCommand = placementFollowedByContinuousOutput(2);
+});
+
 Given("vt-pty で16 codepointを超える grapheme cluster を出力する", function () {
   this.nativeCommand = [
     "--settle-ms",
@@ -198,6 +257,27 @@ Given("本文セルに APC の断片を返す vt-pty がある", function () {
   fs.writeFileSync(
     tool,
     `#!/bin/sh\nprintf '%s\\n' '${placements}' 'kitty.placements=7' 'cells.dirty_placeholders=0 cells.apc_leak=1'\n`,
+  );
+  fs.chmodSync(tool, 0o755);
+  this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
+});
+
+Given("placeholder のない仮想配置を返す vt-pty がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-missing-placeholder-test-"),
+  );
+  const tool = path.join(
+    this.nativeTestDirectory,
+    "missing-placeholder-vt-pty",
+  );
+  const placements = Array.from(
+    { length: 7 },
+    (_, index) =>
+      `placement: image_id=0x${String(index + 1).padStart(6, "0")} placement_id=0x000001 virtual=1 cols=1 rows=1 z=0 image={1x1 format=1 bytes=4}`,
+  ).join("\n");
+  fs.writeFileSync(
+    tool,
+    `#!/bin/sh\nprintf '%s\n' '${placements}' 'kitty.placements=7' 'cells.placeholders=0 cells.underline_not_rgb=0 cells.dirty_placeholders=0 cells.apc_leak=0'\n`,
   );
   fs.chmodSync(tool, 0o755);
   this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
@@ -506,6 +586,41 @@ Then("必要な仮想配置を受け取ってからプロトコル状態が出�
   );
 });
 
+Then("出力の静止を待たずにプロトコル状態が出力される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("kitty.placements=1"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then(
+  "仮想配置に続く placeholder と本文のプロトコル状態が出力される",
+  function () {
+    assert.equal(
+      this.nativeResult.status === 0 &&
+        this.nativeResult.stdout.includes(
+          "placeholder: image_id=0x000001 row=0 col=0",
+        ) &&
+        this.nativeResult.stdout.includes("after-placement"),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
+
+Then("timeout 時点の仮想配置数が出力される", function () {
+  assert.equal(
+    this.nativeResult.status !== 0 &&
+      this.nativeResult.stderr.includes(
+        "waiting for 2 placements (observed 1)",
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
 Then("長い grapheme cluster のプロトコル状態が出力される", function () {
   assert.equal(
     this.nativeResult.status === 0 &&
@@ -540,6 +655,17 @@ Then("本文セルの APC 断片を検出して失敗する", function () {
   assert.equal(
     this.nativeResult.status === 1 &&
       /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("仮想配置に対応する placeholder の欠落を検出して失敗する", function () {
+  assert.equal(
+    this.nativeResult.status === 1 &&
+      this.nativeResult.stderr.includes(
+        "仮想配置に対応する placeholder がありません",
+      ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );

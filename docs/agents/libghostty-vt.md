@@ -7,7 +7,7 @@ read_when:
 
 # libghostty-vt のプロトコル検査
 
-`vt-pty` は pty で子プロセスを起動し、その出力を libghostty-vt へ渡す。描画が落ち着くと、Kitty 画像の placement と端末セルの状態を標準出力へ出す。`WRITE_PTY` の応答は pty へ書き戻す。PNG decoder は IHDR の寸法だけを読み、ゼロ埋め RGBA を返す。
+`vt-pty` は pty で子プロセスを起動し、その出力を libghostty-vt へ渡す。描画が落ち着くか、必要な仮想配置の後に同期出力の終了境界を受け取ると、Kitty 画像の placement と端末セルの状態を標準出力へ出す。`WRITE_PTY` の応答は pty へ書き戻す。PNG decoder は IHDR の寸法だけを読み、ゼロ埋め RGBA を返す。
 
 ## ビルド
 
@@ -41,7 +41,7 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 入口は `PI_FORMULA_VT_TOOL`、既定の cache 内にある `vt-pty` の順で探す。どちらにも実行可能なファイルがなければ、プロトコル検査を成功として skip し、その旨を標準出力へ出す。通常の `npm run check` は native 成果物を必要としない。
 
-子プロセスの出力が落ち着いた場合だけプロトコル状態を出す。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
+配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。`--wait-for-render-boundary` も指定した場合は、必要な仮想配置の後に `ESC[?2026l` の同期出力終了境界を受け取るまで PTY を読む。これにより、配置 APC と別の read に分かれた placeholder や本文も libghostty-vt へ渡しつつ、境界後の出力が続いても全体の静止を待たない。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
@@ -65,11 +65,12 @@ npm run verify:pi-protocol
 
 この検査は `docs/agents/verify-corpus/issue-52.md` から一時セッションを作り、`pi --session` で開く。Pi は `--offline` で起動し、保存済み assistant message を描くだけなのでモデルを呼ばない。拡張の自動探索、tool、skill、prompt template、context file、theme を無効にする。設定は一時 `XDG_CONFIG_HOME` へ隔離し、`PI_FORMULA_MACROS='{}'` で利用者マクロを空にする。
 
-全表示数式の仮想配置を受け取った後、pty の出力が1.5秒止まった時点の状態を検査する。初回組版の途中に無出力時間があっても確定しない。全体の期限は15秒とし、期限内に配置が揃わなければ、必要数と観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。
+Pi の TUI は一回の描画を `ESC[?2026h` と `ESC[?2026l` で囲む。全表示数式の仮想配置を受け取った後、その Kitty APC より後の同期出力終了境界まで読み、pty の出力が止まるのを待たずに状態を検査する。この境界により、同じ描画にある placeholder と本文を処理済みだと判断できる。初回組版の途中に無出力時間があっても、配置と境界が揃うまでは確定しない。配置と境界を待つ期限は15秒とし、期限内に配置が揃わなければ、timeout 時点でもう一度配置を数え、必要数と実際の観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。配置だけが揃って境界が来なければ `waiting for render boundary` と報告する。
 
 次のどれかに該当すると終了コード1で失敗する。
 
 - placeholder セルに `faint`、背景色、`inverse` のいずれかがある
+- 仮想配置の画像 ID に対応する placeholder セルがない
 - 本文セルに APC の ESC または ST が残る
 - 表示数式の数と、storage に image がある仮想配置の数が一致しない
 
