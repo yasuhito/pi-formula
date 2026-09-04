@@ -1,4 +1,4 @@
-cd /home/yasuhito/Work/pi-formula && python3 - <<'PY'
+cd "${PI_FORMULA_REPO:-/home/yasuhito/Work/pi-formula}" && python3 - <<'PY'
 import json
 import subprocess
 import sys
