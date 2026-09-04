@@ -2,13 +2,21 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# 同じ ref で走る CI は最新の1本だけにする。PR ブランチへ push すると
+# push と pull_request の両方が発火して同名ジョブが互いを打ち切り、
+# 打ち切られた側が CANCELLED として残って PR を UNSTABLE にしていた。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     name: ${{ matrix.os }} / Node.js ${{ matrix.node-version }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -50,7 +58,7 @@ jobs:
   native-vt:
     name: ${{ matrix.os }} / libghostty-vt
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
