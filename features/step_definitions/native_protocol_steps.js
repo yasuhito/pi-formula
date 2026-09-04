@@ -303,6 +303,13 @@ Given("保存済みコーパスセッションを Pi で開く", function () {
   };
 });
 
+Given("Pi の未完了本文と確定本文を順に描く検査がある", function () {
+  this.nativeEnvironment = {
+    ...process.env,
+    PI_FORMULA_VT_TOOL: this.vtTool,
+  };
+});
+
 Given("下線色をセミコロン形式へ戻した pi-formula がある", function () {
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(root, ".pi-formula-dirty-placeholder-test-"),
@@ -440,6 +447,19 @@ When("Pi を通したプロトコル検査を実行する", function () {
   );
 });
 
+When("ストリーミング中のプロトコル検査を実行する", function () {
+  this.nativeResult = spawnSync(
+    process.execPath,
+    ["scripts/verify-streaming-protocol.js"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: this.nativeEnvironment,
+      timeout: 30_000,
+    },
+  );
+});
+
 Then("成功として skip したことが出力される", function () {
   assert.deepEqual(
     { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
@@ -459,6 +479,63 @@ Then("Pi を通した検査を成功として skip したことが出力され�
       stdout: "SKIP: Pi を通したプロトコル検査（vt-pty がありません）\n",
     },
     this.nativeResult.stderr,
+  );
+});
+
+Then(
+  "ストリーミング中の検査を成功として skip したことが出力される",
+  function () {
+    assert.deepEqual(
+      { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
+      {
+        status: 0,
+        stdout:
+          "SKIP: ストリーミング中のプロトコル検査（vt-pty がありません）\n",
+      },
+      this.nativeResult.stderr,
+    );
+  },
+);
+
+Then("複数のフレームが時系列で検査されたと報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      /streaming-protocol: frames=([2-9]|[1-9][0-9]+)/u.test(
+        this.nativeResult.stdout,
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("先行する tool 出力を保った3回の差分描画が報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes(
+        "streaming-protocol: streaming_updates=3 preceding_tool=preserved full_clears=0",
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("途中のどのフレームにも APC の断片がないと報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes("streaming-protocol: apc_leak=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("最終フレームの表示数式と仮想配置の数が一致する", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      /streaming-protocol: final display_formulas=(\d+) virtual_images=\1/u.test(
+        this.nativeResult.stdout,
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
 

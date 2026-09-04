@@ -3,7 +3,7 @@
 //
 // 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
 //                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
-//                [--wait-for-render-boundary] [--raw <file>] -- <command> [args...]
+//                [--wait-for-render-boundary] [--frames] [--raw <file>] -- <command> [args...]
 #define _GNU_SOURCE
 #include <ghostty/vt.h>
 #include <errno.h>
@@ -216,6 +216,13 @@ cleanup:
   return ok;
 }
 
+static bool dump_state(GhosttyTerminal term, const char *kind, int number, bool complete, bool kitty_open) {
+  if (number > 0) printf("== %s %d ==\n", kind, number);
+  else printf("== %s ==\n", kind);
+  if (number > 0) printf("frame.complete=%d frame.kitty_open=%d\n", complete, kitty_open);
+  return dump_kitty(term) && dump_cells(term);
+}
+
 static long now_ms(void) {
   struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
   return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
@@ -263,7 +270,7 @@ static bool render_boundary_after_kitty(const OutputBoundary *state) {
 int main(int argc, char **argv) {
   int cols = 120, rows = 40, cell_w = 9, cell_h = 18;
   int settle_ms = 2000, timeout_ms = 60000, wait_for_placements = 0;
-  bool wait_for_render_boundary = false;
+  bool wait_for_render_boundary = false, record_frames = false;
   const char *raw_path = NULL;
   int i = 1;
   for (; i < argc; i++) {
@@ -276,6 +283,7 @@ int main(int argc, char **argv) {
     else if (strcmp(argv[i], "--timeout-ms") == 0 && i + 1 < argc) timeout_ms = atoi(argv[++i]);
     else if (strcmp(argv[i], "--wait-for-placements") == 0 && i + 1 < argc) wait_for_placements = atoi(argv[++i]);
     else if (strcmp(argv[i], "--wait-for-render-boundary") == 0) wait_for_render_boundary = true;
+    else if (strcmp(argv[i], "--frames") == 0) record_frames = true;
     else if (strcmp(argv[i], "--raw") == 0 && i + 1 < argc) raw_path = argv[++i];
     else { fprintf(stderr, "unknown option: %s\n", argv[i]); return 2; }
   }
@@ -325,7 +333,7 @@ int main(int argc, char **argv) {
 
   long start = now_ms(), last_data = start;
   bool saw_data = false, settled = false;
-  int result = 0, observed_placements = 0;
+  int result = 0, observed_placements = 0, frame_number = 0;
   OutputBoundary output_boundary = {0};
   uint8_t buf[65536];
   for (;;) {
@@ -358,8 +366,13 @@ int main(int argc, char **argv) {
     if (raw_sink && fwrite(buf, 1, (size_t)n, raw_sink) != (size_t)n) {
       perror("write raw output"); result = 2; break;
     }
+    uint64_t previous_sync_end = output_boundary.last_sync_end;
     observe_output_boundary(&output_boundary, buf, (size_t)n);
     ghostty_terminal_vt_write(term, buf, (size_t)n);
+    bool frame_complete = output_boundary.last_sync_end > previous_sync_end;
+    if (record_frames && !dump_state(term, "frame", ++frame_number, frame_complete, output_boundary.in_kitty)) {
+      result = 2; break;
+    }
     if (pty_write_failed) {
       fprintf(stderr, "vt-pty: terminal response write failed\n"); result = 2; break;
     }
@@ -410,7 +423,7 @@ int main(int argc, char **argv) {
 
   if (result == 0) {
     printf("== vt-pty %dx%d cell %dx%d ==\n", cols, rows, cell_w, cell_h);
-    if (!dump_kitty(term) || !dump_cells(term)) result = 2;
+    if (!dump_state(term, "final", 0, false, false)) result = 2;
   }
   ghostty_terminal_free(term);
   if (close(master_fd) < 0) { perror("close pty"); result = 2; }

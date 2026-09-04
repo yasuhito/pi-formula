@@ -207,7 +207,7 @@ function renderTuiUpdates(precedingToolLines, streaming, finalized) {
   const writes = [];
   const terminal = {
     columns: 80,
-    rows: 300,
+    rows: 600,
     kittyProtocolActive: false,
     start() {},
     stop() {},

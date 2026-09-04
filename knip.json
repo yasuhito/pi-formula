@@ -6,7 +6,7 @@
     "scripts/check-display-session.js",
     "scripts/detect-display-bands.js",
     "scripts/plan-display.js",
-    "scripts/save-display-response.js",
+    "scripts/streaming-protocol-fixture.js",
     "scripts/verify-display-dimensions.js",
     "scripts/verify-display-plan.js",
     "scripts/verify-echo.js",

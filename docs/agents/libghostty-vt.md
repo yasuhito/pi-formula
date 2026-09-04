@@ -41,7 +41,9 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 入口は `PI_FORMULA_VT_TOOL`、既定の cache 内にある `vt-pty` の順で探す。どちらにも実行可能なファイルがなければ、プロトコル検査を成功として skip し、その旨を標準出力へ出す。通常の `npm run check` は native 成果物を必要としない。
 
-配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。`--wait-for-render-boundary` も指定した場合は、必要な仮想配置の後に `ESC[?2026l` の同期出力終了境界を受け取るまで PTY を読む。これにより、配置 APC と別の read に分かれた placeholder や本文も libghostty-vt へ渡しつつ、境界後の出力が続いても全体の静止を待たない。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
+配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。`--wait-for-render-boundary` も指定した場合は、必要な仮想配置の後に `ESC[?2026l` の同期出力終了境界を受け取るまで PTY を読む。これにより、配置 APC と別の read に分かれた placeholder や本文も libghostty-vt へ渡しつつ、境界後の出力が続いても全体の静止を待たない。
+
+`--frames` を指定すると、pty から読むたびに同期出力の完了を示す `frame.complete`、Kitty APC の継続中を示す `frame.kitty_open`、Kitty storage と仮想配置、placeholder セル、本文セルの APC 断片を出力する。最後に従来の最終状態も出力する。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
 
@@ -75,6 +77,18 @@ Pi の TUI は一回の描画を `ESC[?2026h` と `ESC[?2026l` で囲む。全�
 - 表示数式の数と、storage に image がある仮想配置の数が一致しない
 
 `vt-pty` がなければ通常のプロトコル検査と同様に成功として skip する。実装契約の回帰シナリオは `npm run test:native-vt` で実行する。
+
+## ストリーミング中のプロトコル検査
+
+```sh
+npm run verify:streaming-protocol
+```
+
+Pi の公開 Markdown transformer と `TuiMainScreen` を使い、先行する tool 出力を残したまま Issue 26 の未完了本文を3回伸ばし、確定本文を画像経路で描く。TUI が生成した全画面再描画ではない差分書き込みを、そのまま `vt-pty` へ順に渡す。`vt-pty --frames` が記録したすべてのフレームで本文セルの APC 断片が0件であることを検査する。最終フレームでは、表示数式と storage 付き仮想配置の数が一致し、placeholder セルがあることも検査する。
+
+この検査により、ADR 0001 が定める「ストリーミング中はテキスト経路、確定後は画像経路」という現行経路を時系列で確認する。3回の未完了本文の差分描画では先行する tool 出力を保ち、仮想配置を作らない。確定フレームでは3件の仮想配置と対応する placeholder が揃い、途中の APC 断片は観測されない。確定待ちを外す変更は ADR 0001 の見直しと別の実測を要するため、この検査では行わない。
+
+`vt-pty` がなければ成功として skip する。native 専用の Cucumber シナリオは、複数フレーム、全フレームの APC、最終フレームを独立して検査する。
 
 ## pin の更新
 
