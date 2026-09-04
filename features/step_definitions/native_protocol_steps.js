@@ -508,6 +508,17 @@ Then("複数のフレームが時系列で検査されたと報告される", fu
   );
 });
 
+Then("先行する tool 出力を保った3回の差分描画が報告される", function () {
+  assert.equal(
+    this.nativeResult.status === 0 &&
+      this.nativeResult.stdout.includes(
+        "streaming-protocol: streaming_updates=3 preceding_tool=preserved full_clears=0",
+      ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
 Then("途中のどのフレームにも APC の断片がないと報告される", function () {
   assert.equal(
     this.nativeResult.status === 0 &&
