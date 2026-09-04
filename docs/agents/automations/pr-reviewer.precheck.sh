@@ -1,12 +1,28 @@
-cd /home/yasuhito/Work/pi-formula && python3 - <<'PY'
+cd "${PI_FORMULA_REPO:-/home/yasuhito/Work/pi-formula}" && python3 - <<'PY'
 import json
 import subprocess
 import sys
+import time
 
 AUTOMATION_IDS = (
     "6eaaca9d-67be-4743-88a4-9e82e0659531",
     "4c2c4f81-0bdc-49a8-a52d-7237b9f4c002",
 )
+
+
+# Orca は dispatch の数秒後に run を completed にするが、agent はその後も動き続ける。
+# status だけで tab を閉じると、働いている agent を殺してしまう
+# （2026-09-04 に PR #98 のレビューで、判定を書いた直後の terminal が次の tick に閉じられた）。
+# 動作中の Pi はスピナーを描き続けるため lastOutputAt が更新される。
+# 静かになってからこの窓を過ぎた tab だけを閉じる。
+QUIET_WINDOW_MS = 120_000
+
+
+def terminal_is_busy(terminal):
+    last_output_at = terminal.get("lastOutputAt")
+    if not last_output_at:
+        return False
+    return (time.time() * 1000) - last_output_at < QUIET_WINDOW_MS
 
 
 def cleanup_finished_automation_tabs():
@@ -34,6 +50,8 @@ def cleanup_finished_automation_tabs():
 
     for terminal in terminals:
         if terminal.get("tabId") not in finished_tab_ids:
+            continue
+        if terminal_is_busy(terminal):
             continue
         handle = terminal.get("handle")
         if not handle:
