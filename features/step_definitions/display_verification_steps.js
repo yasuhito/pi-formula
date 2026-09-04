@@ -109,30 +109,7 @@ When("ハーネスの安全条件を調べる", function () {
         Number(/^CAPTURE_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
       ),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
-    exactEcho:
-      /if \[\[ "\$MODE" == corpus \]\]; then[\s\S]*verify-echo\.js/u.test(
-        this.harness,
-      ),
-    promptExploration:
-      /--prompt/u.test(this.harness) &&
-      /if \[\[ "\$PI_FORMULA_VERIFY_MODE" == exploration \]\]/u.test(
-        this.harness,
-      ) &&
-      /pi "\$\{args\[@\]\}"/u.test(this.harness) &&
-      /pi-formula-verify-prompt\.ts/u.test(this.harness),
-    explicitResources:
-      /--extension/u.test(this.harness) &&
-      /--tools/u.test(this.harness) &&
-      /PI_FORMULA_VERIFY_EXTRA_EXTENSIONS/u.test(this.harness) &&
-      /args\+=\(--tools "\$PI_FORMULA_VERIFY_TOOLS"\)/u.test(this.harness) &&
-      /--no-extensions/u.test(this.harness),
-    exitStatuses:
-      /run-display-command" detector detect-display-bands/u.test(
-        this.harness,
-      ) &&
-      /combine-display-status\.js/u.test(this.harness) &&
-      /exit "\$combined_status"/u.test(this.harness) &&
-      /fail\(\)[\s\S]*exit 2/u.test(this.harness),
+    exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
       /kill -- "-\$CAGE_PID"/u.test(this.harness),
@@ -262,23 +239,72 @@ Then("コーパスモードではキャプチャ前に応答一致を確認す�
   assert.equal(this.safety.exactEcho, true);
 });
 
-Then(
-  "探索モードでは自由なプロンプトの応答を一致検証せずに描画する",
-  function () {
-    assert.equal(this.safety.promptExploration, true);
-  },
-);
-
-Then("探索モードでは明示した拡張とツールだけを追加できる", function () {
-  assert.equal(this.safety.explicitResources, true);
+Given("探索モードの引数を持つ実表示検証コマンドがある", function () {
+  this.verifyDisplayArguments = ["--prompt", "表示数式を説明してください。"];
 });
 
-Then(
-  "探索モードでも正常は0、異常な水平帯は1、検証作業の失敗は2にする",
-  function () {
-    assert.equal(this.safety.exitStatuses, true);
-  },
-);
+Given("未対応の引数を持つ実表示検証コマンドがある", function () {
+  this.verifyDisplayArguments = [
+    path.join(root, "docs/agents/verify-corpus/issue-21.md"),
+    "--unknown",
+  ];
+});
+
+When("実表示検証コマンドを実行する", function () {
+  this.verifyDisplayResult = spawnSync(
+    path.join(root, "scripts/verify-display"),
+    this.verifyDisplayArguments,
+    { encoding: "utf8", timeout: 5_000 },
+  );
+});
+
+Then("探索モードを使えずコーパスモードの使い方が表示される", function () {
+  assert.deepEqual(
+    {
+      status: this.verifyDisplayResult.status,
+      stderr: this.verifyDisplayResult.stderr,
+    },
+    {
+      status: 2,
+      stderr:
+        "verify-display: 未対応の引数です: --prompt 表示数式を説明してください。\nUsage: scripts/verify-display <corpus.md>\n",
+    },
+  );
+});
+
+Then("エラー本文と Usage を stderr の別の行へ表示する", function () {
+  assert.match(
+    this.verifyDisplayResult.stderr,
+    /^verify-display: 未対応の引数です: .* --unknown\nUsage:/u,
+  );
+});
+
+When("実表示検証の検証契約を出力する", function () {
+  this.verifyDisplayResult = spawnSync(
+    path.join(root, "scripts/verify-display"),
+    ["--describe"],
+    { encoding: "utf8", timeout: 5_000 },
+  );
+});
+
+Then("コーパス撮影とプロトコル状態の検査入口が得られる", function () {
+  const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
+  assert.deepEqual(
+    { status: this.verifyDisplayResult.status, contract },
+    {
+      status: 0,
+      contract: {
+        capture: "corpus",
+        pixelCheck: "scripts/detect-display-bands.js",
+        finalJudgment: "human",
+        protocolChecks: [
+          "npm run verify:encoder-protocol",
+          "npm run verify:pi-protocol",
+        ],
+      },
+    },
+  );
+});
 
 Then("失敗時も検証セッションの process group を止める", function () {
   assert.equal(this.safety.cleanup, true);
