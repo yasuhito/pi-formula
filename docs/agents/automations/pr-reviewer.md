@@ -260,14 +260,18 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 - 判断不能なら `<promise>BLOCKED: 理由</promise>` を出力する。
 ```
 
-`orca-ide terminal wait --for tui-idle --timeout-ms 300000 --json` を繰り返して完了を待つ。TUI 出力は有界で、プロンプト中のマーカーも含むため、terminal transcript の文字列検索を判定に使わない。判定の唯一の情報源は review worker が書いた `review_report_path` とする。
+完了を待つ。TUI 出力は有界で、プロンプト中のマーカーも含むため、terminal transcript の文字列検索を判定に使わない。判定の唯一の情報源は review worker が書いた `review_report_path` とする。
+
+`terminal wait --for tui-idle` は idle を取り逃がして即座に `null` を返すことがある。返り値を待ちの完了と見なすと、実際にはほとんど待たずにループを抜けてしまう。**結果ファイルの出現そのものを期限付きで待つ。**
 
 ```bash
-# 1回目の idle で結果ファイルが無ければ、terminal を閉じずに再度待つ。
-for attempt in 1 2 3; do
-  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 300000 --json || true
+# terminal wait が null を返しても待ちが進んだことにしない。
+# 判定の情報源は結果ファイルなので、ファイルの出現を期限まで繰り返し確かめる。
+report_deadline=$(( $(date +%s) + 900 ))
+while [ "$(date +%s)" -lt "$report_deadline" ]; do
   test -s "$review_report_path" && break
-  sleep 2
+  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
+  sleep 5
 done
 
 test -s "$review_report_path"
@@ -430,7 +434,16 @@ PR #<PR> の独立レビュー指摘を修正してください。
 最終回答の前に、結果ファイル `/tmp/pi-formula-fix-<PR>.md` を書く。1行目を `HEAD: <git rev-parse HEAD の値>`、2行目を `RESULT: COMPLETE` または `RESULT: BLOCKED: 理由`、最終行を同じ `<promise>` にする。
 ```
 
-送信前に `rm -f /tmp/pi-formula-fix-<PR>.md` で消しておく。完了待ちは transcript の文字列検索ではなく、結果ファイルと worktree の git 状態（`review_base_head` から HEAD が進み、clean）で判定する。`terminal wait --for tui-idle` を繰り返し、結果ファイルが無くても「HEAD が進んだ・clean・idle」を 2 回連続で確認できたら完了とみなす。
+送信前に `rm -f /tmp/pi-formula-fix-<PR>.md` で消しておく。完了待ちは transcript の文字列検索ではなく、結果ファイルと worktree の git 状態（`review_base_head` から HEAD が進み、clean）で判定する。ここでも `terminal wait` の返り値を待ちの完了と見なさず、期限まで結果ファイルと git 状態を繰り返し確かめる。結果ファイルが無くても「HEAD が進んだ・clean・idle」を 2 回連続で確認できたら完了とみなす。
+
+```bash
+fix_deadline=$(( $(date +%s) + 900 ))
+while [ "$(date +%s)" -lt "$fix_deadline" ]; do
+  test -s /tmp/pi-formula-fix-<PR>.md && break
+  orca-ide terminal wait --terminal "$implementer" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
+  sleep 5
+done
+```
 
 完了後、Coordinator が確認する。
 
