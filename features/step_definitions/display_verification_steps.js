@@ -109,7 +109,6 @@ When("ハーネスの安全条件を調べる", function () {
         Number(/^CAPTURE_READY_TIMEOUT=([0-9]+)$/mu.exec(this.harness)?.[1]),
       ),
     capturedImage: /check-display-rendered\.js/u.test(this.harness),
-    exactEcho: /verify-echo\.js/u.test(this.harness),
     cleanup:
       /trap cleanup EXIT INT TERM HUP/u.test(this.harness) &&
       /kill -- "-\$CAGE_PID"/u.test(this.harness),
@@ -235,10 +234,6 @@ Then("ピクセル判定前に描画完了を確認する", function () {
   assert.equal(this.safety.capturedImage, true);
 });
 
-Then("コーパスモードではキャプチャ前に応答一致を確認する", function () {
-  assert.equal(this.safety.exactEcho, true);
-});
-
 Given("探索モードの引数を持つ実表示検証コマンドがある", function () {
   this.verifyDisplayArguments = ["--prompt", "表示数式を説明してください。"];
 });
@@ -287,6 +282,15 @@ When("実表示検証の検証契約を出力する", function () {
   );
 });
 
+Then("コーパスモードでは応答一致をキャプチャより前に計画する", function () {
+  const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
+  assert.deepEqual(contract?.stages, [
+    "verify-response",
+    "capture",
+    "pixel-check",
+  ]);
+});
+
 Then("コーパス撮影とプロトコル状態の検査入口が得られる", function () {
   const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
   assert.deepEqual(
@@ -297,9 +301,11 @@ Then("コーパス撮影とプロトコル状態の検査入口が得られる",
         capture: "corpus",
         pixelCheck: "scripts/detect-display-bands.js",
         finalJudgment: "human",
+        stages: ["verify-response", "capture", "pixel-check"],
         protocolChecks: [
           "npm run verify:encoder-protocol",
           "npm run verify:pi-protocol",
+          "npm run verify:streaming-protocol",
         ],
       },
     },

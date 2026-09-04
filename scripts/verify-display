@@ -19,7 +19,7 @@ USAGE="Usage: scripts/verify-display <corpus.md>"
 
 if [[ "${1:-}" == --describe && $# -eq 1 ]]; then
   cat <<'JSON'
-{"capture":"corpus","pixelCheck":"scripts/detect-display-bands.js","finalJudgment":"human","protocolChecks":["npm run verify:encoder-protocol","npm run verify:pi-protocol"]}
+{"capture":"corpus","pixelCheck":"scripts/detect-display-bands.js","finalJudgment":"human","stages":["verify-response","capture","pixel-check"],"protocolChecks":["npm run verify:encoder-protocol","npm run verify:pi-protocol","npm run verify:streaming-protocol"]}
 JSON
   exit 0
 fi

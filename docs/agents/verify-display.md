@@ -30,9 +30,10 @@ scripts/verify-display --describe
 ```sh
 npm run verify:encoder-protocol
 npm run verify:pi-protocol
+npm run verify:streaming-protocol
 ```
 
-エンコーダ層は Pi とモデルを起動せず、Markdown transformer の出力を直接検査する。Pi を通す検査は保存済みコーパスセッションを `--offline` で開き、1回の描画が終わった時点のプロトコル状態を検査する。詳しい検査項目と native ツールがない場合の skip は、[libghostty-vt のプロトコル検査](libghostty-vt.md)を参照する。
+エンコーダ層は Pi とモデルを起動せず、Markdown transformer の出力を直接検査する。Pi を通す検査は保存済みコーパスセッションを `--offline` で開き、1回の描画が終わった時点のプロトコル状態を検査する。ストリーミング中の検査は、未完了本文から確定本文までの各フレームで APC の断片が本文セルへ漏れないことと、最終フレームの仮想配置を検査する。詳しい検査項目と native ツールがない場合の skip は、[libghostty-vt のプロトコル検査](libghostty-vt.md)を参照する。
 
 フォントと字形の問題はプロトコル状態では分からない。動的字形は公開 API から PNG を作る `features/api.feature.md` のシナリオで回帰検査する。最終的な見た目はコーパスモードのキャプチャを人が確認する。
 

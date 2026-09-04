@@ -66,6 +66,7 @@
     "verify:vt": "node scripts/run-vt-pty.js",
     "verify:encoder-protocol": "npm run build && node scripts/verify-encoder-protocol.js",
     "verify:pi-protocol": "node scripts/verify-pi-protocol.js",
+    "verify:streaming-protocol": "npm run build && node scripts/verify-streaming-protocol.js",
     "verify:session-record": "node scripts/verify-session-tools.js",
     "release:prepare": "npm run check && node scripts/prepare-release.js"
   },
