@@ -55,6 +55,7 @@
     "knip": "knip",
     "complexity": "node scripts/check-complexity.js",
     "check:test-assertions": "node scripts/check-test-assertions.js",
+    "automation:resolve-review-report": "node scripts/resolve-review-report.js",
     "check:package": "npm run build && publint && attw --pack .",
     "typecheck": "tsc --noEmit",
     "test:unit": "npm run build && node --test test/*.test.js",

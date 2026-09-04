@@ -201,20 +201,25 @@ cd <worktreePath>
 review_base_head=$(git rev-parse HEAD)
 review_report_path="/tmp/pi-formula-review-<PR>-$review_base_head.md"
 
-# 使える結果ファイルの条件。再開の判定と worker 完了後の検証で同じものを使う。
+# 実行可能な判定境界を再開時と回帰試験で共用する。resolve は無効な
+# ファイルだけを削除し、inspect は worker の書き込み中に削除しない。
+review_resolution=$(npm run --silent automation:resolve-review-report -- \
+  resolve "$review_report_path" "$review_base_head")
+create_review_terminal=$(printf '%s' "$review_resolution" | \
+  jq -r '.createReviewTerminal')
+
 review_report_valid() {
-  test -s "$review_report_path" \
-    && grep -Fxq "HEAD: $review_base_head" "$review_report_path" \
-    && grep -Eq '^VERDICT: (PASS|CHANGES_REQUIRED)$' "$review_report_path" \
-    && grep -Fxq '<promise>COMPLETE</promise>' "$review_report_path"
+  npm run --silent automation:resolve-review-report -- \
+    inspect "$review_report_path" "$review_base_head" | \
+    jq -e '.reportValid == true' >/dev/null
 }
 
-if review_report_valid; then
+if [ "$create_review_terminal" = false ]; then
   review_report=$(cat "$review_report_path")
-  # worker を起こさず 6.2 へ進む。
+  # nextStep 6.2 へ進む。PASS でも passGate 7.5 を省略しない。
 else
-  rm -f "$review_report_path"
-  # 下の worker 起動へ進む。
+  # 下の worker 起動へ進む。無効なファイルは resolve が削除済み。
+  :
 fi
 ```
 
@@ -223,24 +228,26 @@ fi
 結果ファイルが使えなかった場合だけ、review worker を起動する。
 
 ```bash
-terminal_json=$(orca-ide terminal create \
-  --worktree path:"<worktreePath>" \
-  --title "read-only-review-pr-<PR>" \
-  --command 'pi --name "🔎 レビュー PR #<PR>" --model openai-codex/gpt-5.6-sol --thinking xhigh' \
-  --json)
-review_terminal=$(printf '%s' "$terminal_json" | jq -r '.result.terminal.handle // .result.handle')
+if [ "$create_review_terminal" = true ]; then
+  terminal_json=$(orca-ide terminal create \
+    --worktree path:"<worktreePath>" \
+    --title "read-only-review-pr-<PR>" \
+    --command 'pi --name "🔎 レビュー PR #<PR>" --model openai-codex/gpt-5.6-sol --thinking xhigh' \
+    --json)
+  review_terminal=$(printf '%s' "$terminal_json" | jq -r '.result.terminal.handle // .result.handle')
 
-# tui-idle は pi の描画完了より早く返ることがある。pi のフッター（model 名）が出るまで待ってから送る。
-orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 300000 --json
-for attempt in $(seq 1 30); do
-  orca-ide terminal read --terminal "$review_terminal" --json | grep -q 'gpt-5.6-sol' && break
-  sleep 2
-done
-orca-ide terminal send --terminal "$review_terminal" --text "$REVIEW_PROMPT" --enter --json
-# 30 秒待っても入力欄が空のまま idle なら、1 回だけ再送する。
-sleep 30
-if ! orca-ide terminal read --terminal "$review_terminal" --json | grep -Eq 'Working|PR #<PR>'; then
+  # tui-idle は pi の描画完了より早く返ることがある。pi のフッター（model 名）が出るまで待ってから送る。
+  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 300000 --json
+  for attempt in $(seq 1 30); do
+    orca-ide terminal read --terminal "$review_terminal" --json | grep -q 'gpt-5.6-sol' && break
+    sleep 2
+  done
   orca-ide terminal send --terminal "$review_terminal" --text "$REVIEW_PROMPT" --enter --json
+  # 30 秒待っても入力欄が空のまま idle なら、1 回だけ再送する。
+  sleep 30
+  if ! orca-ide terminal read --terminal "$review_terminal" --json | grep -Eq 'Working|PR #<PR>'; then
+    orca-ide terminal send --terminal "$review_terminal" --text "$REVIEW_PROMPT" --enter --json
+  fi
 fi
 ```
 
@@ -288,27 +295,28 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 `terminal wait --for tui-idle` は idle を取り逃がして即座に `null` を返すことがある。返り値を待ちの完了と見なすと、実際にはほとんど待たずにループを抜けてしまう。**結果ファイルの出現そのものを期限付きで待つ。**
 
 ```bash
-# terminal wait が null を返しても待ちが進んだことにしない。
-# 判定の情報源は結果ファイルなので、ファイルの出現を期限まで繰り返し確かめる。
-report_deadline=$(( $(date +%s) + 900 ))
-while [ "$(date +%s)" -lt "$report_deadline" ]; do
-  review_report_valid && break
-  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
-  sleep 5
-done
+if [ "$create_review_terminal" = true ]; then
+  # terminal wait が null を返しても待ちが進んだことにしない。
+  # 判定の情報源は結果ファイルなので、ファイルの出現を期限まで繰り返し確かめる。
+  report_deadline=$(( $(date +%s) + 900 ))
+  while [ "$(date +%s)" -lt "$report_deadline" ]; do
+    review_report_valid && break
+    orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
+    sleep 5
+  done
 
-review_report_valid
-review_report=$(cat "$review_report_path")
+  review_report_valid
+  review_report=$(cat "$review_report_path")
+  # terminal handle はこの分岐でだけ定義される。この分岐でだけ閉じる。
+  orca-ide terminal close --terminal "$review_terminal" --json || true
+fi
 ```
 
 - 結果ファイルの HEAD が一致し、VERDICT と COMPLETE を検証した後だけ review terminal を閉じる。
 - `VERDICT: PASS` を `<review>PASS</review>`、`VERDICT: CHANGES_REQUIRED` を `<review>CHANGES_REQUIRED</review>` と同じ意味として扱う。
 - 結果ファイルが無い、空、HEAD不一致、形式不正なら、terminal を閉じずに再待機する。それでも取得できない場合だけ Fail とする。
 
-```bash
-orca-ide terminal close --terminal "$review_terminal" --json || true
-rm -f "$review_report_path"
-```
+有効な `review_report_path` はここでは削除しない。run が 6.2、Fix、7.5 の途中で終わっても、Review record が HEAD に対する判定を永続化するまでは次の run が再利用できる。
 
 次の場合は Fail へ進む。
 
@@ -385,7 +393,7 @@ PASS 相当として扱う場合:
 - <なし、または具体的なリスク>
 ```
 
-同じ marker のコメントがすでにあれば新規投稿せず、そのコメントを更新する。
+同じ marker のコメントがすでにあれば新規投稿せず、そのコメントを更新する。Review record の作成または更新を確認した後に限り、`rm -f "$review_report_path"` で結果ファイルを削除する。それより前に削除しない。
 
 ```bash
 viewer=$(gh api user --jq '.login')
