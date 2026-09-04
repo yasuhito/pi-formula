@@ -152,6 +152,12 @@ pi-formula の worker として
 - When Pi を通したプロトコル検査を実行する
 - Then 描画が落ち着かない理由が出力される
 
+## Scenario: placeholder が届いていない仮想配置を検出する
+
+- Given placeholder のない仮想配置を返す vt-pty がある
+- When Pi を通したプロトコル検査を実行する
+- Then 仮想配置に対応する placeholder の欠落を検出して失敗する
+
 `@native-vt`
 ## Scenario: Pi を通した表示数式の placeholder セルは汚れていない
 

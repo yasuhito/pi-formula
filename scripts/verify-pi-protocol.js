@@ -76,10 +76,26 @@ function protocolState(output) {
   const dirty = Number(output.match(/cells\.dirty_placeholders=(\d+)/u)?.[1]);
   const apcLeak = Number(output.match(/cells\.apc_leak=(\d+)/u)?.[1]);
   const placements = Number(output.match(/kitty\.placements=(\d+)/u)?.[1]);
-  const virtualImages = [
-    ...output.matchAll(/^placement: .* virtual=1 .* image=\{/gmu),
-  ].length;
-  return { apcLeak, dirty, placements, virtualImages };
+  const virtualImageIds = [
+    ...output.matchAll(
+      /^placement: image_id=(0x[0-9a-f]+) .* virtual=1 .* image=\{/gmu,
+    ),
+  ].map((match) => match[1]);
+  const placeholderImageIds = new Set(
+    [...output.matchAll(/^placeholder: image_id=(0x[0-9a-f]+)/gmu)].map(
+      (match) => match[1],
+    ),
+  );
+  const missingPlaceholderImages = virtualImageIds.filter(
+    (imageId) => !placeholderImageIds.has(imageId),
+  );
+  return {
+    apcLeak,
+    dirty,
+    missingPlaceholderImages,
+    placements,
+    virtualImages: virtualImageIds.length,
+  };
 }
 
 function inspect(state, expected) {
@@ -88,6 +104,12 @@ function inspect(state, expected) {
   }
   if (!Number.isFinite(state.apcLeak) || state.apcLeak !== 0) {
     return `Pi を通した本文セルに APC の断片があります: ${state.apcLeak}`;
+  }
+  if (state.missingPlaceholderImages.length > 0) {
+    return (
+      "仮想配置に対応する placeholder がありません: " +
+      state.missingPlaceholderImages.join(", ")
+    );
   }
   if (state.placements !== expected || state.virtualImages !== expected) {
     return (
@@ -118,6 +140,7 @@ function run(tool, directory, markdown, expected) {
     "15000",
     "--wait-for-placements",
     String(expected),
+    "--wait-for-render-boundary",
     "--",
     pi,
     "--session",

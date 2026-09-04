@@ -149,27 +149,35 @@ setTimeout(() => {
   },
 );
 
-function placementFollowedByContinuousOutput(waitForPlacements, tail = "") {
+function placementFollowedByContinuousOutput(
+  waitForPlacements,
+  tail = "",
+  padding = 0,
+) {
+  const timeout = padding > 0 ? 2000 : 300;
   const program = `
 const png = Buffer.alloc(24);
 png.set([137, 80, 78, 71]);
 png.writeUInt32BE(1, 16);
 png.writeUInt32BE(1, 20);
-process.stdout.write(
-  "\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
+const placement = Buffer.from(
+  "\\x1b[?2026h\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
     png.toString("base64") +
     "\\x1b\\\\",
 );
-setTimeout(() => process.stdout.write(${JSON.stringify(tail)}), 30);
-setInterval(() => process.stdout.write("."), 5);
+process.stdout.write(Buffer.concat([placement, Buffer.alloc(${padding})]), () => {
+  process.stdout.write(${JSON.stringify(`${tail}\x1b[?2026l`)});
+  setInterval(() => process.stdout.write("."), 5);
+});
 `;
   return [
     "--settle-ms",
-    "1000",
+    String(timeout + 1000),
     "--timeout-ms",
-    "300",
+    String(timeout),
     "--wait-for-placements",
     String(waitForPlacements),
+    "--wait-for-render-boundary",
     "--",
     process.execPath,
     "-e",
@@ -188,7 +196,11 @@ Given(
       "\x1b[38;2;0;0;1m\x1b[58:2::0:0:1m" +
       `${String.fromCodePoint(0x10eeee)}\u0305\u0305` +
       "\x1b[39;59mafter-placement";
-    this.nativeCommand = placementFollowedByContinuousOutput(1, placeholder);
+    this.nativeCommand = placementFollowedByContinuousOutput(
+      1,
+      placeholder,
+      65536,
+    );
   },
 );
 
@@ -245,6 +257,27 @@ Given("本文セルに APC の断片を返す vt-pty がある", function () {
   fs.writeFileSync(
     tool,
     `#!/bin/sh\nprintf '%s\\n' '${placements}' 'kitty.placements=7' 'cells.dirty_placeholders=0 cells.apc_leak=1'\n`,
+  );
+  fs.chmodSync(tool, 0o755);
+  this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
+});
+
+Given("placeholder のない仮想配置を返す vt-pty がある", function () {
+  this.nativeTestDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-missing-placeholder-test-"),
+  );
+  const tool = path.join(
+    this.nativeTestDirectory,
+    "missing-placeholder-vt-pty",
+  );
+  const placements = Array.from(
+    { length: 7 },
+    (_, index) =>
+      `placement: image_id=0x${String(index + 1).padStart(6, "0")} placement_id=0x000001 virtual=1 cols=1 rows=1 z=0 image={1x1 format=1 bytes=4}`,
+  ).join("\n");
+  fs.writeFileSync(
+    tool,
+    `#!/bin/sh\nprintf '%s\n' '${placements}' 'kitty.placements=7' 'cells.placeholders=0 cells.underline_not_rgb=0 cells.dirty_placeholders=0 cells.apc_leak=0'\n`,
   );
   fs.chmodSync(tool, 0o755);
   this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
@@ -622,6 +655,17 @@ Then("本文セルの APC 断片を検出して失敗する", function () {
   assert.equal(
     this.nativeResult.status === 1 &&
       /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("仮想配置に対応する placeholder の欠落を検出して失敗する", function () {
+  assert.equal(
+    this.nativeResult.status === 1 &&
+      this.nativeResult.stderr.includes(
+        "仮想配置に対応する placeholder がありません",
+      ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
