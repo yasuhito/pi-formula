@@ -260,7 +260,7 @@ Then("探索モードを使えずコーパスモードの使い方が表示さ�
     {
       status: 2,
       stderr:
-        "verify-display: 未対応の引数です: --prompt 表示数式を説明してください。\nUsage: scripts/verify-display [--theme <light|dark>] [--terminal <ghostty|kitty>] [--extension <path>] <corpus.md>\n",
+        "verify-display: 未対応の引数です: --prompt 表示数式を説明してください。\nUsage: scripts/verify-display [--theme <light|dark>] [--terminal <ghostty|kitty>] [--extension <path>] [--reflow <cols>] [--path <image|text>] <corpus.md>\n",
     },
   );
 });

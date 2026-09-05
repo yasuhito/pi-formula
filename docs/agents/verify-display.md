@@ -17,15 +17,20 @@ cage、wlr-randr、選択する端末、grim、jq、Node.js、Pi が必要にな
 scripts/verify-display docs/agents/verify-corpus/issue-21.md
 scripts/verify-display --theme dark --terminal kitty docs/agents/verify-corpus/issue-21.md
 scripts/verify-display --extension /tmp/package/src/extension.ts docs/agents/verify-corpus/issue-21.md
+scripts/verify-display --reflow 100 docs/agents/verify-corpus/issue-21.md
+scripts/verify-display --path text docs/agents/verify-corpus/issue-21.md
 ```
 
 `--theme` は `light` または `dark`、`--terminal` は `ghostty` または `kitty` を受け付ける。暗いテーマでは、Pi と端末の両方へ暗い背景と明るい文字色を設定する。必要な端末コマンドは選択したものだけを検査する。
 
-検証の役割、プロトコル層の検査入口、解決後のテーマ・テーマファイル・端末・拡張パスは道具から取得できる。
+`--reflow <cols>` は最初の描画が安定した後、出力幅を 1 セル 8px と左右余白 16px から求めた列数相当へ変え、描き直しが安定してから撮る。`--path` の既定は `image` で、従来どおり画像経路を確認する。`text` を指定すると隔離設定でテキスト経路を選び、その経路が選ばれたことを確認して撮る。
+
+検証の役割、プロトコル層の検査入口、解決後のテーマ・テーマファイル・端末・拡張パス・描き直す列数・表示経路は道具から取得できる。
 
 ```sh
 scripts/verify-display --describe
 scripts/verify-display --describe --theme dark --terminal kitty
+scripts/verify-display --describe --reflow 100 --path text
 ```
 
 ## プロトコル層の検証
@@ -76,13 +81,13 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 検証用の追加マクロは qni-cli の `ket`、`bra`、`braket` と同じ定義を使う。CI は qni-cli の TypeScript を解析して名前、展開値、引数数を照合する。
 
-現在の checkout の公開 API で試験用 PNG を作り、PNG 署名が一致したことを確認してから撮影する。画像経路を選べない場合は終了コード2にする。
+現在の checkout の公開 API で試験用 PNG を作り、選択した表示経路を確認してから撮影する。画像経路では PNG 署名が一致しなければ、テキスト経路では PNG が返れば終了コード2にする。
 
 ## 安全性
 
 `WAYLAND_DISPLAY` と `DISPLAY` を外し、`WLR_BACKENDS=headless` の cage を専用 process group で起動する。検証セッションの中だけで選択した端末を描画し、その Wayland display だけを grim で撮る。利用者の compositor、フォーカス、ワークスペースは使わない。
 
-cage の出力は、コーパスから計画した 1920 x 8000〜16000 px へ広げる。Markdown の行数、折り返し、各表示数式の画像行数、Pi の画面部品を含めて高さを決める。16000 px に収まらないコーパスは描画前に拒否する。
+cage の出力は、コーパスから計画した 1920 x 8000〜16000 px へ広げる。Markdown の行数、折り返し、各表示数式の画像行数、Pi の画面部品を含めて高さを決める。16000 px に収まらないコーパスは描画前に拒否する。`--reflow` では最初の描画完了後に同じ headless 出力の幅だけを変更する。
 
 通常の外部処理には8秒、ビルドには120秒、ピクセル判定には30秒の上限を使う。Ghostty の寿命は270秒とする。`EXIT`、`INT`、`TERM`、`HUP` では検証セッションの process group を停止する。
 
