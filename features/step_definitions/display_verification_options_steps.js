@@ -79,6 +79,10 @@ if (command === "timeout") {
   const result = spawnSync(args[0], args.slice(1), { stdio: "inherit" });
   process.exit(result.status ?? 2);
 }
+if (command === "setsid") {
+  const result = spawnSync(args[0], args.slice(1), { stdio: "inherit" });
+  process.exit(result.status ?? 2);
+}
 if (command === "realpath") {
   console.log(path.resolve(args.at(-1)));
 } else if (command === "mktemp") {
@@ -87,6 +91,10 @@ if (command === "realpath") {
   fs.mkdirSync(args.at(-1), { recursive: true });
 } else if (command === "rm") {
   fs.rmSync(args.at(-1), { recursive: true, force: true });
+} else if (command === "install") {
+  fs.copyFileSync(args.at(-2), args.at(-1));
+} else if (command === "sleep") {
+  // 描画待ちの再試行を実時間なしで進める。
 } else if (command === "npm") {
   if (process.env.PI_FORMULA_FULL_FIXTURE !== "1") {
     console.error("verify-display fixture sentinel");
@@ -155,7 +163,6 @@ if (command === "realpath") {
       },
     }) + "\\n",
   );
-  setInterval(() => {}, 1_000);
 }
 `;
 
@@ -285,16 +292,26 @@ Then("未知の実表示検証設定は終了コード2で断られる", functio
   assert.equal(this.verifyDisplayResult.status, 2);
 });
 
-const fullFixtureCommands = [
-  "cage",
-  "ghostty",
-  "grim",
-  "jq",
-  "kitty",
-  "npm",
-  "pi",
-  "wlr-randr",
+const portableFixtureCommands = [
+  "cat",
+  "chmod",
+  "env",
+  "grep",
+  "head",
+  "tail",
+  "tr",
 ];
+
+function executablePath(command) {
+  for (const directory of (process.env.PATH ?? "").split(path.delimiter)) {
+    const candidate = path.join(directory, command);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {}
+  }
+  throw new Error(`テストに必要なコマンドがありません: ${command}`);
+}
 
 Given("実表示検証用コマンドの stub 環境がある", function () {
   this.directory = fs.mkdtempSync(
@@ -302,8 +319,17 @@ Given("実表示検証用コマンドの stub 環境がある", function () {
   );
   this.commandDirectory = path.join(this.directory, "bin");
   fs.mkdirSync(this.commandDirectory);
-  for (const command of fullFixtureCommands) {
-    writeCommandFixture(this.commandDirectory, command);
+  for (const command of [...requiredCommands, "npm"]) {
+    const filename = path.join(this.commandDirectory, command);
+    if (command === "bash") fs.symlinkSync("/bin/bash", filename);
+    else if (command === "node") fs.symlinkSync(process.execPath, filename);
+    else writeCommandFixture(this.commandDirectory, command);
+  }
+  for (const command of portableFixtureCommands) {
+    fs.symlinkSync(
+      executablePath(command),
+      path.join(this.commandDirectory, command),
+    );
   }
   this.fixtureDimensions = path.join(this.directory, "dimensions");
   this.fixtureModes = path.join(this.directory, "modes");
@@ -311,7 +337,7 @@ Given("実表示検証用コマンドの stub 環境がある", function () {
   this.fixtureCapture = path.join(this.directory, "capture.png");
   this.fixtureEnvironment = {
     ...process.env,
-    PATH: `${this.commandDirectory}${path.delimiter}${process.env.PATH}`,
+    PATH: this.commandDirectory,
     PI_FORMULA_FULL_FIXTURE: "1",
     PI_FORMULA_FIXTURE_DIMENSIONS: this.fixtureDimensions,
     PI_FORMULA_FIXTURE_MODES: this.fixtureModes,
