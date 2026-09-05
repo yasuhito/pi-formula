@@ -18,12 +18,12 @@ PR reviewer として
 
 ### Examples:
 
-| 欠陥 |
-| --- |
-| ファイルなし |
-| HEAD 不一致 |
-| VERDICT なし |
-| COMPLETE なし |
+  | 欠陥 |
+  | --- |
+  | ファイルなし |
+  | HEAD 不一致 |
+  | VERDICT なし |
+  | COMPLETE なし |
 
 ## Scenario: 再利用した PASS 判定も merge gate へ進める
 

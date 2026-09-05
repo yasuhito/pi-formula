@@ -74,12 +74,12 @@ After(function () {
   }
 });
 
-Given("terminal の最終出力が「{string}」である", function (state) {
+Given(/^terminal の最終出力が「(.+)」である$/, function (state) {
   prepareFakeCommands(this);
   this.terminalState = terminalStates[state];
 });
 
-When("「{string}」precheck を実行する", function (precheck) {
+When(/^「(.+)」precheck を実行する$/, function (precheck) {
   const result = spawnSync("bash", [prechecks[precheck]], {
     cwd: root,
     encoding: "utf8",
@@ -109,7 +109,7 @@ When("「{string}」precheck を実行する", function (precheck) {
 });
 
 Then(
-  "precheck は正常終了し terminal close は「{string}」だけ呼ばれる",
+  /^precheck は正常終了し terminal close は「(.+)」だけ呼ばれる$/,
   function (expected) {
     assert.deepEqual(this.precheckObservation, {
       error: null,

@@ -32,7 +32,7 @@ Given("現 HEAD の有効な PASS レポートが残っている", function () {
   prepareReport(this, validReport);
 });
 
-Given("現 HEAD のレポートが「{string}」である", function (defect) {
+Given(/^現 HEAD のレポートが「(.+)」である$/, function (defect) {
   const reports = {
     ファイルなし: undefined,
     "HEAD 不一致": validReport.replace(head, "different-head"),
