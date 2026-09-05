@@ -12,11 +12,11 @@ precheck がその terminal を閉じないようにしたい
 
 ### Examples:
 
-| 状態 | precheck | 呼び出し |
-| --- | --- | --- |
-| 直近 | PR reviewer | なし |
-| 2分より前 | PR reviewer | worker-terminal |
-| 記録なし | PR reviewer | worker-terminal |
-| 直近 | issue coordinator | なし |
-| 2分より前 | issue coordinator | worker-terminal |
-| 記録なし | issue coordinator | worker-terminal |
+  | 状態 | precheck | 呼び出し |
+  | --- | --- | --- |
+  | 直近 | PR reviewer | なし |
+  | 2分より前 | PR reviewer | worker-terminal |
+  | 記録なし | PR reviewer | worker-terminal |
+  | 直近 | issue coordinator | なし |
+  | 2分より前 | issue coordinator | worker-terminal |
+  | 記録なし | issue coordinator | worker-terminal |
