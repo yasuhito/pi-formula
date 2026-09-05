@@ -57,15 +57,37 @@ const requiredCommands = [
   "mkdir",
 ];
 
-function executablePath(command) {
-  for (const directory of (process.env.PATH ?? "").split(path.delimiter)) {
-    const candidate = path.join(directory, command);
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch {}
-  }
-  throw new Error(`テストに必要なコマンドがありません: ${command}`);
+const commandFixture = `#!/usr/bin/env node
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+
+const command = path.basename(process.argv[1]);
+const args = process.argv.slice(2);
+if (command === "timeout") {
+  if (args[0]?.startsWith("--signal=")) args.shift();
+  args.shift();
+  const result = spawnSync(args[0], args.slice(1), { stdio: "inherit" });
+  process.exit(result.status ?? 2);
+}
+if (command === "realpath") {
+  console.log(path.resolve(args.at(-1)));
+} else if (command === "mktemp") {
+  console.log(fs.mkdtempSync(path.join(os.tmpdir(), "verify-display-fixture-")));
+} else if (command === "mkdir") {
+  fs.mkdirSync(args.at(-1), { recursive: true });
+} else if (command === "rm") {
+  fs.rmSync(args.at(-1), { recursive: true, force: true });
+} else if (command === "npm") {
+  console.error("verify-display fixture sentinel");
+  process.exit(73);
+}
+`;
+
+function writeCommandFixture(directory, command) {
+  const filename = path.join(directory, command);
+  fs.writeFileSync(filename, commandFixture, { mode: 0o755 });
 }
 
 Given(
@@ -78,18 +100,19 @@ Given(
     fs.mkdirSync(this.commandDirectory);
     const omitted = selected === "ghostty" ? "kitty" : "ghostty";
     for (const command of requiredCommands) {
-      if (command !== omitted) {
+      if (command === omitted) continue;
+      if (command === "bash") {
+        fs.symlinkSync("/bin/bash", path.join(this.commandDirectory, command));
+      } else if (command === "node") {
         fs.symlinkSync(
-          executablePath(command),
+          process.execPath,
           path.join(this.commandDirectory, command),
         );
+      } else {
+        writeCommandFixture(this.commandDirectory, command);
       }
     }
-    fs.writeFileSync(
-      path.join(this.commandDirectory, "npm"),
-      "#!/usr/bin/env bash\nexit 73\n",
-      { mode: 0o755 },
-    );
+    writeCommandFixture(this.commandDirectory, "npm");
   },
 );
 
@@ -153,11 +176,14 @@ Then(
     assert.deepEqual(
       {
         status: this.verifyDisplayResult.status,
+        reachedSentinel: this.verifyDisplayResult.stderr.includes(
+          "verify-display fixture sentinel",
+        ),
         reportsMissingOther: this.verifyDisplayResult.stderr.includes(
           `必要なコマンドがありません: ${other}`,
         ),
       },
-      { status: 2, reportsMissingOther: false },
+      { status: 2, reachedSentinel: true, reportsMissingOther: false },
     );
   },
 );
