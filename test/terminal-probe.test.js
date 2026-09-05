@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const { probePngSupport } = require("../dist/terminal-probe.js");
+const { decodePng } = require("../scripts/detect-display-bands.js");
 
 function probeHarness() {
   let listener;
@@ -22,6 +23,7 @@ function probeHarness() {
   const imageId = /i=(\d+)/u.exec(query)[1];
   return {
     imageId,
+    query,
     input(data) {
       return listener(data);
     },
@@ -67,6 +69,13 @@ for (const responseValue of ["OK", "EINVAL"]) {
     assert.deepEqual(actual, expected);
   });
 }
+
+test("the PNG query contains strictly decodable image data", () => {
+  const probe = probeHarness();
+  const payload = /;([^;]+)\x1b\\$/u.exec(probe.query)?.[1] ?? "";
+
+  assert.doesNotThrow(() => decodePng(Buffer.from(payload, "base64")));
+});
 
 test("a partial PNG prefix returns preceding user input before timing out", async () => {
   const keepEventLoopAlive = setTimeout(() => {}, 1000);
