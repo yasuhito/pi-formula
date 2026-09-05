@@ -129,7 +129,7 @@ function main() {
   }
   try {
     checkDisplayRendered(image, previous, backgrounds, baseline, allowBlank);
-    console.log("Ghostty の描画完了をキャプチャで確認しました");
+    console.log("端末の描画完了をキャプチャで確認しました");
   } catch (error) {
     console.error(`描画は未完了: ${error.message}`);
     process.exitCode = 1;

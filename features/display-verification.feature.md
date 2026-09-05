@@ -128,6 +128,50 @@ pi-formula の worker として
 - When 実表示検証の検証契約を出力する
 - Then コーパス撮影とプロトコル状態の検査入口が得られる
 
+## Scenario: 実表示検証の既定設定を解決する
+
+- When 実表示検証の検証契約を出力する
+- Then 明るいテーマと Ghostty と現在の拡張が解決される
+
+## Scenario: 暗いテーマを解決する
+
+- When 暗いテーマの実表示検証契約を出力する
+- Then 暗いテーマファイルが解決される
+
+## Scenario: Kitty を解決する
+
+- When Kitty の実表示検証契約を出力する
+- Then 実表示検証の端末が Kitty に解決される
+
+## Scenario Outline: 選択した端末だけを必要とする
+
+- Given `<selected>` だけがある実表示検証のコマンド環境がある
+- When `<selected>` を選んで実表示検証コマンドを実行する
+- Then 選ばなかった `<other>` の不足は報告されない
+
+### Examples:
+
+  | selected | other   |
+  | ghostty  | kitty   |
+  | kitty    | ghostty |
+
+## Scenario: 公開候補の拡張を解決する
+
+- When 公開候補の拡張を指定して実表示検証契約を出力する
+- Then 指定した拡張パスが解決される
+
+## Scenario Outline: 未知の実表示検証設定を断る
+
+- Given 未知の `<option>` と `<value>` を持つ実表示検証コマンドがある
+- When 実表示検証コマンドを実行する
+- Then 未知の実表示検証設定は終了コード2で断られる
+
+### Examples:
+
+  | option     | value |
+  | --theme    | sepia |
+  | --terminal | xterm |
+
 ## Scenario: 引数エラーの使い方を別の行へ表示する
 
 - Given 未対応の引数を持つ実表示検証コマンドがある

@@ -82,9 +82,7 @@ When("ハーネスの安全条件を調べる", function () {
       ) &&
       /run-display-command" poll check-display-rendered/u.test(this.harness) &&
       /--previous=\$PREVIOUS_CAPTURE_FILE/u.test(this.harness) &&
-      /Ghostty の描画完了をキャプチャで確認できませんでした/u.test(
-        this.harness,
-      ),
+      /描画完了をキャプチャで確認できませんでした/u.test(this.harness),
     additionalMacros:
       /--extension "\$PI_FORMULA_VERIFY_MACROS_EXTENSION"/u.test(
         this.harness,
@@ -262,7 +260,7 @@ Then("探索モードを使えずコーパスモードの使い方が表示さ�
     {
       status: 2,
       stderr:
-        "verify-display: 未対応の引数です: --prompt 表示数式を説明してください。\nUsage: scripts/verify-display <corpus.md>\n",
+        "verify-display: 未対応の引数です: --prompt 表示数式を説明してください。\nUsage: scripts/verify-display [--theme <light|dark>] [--terminal <ghostty|kitty>] [--extension <path>] <corpus.md>\n",
     },
   );
 });
@@ -294,20 +292,25 @@ Then("コーパスモードでは応答一致をキャプチャより前に計�
 Then("コーパス撮影とプロトコル状態の検査入口が得られる", function () {
   const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
   assert.deepEqual(
-    { status: this.verifyDisplayResult.status, contract },
+    {
+      status: this.verifyDisplayResult.status,
+      capture: contract?.capture,
+      pixelCheck: contract?.pixelCheck,
+      finalJudgment: contract?.finalJudgment,
+      stages: contract?.stages,
+      protocolChecks: contract?.protocolChecks,
+    },
     {
       status: 0,
-      contract: {
-        capture: "corpus",
-        pixelCheck: "scripts/detect-display-bands.js",
-        finalJudgment: "human",
-        stages: ["verify-response", "capture", "pixel-check"],
-        protocolChecks: [
-          "npm run verify:encoder-protocol",
-          "npm run verify:pi-protocol",
-          "npm run verify:streaming-protocol",
-        ],
-      },
+      capture: "corpus",
+      pixelCheck: "scripts/detect-display-bands.js",
+      finalJudgment: "human",
+      stages: ["verify-response", "capture", "pixel-check"],
+      protocolChecks: [
+        "npm run verify:encoder-protocol",
+        "npm run verify:pi-protocol",
+        "npm run verify:streaming-protocol",
+      ],
     },
   );
 });

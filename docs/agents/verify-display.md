@@ -1,5 +1,5 @@
 ---
-summary: 保存済みコーパスを独立した Ghostty で撮影し、表示数式を実表示検証する
+summary: 保存済みコーパスを独立した端末で撮影し、表示数式を実表示検証する
 read_when:
   - 表示数式の実表示検証を実行または変更する時
   - コーパスモードとプロトコル層の検証の役割を確認する時
@@ -7,20 +7,25 @@ read_when:
 
 # 表示数式の実表示検証
 
-`scripts/verify-display` は、保存済み Markdown を Ghostty 上の Pi に一字一句そのまま描画させ、履歴全体を1枚の PNG に撮るローカル専用ハーネスである。この**コーパスモード**は、表示の異常と検証作業の失敗を区別する。
+`scripts/verify-display` は、保存済み Markdown を Ghostty または Kitty 上の Pi に一字一句そのまま描画させ、履歴全体を1枚の PNG に撮るローカル専用ハーネスである。この**コーパスモード**は、表示の異常と検証作業の失敗を区別する。
 
 ## 実行
 
-cage、wlr-randr、Ghostty、grim、jq、Node.js、Pi が必要になる。
+cage、wlr-randr、選択する端末、grim、jq、Node.js、Pi が必要になる。引数を省略すると、明るいテーマ、Ghostty、現在の checkout の `src/extension.ts` を使う。
 
 ```sh
 scripts/verify-display docs/agents/verify-corpus/issue-21.md
+scripts/verify-display --theme dark --terminal kitty docs/agents/verify-corpus/issue-21.md
+scripts/verify-display --extension /tmp/package/src/extension.ts docs/agents/verify-corpus/issue-21.md
 ```
 
-検証の役割と、プロトコル層の検査入口は道具から取得できる。
+`--theme` は `light` または `dark`、`--terminal` は `ghostty` または `kitty` を受け付ける。暗いテーマでは、Pi と端末の両方へ暗い背景と明るい文字色を設定する。必要な端末コマンドは選択したものだけを検査する。
+
+検証の役割、プロトコル層の検査入口、解決後のテーマ・テーマファイル・端末・拡張パスは道具から取得できる。
 
 ```sh
 scripts/verify-display --describe
+scripts/verify-display --describe --theme dark --terminal kitty
 ```
 
 ## プロトコル層の検証
@@ -75,7 +80,7 @@ PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
 
 ## 安全性
 
-`WAYLAND_DISPLAY` と `DISPLAY` を外し、`WLR_BACKENDS=headless` の cage を専用 process group で起動する。検証セッションの中だけで Ghostty を描画し、その Wayland display だけを grim で撮る。利用者の compositor、フォーカス、ワークスペースは使わない。
+`WAYLAND_DISPLAY` と `DISPLAY` を外し、`WLR_BACKENDS=headless` の cage を専用 process group で起動する。検証セッションの中だけで選択した端末を描画し、その Wayland display だけを grim で撮る。利用者の compositor、フォーカス、ワークスペースは使わない。
 
 cage の出力は、コーパスから計画した 1920 x 8000〜16000 px へ広げる。Markdown の行数、折り返し、各表示数式の画像行数、Pi の画面部品を含めて高さを決める。16000 px に収まらないコーパスは描画前に拒否する。
 
