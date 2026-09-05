@@ -2,16 +2,21 @@
 
 const fs = require("node:fs");
 
-function verifyImagePath(marker) {
+function verifyDisplayPath(marker, expected = "image") {
   let selected;
   try {
     selected = fs.readFileSync(marker, "utf8").trim();
   } catch {
     selected = "missing";
   }
-  if (selected !== "image") {
-    throw new Error(`画像経路を確認できませんでした: ${selected}`);
+  if (selected !== expected) {
+    const label = expected === "image" ? "画像経路" : "テキスト経路";
+    throw new Error(`${label}を確認できませんでした: ${selected}`);
   }
+}
+
+function verifyImagePath(marker) {
+  verifyDisplayPath(marker, "image");
 }
 
 function main() {
@@ -30,4 +35,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { verifyImagePath };
+module.exports = { verifyDisplayPath, verifyImagePath };

@@ -15,10 +15,12 @@ WINDOW_TITLE="pi-formula-verify-$$"
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [[ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ]] || SCRIPT_DIR=.
 ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
-USAGE="Usage: scripts/verify-display [--theme <light|dark>] [--terminal <ghostty|kitty>] [--extension <path>] <corpus.md>"
+USAGE="Usage: scripts/verify-display [--theme <light|dark>] [--terminal <ghostty|kitty>] [--extension <path>] [--reflow <cols>] [--path <image|text>] <corpus.md>"
 THEME=light
 TERMINAL=ghostty
 EXTENSION="$ROOT/src/extension.ts"
+REFLOW=
+DISPLAY_PATH=image
 DESCRIBE=false
 CORPUS=
 ORIGINAL_ARGUMENTS="$*"
@@ -47,6 +49,16 @@ while [[ $# -gt 0 ]]; do
     --extension)
       [[ $# -ge 2 ]] || argument_error "$1"
       EXTENSION=$2
+      shift 2
+      ;;
+    --reflow)
+      [[ $# -ge 2 ]] || argument_error "$1"
+      REFLOW=$2
+      shift 2
+      ;;
+    --path)
+      [[ $# -ge 2 ]] || argument_error "$1"
+      DISPLAY_PATH=$2
       shift 2
       ;;
     --*)
@@ -96,9 +108,23 @@ case "$TERMINAL" in
   *) argument_error "--terminal $TERMINAL" ;;
 esac
 
+case "$DISPLAY_PATH" in
+  image) DISPLAY_PATH_LABEL=画像経路 ;;
+  text) DISPLAY_PATH_LABEL=テキスト経路 ;;
+  *) argument_error "--path $DISPLAY_PATH" ;;
+esac
+if [[ -n "$REFLOW" && ! "$REFLOW" =~ ^[1-9][0-9]*$ ]]; then
+  argument_error "--reflow $REFLOW"
+fi
+REFLOW_WIDTH=
+if [[ -n "$REFLOW" ]]; then
+  REFLOW_WIDTH=$((REFLOW * 8 + 16))
+fi
+
 if [[ "$DESCRIBE" == true ]]; then
-  node - "$THEME" "$THEME_FILE" "$TERMINAL" "$EXTENSION" <<'NODE'
-const [theme, themeFile, terminal, extension] = process.argv.slice(2);
+  node - "$THEME" "$THEME_FILE" "$TERMINAL" "$EXTENSION" \
+    "${REFLOW:-null}" "$DISPLAY_PATH" <<'NODE'
+const [theme, themeFile, terminal, extension, reflowValue, path] = process.argv.slice(2);
 console.log(JSON.stringify({
   capture: "corpus",
   pixelCheck: "scripts/detect-display-bands.js",
@@ -113,6 +139,8 @@ console.log(JSON.stringify({
   themeFile,
   terminal,
   extension,
+  reflow: reflowValue === "null" ? null : Number(reflowValue),
+  path,
 }));
 NODE
   exit 0
@@ -182,8 +210,13 @@ TERMINAL_CONFIG="$TEMP_DIR/terminal.conf"
 CONFIG_HOME="$TEMP_DIR/config"
 IMAGE_MARKER="$TEMP_DIR/image-path"
 DISPLAY_FILE="$TEMP_DIR/wayland-display"
+OUTPUT_FILE="$TEMP_DIR/wayland-output"
 CAGE_LOG="$TEMP_DIR/cage.log"
 run mkdir -p "$CONFIG_HOME"
+if [[ "$DISPLAY_PATH" == text ]]; then
+  run mkdir -p "$CONFIG_HOME/pi-formula"
+  printf '{"path":"text"}\n' >"$CONFIG_HOME/pi-formula/config.json"
+fi
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
 if ! PLAN=$(run node "$ROOT/scripts/verify-display-plan.js" "$CORPUS"); then
@@ -256,9 +289,9 @@ RUNNER
 run chmod +x "$RUNNER"
 
 # 検証セッションの中で走る。出力を計画高へ広げ、その WAYLAND_DISPLAY を外へ伝える。
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_HEIGHT=%q\nPI_FORMULA_VERIFY_DISPLAY_FILE=%q\nPI_FORMULA_VERIFY_TERMINAL=%q\nPI_FORMULA_VERIFY_TERMINAL_CONFIG=%q\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_RUNNER=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\n' \
-  "$HEIGHT" "$DISPLAY_FILE" "$TERMINAL" "$TERMINAL_CONFIG" "$WINDOW_TITLE" \
-  "$RUNNER" "$WINDOW_LIFETIME" >"$LAUNCHER"
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_HEIGHT=%q\nPI_FORMULA_VERIFY_DISPLAY_FILE=%q\nPI_FORMULA_VERIFY_OUTPUT_FILE=%q\nPI_FORMULA_VERIFY_TERMINAL=%q\nPI_FORMULA_VERIFY_TERMINAL_CONFIG=%q\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_RUNNER=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\n' \
+  "$HEIGHT" "$DISPLAY_FILE" "$OUTPUT_FILE" "$TERMINAL" "$TERMINAL_CONFIG" \
+  "$WINDOW_TITLE" "$RUNNER" "$WINDOW_LIFETIME" >"$LAUNCHER"
 run cat >>"$LAUNCHER" <<'LAUNCHER'
 output=$(wlr-randr | grep -oE '^[A-Za-z0-9-]+' | head -1)
 [[ -n "$output" ]] || {
@@ -270,6 +303,7 @@ wlr-randr --output "$output" --custom-mode "1920x${PI_FORMULA_VERIFY_HEIGHT}" ||
   exit 2
 }
 printf '%s\n' "$WAYLAND_DISPLAY" >"$PI_FORMULA_VERIFY_DISPLAY_FILE"
+printf '%s\n' "$output" >"$PI_FORMULA_VERIFY_OUTPUT_FILE"
 case "$PI_FORMULA_VERIFY_TERMINAL" in
   ghostty)
     exec timeout --signal=TERM "$PI_FORMULA_VERIFY_WINDOW_LIFETIME" \
@@ -295,9 +329,11 @@ env -u WAYLAND_DISPLAY -u DISPLAY \
 CAGE_PID=$!
 
 VERIFY_WAYLAND_DISPLAY=
+VERIFY_OUTPUT=
 for _ in {1..40}; do
-  if [[ -s "$DISPLAY_FILE" ]]; then
+  if [[ -s "$DISPLAY_FILE" && -s "$OUTPUT_FILE" ]]; then
     read -r VERIFY_WAYLAND_DISPLAY <"$DISPLAY_FILE"
+    read -r VERIFY_OUTPUT <"$OUTPUT_FILE"
     break
   fi
   kill -0 "$CAGE_PID" 2>/dev/null \
@@ -306,6 +342,8 @@ for _ in {1..40}; do
 done
 [[ -n "$VERIFY_WAYLAND_DISPLAY" ]] \
   || fail "検証セッションの WAYLAND_DISPLAY を受け取れませんでした"
+[[ -n "$VERIFY_OUTPUT" ]] \
+  || fail "検証セッションの出力名を受け取れませんでした"
 
 capture_size=
 for ((elapsed = 0; elapsed < SESSION_READY_TIMEOUT; elapsed += 1)); do
@@ -319,11 +357,11 @@ done
 [[ "$capture_size" == "1920x$HEIGHT" ]] \
   || fail "検証セッションの出力を 1920x${HEIGHT} で用意できませんでした"
 
-"$ROOT/scripts/run-display-command" infrastructure wait-for-image-path \
+"$ROOT/scripts/run-display-command" infrastructure wait-for-display-path \
   timeout --signal=TERM "$((IMAGE_PATH_TIMEOUT + COMMAND_TIMEOUT))" \
   node "$ROOT/scripts/wait-for-image-path.js" "$IMAGE_MARKER" \
-  "$((IMAGE_PATH_TIMEOUT * 1000))" "$IMAGE_PATH_INTERVAL_MS" \
-  || fail "現在の pi-formula が画像経路を選べませんでした"
+  "$((IMAGE_PATH_TIMEOUT * 1000))" "$IMAGE_PATH_INTERVAL_MS" "$DISPLAY_PATH" \
+  || fail "現在の pi-formula が${DISPLAY_PATH_LABEL}を選べませんでした"
 
 completed=false
 for ((attempt = 0; attempt < SESSION_TIMEOUT; attempt += 1)); do
@@ -342,30 +380,48 @@ done
 run node "$ROOT/scripts/verify-echo.js" "$CORPUS" "$SESSION_FILE" \
   || fail "Pi の応答がコーパスと一字一句一致しません"
 
-display_rendered=false
-capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
-rendered_options=("--background=$BACKGROUND_RGB" "--background=$SECONDARY_BACKGROUND_RGB")
-while ((SECONDS < capture_deadline)); do
-  run_inside grim "$CAPTURE_FILE"
-  run node "$ROOT/scripts/verify-display-dimensions.js" png "$CAPTURE_FILE" 1920 "$HEIGHT" \
-    || fail "検証セッションのキャプチャ寸法が不正です"
-  if "$ROOT/scripts/run-display-command" poll check-display-rendered \
-    timeout --signal=TERM "$COMMAND_TIMEOUT" node \
-    "$ROOT/scripts/check-display-rendered.js" \
-    "${rendered_options[@]}" "$CAPTURE_FILE"; then
-    display_rendered=true
-    break
-  else
-    poll_status=$?
-    [[ "$poll_status" -eq 1 ]] || fail "キャプチャの描画完了を検査できませんでした"
-  fi
-  run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
-  rendered_options=("--background=$BACKGROUND_RGB" \
-    "--background=$SECONDARY_BACKGROUND_RGB" "--previous=$PREVIOUS_CAPTURE_FILE")
-  run sleep "$CAPTURE_READY_INTERVAL"
-done
-[[ "$display_rendered" == true ]] \
-  || fail "$TERMINAL_LABEL の描画完了をキャプチャで確認できませんでした"
+wait_for_rendered_capture() {
+  local expected_width=$1
+  local display_rendered=false
+  local capture_deadline=$((SECONDS + CAPTURE_READY_TIMEOUT))
+  local poll_status
+  local -a rendered_options=(
+    "--background=$BACKGROUND_RGB" "--background=$SECONDARY_BACKGROUND_RGB"
+  )
+  run rm -f -- "$PREVIOUS_CAPTURE_FILE"
+  while ((SECONDS < capture_deadline)); do
+    run_inside grim "$CAPTURE_FILE"
+    run node "$ROOT/scripts/verify-display-dimensions.js" png \
+      "$CAPTURE_FILE" "$expected_width" "$HEIGHT" \
+      || fail "検証セッションのキャプチャ寸法が不正です"
+    if "$ROOT/scripts/run-display-command" poll check-display-rendered \
+      timeout --signal=TERM "$COMMAND_TIMEOUT" node \
+      "$ROOT/scripts/check-display-rendered.js" \
+      "${rendered_options[@]}" "$CAPTURE_FILE"; then
+      display_rendered=true
+      break
+    else
+      poll_status=$?
+      [[ "$poll_status" -eq 1 ]] \
+        || fail "キャプチャの描画完了を検査できませんでした"
+    fi
+    run install -m 0644 "$CAPTURE_FILE" "$PREVIOUS_CAPTURE_FILE"
+    rendered_options=("--background=$BACKGROUND_RGB" \
+      "--background=$SECONDARY_BACKGROUND_RGB" \
+      "--previous=$PREVIOUS_CAPTURE_FILE")
+    run sleep "$CAPTURE_READY_INTERVAL"
+  done
+  [[ "$display_rendered" == true ]] \
+    || fail "$TERMINAL_LABEL の描画完了をキャプチャで確認できませんでした"
+}
+
+wait_for_rendered_capture 1920
+if [[ -n "$REFLOW" ]]; then
+  run_inside wlr-randr --output "$VERIFY_OUTPUT" \
+    --custom-mode "${REFLOW_WIDTH}x${HEIGHT}" \
+    || fail "検証セッションの出力を ${REFLOW} 列相当へ変更できませんでした"
+  wait_for_rendered_capture "$REFLOW_WIDTH"
+fi
 
 # 表示の正しさは人が目で確かめる。撮れた画面を必ず残して場所を伝える。
 CAPTURE_DESTINATION=${PI_FORMULA_VERIFY_CAPTURE:-${XDG_STATE_HOME:-$HOME/.local/state}/pi-formula/verify-display-capture.png}

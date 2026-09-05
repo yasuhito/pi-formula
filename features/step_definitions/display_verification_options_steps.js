@@ -23,6 +23,14 @@ When("Kitty の実表示検証契約を出力する", function () {
   this.verifyDisplayResult = describeDisplay("--terminal", "kitty");
 });
 
+When("テキスト経路の実表示検証契約を出力する", function () {
+  this.verifyDisplayResult = describeDisplay("--path", "text");
+});
+
+When("100 列へ描き直す実表示検証契約を出力する", function () {
+  this.verifyDisplayResult = describeDisplay("--reflow", "100");
+});
+
 When("公開候補の拡張を指定して実表示検証契約を出力する", function () {
   this.verifyDisplayResult = describeDisplay(
     "--extension",
@@ -80,8 +88,74 @@ if (command === "realpath") {
 } else if (command === "rm") {
   fs.rmSync(args.at(-1), { recursive: true, force: true });
 } else if (command === "npm") {
-  console.error("verify-display fixture sentinel");
-  process.exit(73);
+  if (process.env.PI_FORMULA_FULL_FIXTURE !== "1") {
+    console.error("verify-display fixture sentinel");
+    process.exit(73);
+  }
+} else if (command === "jq") {
+  console.log("80");
+} else if (command === "wlr-randr") {
+  if (args.length === 0) {
+    console.log("HEADLESS-1 connected");
+  } else {
+    const dimensions = args.at(-1);
+    fs.writeFileSync(process.env.PI_FORMULA_FIXTURE_DIMENSIONS, dimensions);
+    fs.appendFileSync(process.env.PI_FORMULA_FIXTURE_MODES, dimensions + "\\n");
+  }
+} else if (command === "grim") {
+  const [width, height] = fs
+    .readFileSync(process.env.PI_FORMULA_FIXTURE_DIMENSIONS, "utf8")
+    .trim()
+    .split("x")
+    .map(Number);
+  const { createPng } = require(process.env.PI_FORMULA_FIXTURE_PNG_MODULE);
+  fs.writeFileSync(
+    args.at(-1),
+    createPng(width, height, (x, y) =>
+      x < Math.max(2, Math.floor(width / 100)) && y < Math.max(2, Math.floor(height / 5))
+        ? [40, 40, 35]
+        : [250, 248, 240],
+    ),
+  );
+} else if (command === "cage") {
+  const separator = args.indexOf("--");
+  const result = spawnSync(args[separator + 1], args.slice(separator + 2), {
+    env: { ...process.env, WAYLAND_DISPLAY: "wayland-fixture" },
+    stdio: "inherit",
+  });
+  process.exit(result.status ?? 2);
+} else if (command === "ghostty" || command === "kitty") {
+  const executable =
+    command === "ghostty" ? args[args.indexOf("-e") + 1] : args.at(-1);
+  const result = spawnSync(executable, [], { stdio: "inherit" });
+  process.exit(result.status ?? 2);
+} else if (command === "pi") {
+  const session = args[args.indexOf("--session") + 1];
+  const corpusArgument = args.find((argument) => argument.startsWith("@"));
+  const response = fs.readFileSync(corpusArgument.slice(1), "utf8");
+  const configFile = path.join(
+    process.env.XDG_CONFIG_HOME,
+    "pi-formula",
+    "config.json",
+  );
+  let selected = "image";
+  if (fs.existsSync(configFile)) {
+    selected = JSON.parse(fs.readFileSync(configFile, "utf8")).path ?? selected;
+  }
+  fs.writeFileSync(process.env.PI_FORMULA_VERIFY_IMAGE_MARKER, selected + "\\n");
+  fs.appendFileSync(process.env.PI_FORMULA_FIXTURE_PATHS, selected + "\\n");
+  fs.writeFileSync(
+    session,
+    JSON.stringify({
+      type: "message",
+      message: {
+        role: "assistant",
+        stopReason: "stop",
+        content: [{ type: "text", text: response }],
+      },
+    }) + "\\n",
+  );
+  setInterval(() => {}, 1_000);
 }
 `;
 
@@ -144,12 +218,16 @@ Then("明るいテーマと Ghostty と現在の拡張が解決される", funct
       themeFile: contract?.themeFile,
       terminal: contract?.terminal,
       extension: contract?.extension,
+      reflow: contract?.reflow,
+      path: contract?.path,
     },
     {
       theme: "light",
       themeFile: path.join(root, "scripts/verify-display-theme.json"),
       terminal: "ghostty",
       extension: path.join(root, "src/extension.ts"),
+      reflow: null,
+      path: "image",
     },
   );
 });
@@ -168,6 +246,16 @@ Then("暗いテーマファイルが解決される", function () {
 Then("実表示検証の端末が Kitty に解決される", function () {
   const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
   assert.equal(contract?.terminal, "kitty");
+});
+
+Then("実表示検証の表示経路がテキスト経路に解決される", function () {
+  const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
+  assert.equal(contract?.path, "text");
+});
+
+Then("実表示検証の描き直す端末幅が 100 列に解決される", function () {
+  const contract = JSON.parse(this.verifyDisplayResult.stdout || "null");
+  assert.equal(contract?.reflow, 100);
 });
 
 Then(
@@ -195,4 +283,98 @@ Then("指定した拡張パスが解決される", function () {
 
 Then("未知の実表示検証設定は終了コード2で断られる", function () {
   assert.equal(this.verifyDisplayResult.status, 2);
+});
+
+const fullFixtureCommands = [
+  "cage",
+  "ghostty",
+  "grim",
+  "jq",
+  "kitty",
+  "npm",
+  "pi",
+  "wlr-randr",
+];
+
+Given("実表示検証用コマンドの stub 環境がある", function () {
+  this.directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "pi-formula-cucumber-display-"),
+  );
+  this.commandDirectory = path.join(this.directory, "bin");
+  fs.mkdirSync(this.commandDirectory);
+  for (const command of fullFixtureCommands) {
+    writeCommandFixture(this.commandDirectory, command);
+  }
+  this.fixtureDimensions = path.join(this.directory, "dimensions");
+  this.fixtureModes = path.join(this.directory, "modes");
+  this.fixturePaths = path.join(this.directory, "paths");
+  this.fixtureCapture = path.join(this.directory, "capture.png");
+  this.fixtureEnvironment = {
+    ...process.env,
+    PATH: `${this.commandDirectory}${path.delimiter}${process.env.PATH}`,
+    PI_FORMULA_FULL_FIXTURE: "1",
+    PI_FORMULA_FIXTURE_DIMENSIONS: this.fixtureDimensions,
+    PI_FORMULA_FIXTURE_MODES: this.fixtureModes,
+    PI_FORMULA_FIXTURE_PATHS: this.fixturePaths,
+    PI_FORMULA_FIXTURE_PNG_MODULE: path.join(
+      root,
+      "test/support/png-fixture.js",
+    ),
+    PI_FORMULA_VERIFY_CAPTURE: this.fixtureCapture,
+  };
+});
+
+function runFullFixture(world, ...options) {
+  world.verifyDisplayResult = spawnSync(
+    path.join(root, "scripts/verify-display"),
+    [...options, path.join(root, "docs/agents/verify-corpus/issue-21.md")],
+    { encoding: "utf8", env: world.fixtureEnvironment, timeout: 30_000 },
+  );
+  world.fixtureObservation = {
+    status: world.verifyDisplayResult.status,
+    modes: fs.existsSync(world.fixtureModes)
+      ? fs.readFileSync(world.fixtureModes, "utf8").trim().split("\n")
+      : [],
+    paths: fs.existsSync(world.fixturePaths)
+      ? fs.readFileSync(world.fixturePaths, "utf8").trim().split("\n")
+      : [],
+    captureSize: fs.existsSync(world.fixtureCapture)
+      ? spawnSync(
+          process.execPath,
+          [
+            path.join(root, "scripts/verify-display-dimensions.js"),
+            "size",
+            world.fixtureCapture,
+          ],
+          { encoding: "utf8", timeout: 5_000 },
+        ).stdout.trim()
+      : "missing",
+  };
+  fs.rmSync(world.directory, { recursive: true, force: true });
+}
+
+When("100 列へ描き直して実表示検証する", function () {
+  runFullFixture(this, "--reflow", "100");
+});
+
+Then("幅変更後のキャプチャが残る", function () {
+  assert.deepEqual(this.fixtureObservation, {
+    status: 0,
+    modes: ["1920x80", "816x80"],
+    paths: ["image"],
+    captureSize: "816x80",
+  });
+});
+
+When("テキスト経路で実表示検証する", function () {
+  runFullFixture(this, "--path", "text");
+});
+
+Then("画像経路を要求せずテキスト経路のキャプチャが残る", function () {
+  assert.deepEqual(this.fixtureObservation, {
+    status: 0,
+    modes: ["1920x80"],
+    paths: ["text"],
+    captureSize: "1920x80",
+  });
 });

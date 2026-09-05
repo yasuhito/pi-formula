@@ -138,6 +138,16 @@ pi-formula の worker として
 - When 暗いテーマの実表示検証契約を出力する
 - Then 暗いテーマファイルが解決される
 
+## Scenario: テキスト経路を解決する
+
+- When テキスト経路の実表示検証契約を出力する
+- Then 実表示検証の表示経路がテキスト経路に解決される
+
+## Scenario: 描き直す端末幅を解決する
+
+- When 100 列へ描き直す実表示検証契約を出力する
+- Then 実表示検証の描き直す端末幅が 100 列に解決される
+
 ## Scenario: Kitty を解決する
 
 - When Kitty の実表示検証契約を出力する
@@ -171,6 +181,19 @@ pi-formula の worker として
   | option     | value |
   | --theme    | sepia |
   | --terminal | xterm |
+  | --path     | svg   |
+
+## Scenario: 幅変更後の描き直しをキャプチャする
+
+- Given 実表示検証用コマンドの stub 環境がある
+- When 100 列へ描き直して実表示検証する
+- Then 幅変更後のキャプチャが残る
+
+## Scenario: テキスト経路をキャプチャする
+
+- Given 実表示検証用コマンドの stub 環境がある
+- When テキスト経路で実表示検証する
+- Then 画像経路を要求せずテキスト経路のキャプチャが残る
 
 ## Scenario: 引数エラーの使い方を別の行へ表示する
 
