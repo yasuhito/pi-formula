@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 - Unreleased
+## 0.1.0 - 2026-09-09
 
 - Add the CommonJS TypeScript foundation for rendering display formulas as transparent MathJax PNG images.
 - Add a Pi 0.84 extension that keeps inline formulas in Unicode text and renders display formulas as images in Ghostty and Kitty.
@@ -13,3 +13,4 @@
 - Add English and Japanese installation guides, a Ghostty preview, support and coexistence notes, dependency audit details, and an intentionally limited npm tarball.
 - Let an explicit session `auto` preference bypass the saved global default and return display-path selection to the terminal probe.
 - Select an installed CJK serif for Japanese `\\text{}` in display formulas and report the choice in `/formula status`.
+- Detect Kitty graphics support with a strictly decodable probe PNG so Kitty selects the image path instead of falling back to text.
