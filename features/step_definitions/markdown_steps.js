@@ -7,7 +7,11 @@ const net = require("node:net");
 const { resolve } = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { Given, Then, When } = require("@cucumber/cucumber");
-const { Markdown } = require("@earendil-works/pi-tui");
+const {
+  Markdown,
+  resetCapabilitiesCache,
+  setCapabilityOverrides,
+} = require("@earendil-works/pi-tui");
 
 const registerFormula = require("../../dist/extension.js").default;
 const {
@@ -45,10 +49,19 @@ function imageIdentities(markdown) {
 
 function renderUnicode(markdown) {
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });
-  return new Markdown(markdown, 0, 0, passthroughTheme)
-    .render(80)
-    .map((line) => line.trimEnd())
-    .join("\n");
+  // 端末 capability の自動検出は実行中の端末の環境変数に従う。Ghostty の中で
+  // 回すと URL が OSC 8 で包まれ、期待値が環境によって変わる。この検査は
+  // 装飾の有無ではなく Unicode の文字列を見るので、capability を固定する。
+  setCapabilityOverrides({ images: null, trueColor: true, hyperlinks: false });
+  try {
+    return new Markdown(markdown, 0, 0, passthroughTheme)
+      .render(80)
+      .map((line) => line.trimEnd())
+      .join("\n");
+  } finally {
+    setCapabilityOverrides({});
+    resetCapabilitiesCache();
+  }
 }
 
 function cacheImage(bytes) {
