@@ -106,16 +106,18 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: npm run release:prepare -- "${RELEASE_TAG}" .release
 
-      - name: Verify the exact tarball is already on npm
+      - name: Verify the tarball contents are already on npm
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           VERSION="${RELEASE_TAG#v}"
           set -- .release/*.tgz
           test "$#" -eq 1
-          LOCAL_INTEGRITY="sha512-$(openssl dgst -sha512 -binary "$1" | openssl base64 -A)"
           test "$(npm view "pi-formula@${VERSION}" version)" = "${VERSION}"
-          test "$(npm view "pi-formula@${VERSION}" dist.integrity)" = "${LOCAL_INTEGRITY}"
+          REGISTRY_DIRECTORY="$(mktemp -d)"
+          trap 'rm -rf "$REGISTRY_DIRECTORY"' EXIT
+          REGISTRY_FILENAME="$(npm pack "pi-formula@${VERSION}" --pack-destination "$REGISTRY_DIRECTORY" --ignore-scripts --silent)"
+          scripts/compare-tarball-contents.sh "$1" "$REGISTRY_DIRECTORY/$REGISTRY_FILENAME"
 
       - name: Create the remote tag and GitHub Release
         env:

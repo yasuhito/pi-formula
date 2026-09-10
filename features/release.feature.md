@@ -16,6 +16,12 @@ pi-formula の保守者として
 - When 初回版の遠隔タグと Release を作る経路を調べる
 - Then タグ push 用の公開処理と競合せず初回版を完了できる
 
+## Scenario: 再圧縮された npm 公開物を検証済み tarball と照合する
+
+- Given 同じ tar ストリームを異なる圧縮レベルで gzip にした二つの tarball がある
+- When tarball の中身を照合する
+- Then tarball の中身は一致する
+
 ## Scenario: タグと package.json の版が異なる公開を止める
 
 - Given package.json と異なる版の公開タグがある

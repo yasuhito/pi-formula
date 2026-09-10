@@ -37,7 +37,7 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
 5. npm の版を確認し、検証済みのローカルコミットが `origin/main` と一致することを確認する。タグはまだ push しない。
 
    ```sh
-   npm view pi-formula@0.1.0 version dist.integrity
+   npm view pi-formula@0.1.0 version
    git fetch origin main
    test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
    ```
@@ -50,7 +50,7 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
    gh run watch <run-id>
    ```
 
-`initial-release` は同じ全チェックを再実行し、指定版と tarball の integrity が npm の公開物に一致することを確認してから、選択したコミットに遠隔タグを付け、`pi-formula 0.1.0` という題名と `release-notes.md` を持つ GitHub Release を作る。タグ作成には workflow の `GITHUB_TOKEN` を使うため、タグ push 用の公開処理は新しく起動せず、同じ npm 版を再公開しない。初回版は 1Password で手動公開するため、OpenID Connect の由来証明は付かない。
+`initial-release` は同じ全チェックを再実行し、指定版の npm 公開物をダウンロードして、gzip を解いた tar ストリームが検証済み tarball と一致することを確認する。npm registry は公開時に tarball を再圧縮するため、gzip のバイト列や `dist.integrity` が異なっても、公開物の中身が同じなら照合は通る。照合後、選択したコミットに遠隔タグを付け、`pi-formula 0.1.0` という題名と `release-notes.md` を持つ GitHub Release を作る。タグ作成には workflow の `GITHUB_TOKEN` を使うため、タグ push 用の公開処理は新しく起動せず、同じ npm 版を再公開しない。初回版は 1Password で手動公開するため、OpenID Connect の由来証明は付かない。
 
 ## 継続公開の事前設定
 

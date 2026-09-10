@@ -1,8 +1,15 @@
 const assert = require("node:assert/strict");
-const { mkdtempSync, readFileSync, rmSync } = require("node:fs");
+const {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join, resolve } = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { gzipSync } = require("node:zlib");
 const { After, Given, Then, When } = require("@cucumber/cucumber");
 const { extractReleaseNotes } = require("../../scripts/release-notes");
 
@@ -71,9 +78,6 @@ Then("タグ push 用の公開処理と競合せず初回版を完了できる",
         this.releaseWorkflow.match(/if: github\.event_name == 'push'/gu) ?? []
       ).length,
       npmCheckedBeforeTag: npmCheck !== -1 && npmCheck < tagCreation,
-      exactTarballChecked:
-        /dist\.integrity/u.test(this.initialReleaseJob) &&
-        /LOCAL_INTEGRITY/u.test(this.initialReleaseJob),
       createsTag: /refs\/tags\/\$\{RELEASE_TAG\}/u.test(this.initialReleaseJob),
       createsRelease: /gh release create "\$\{RELEASE_TAG\}"/u.test(
         this.initialReleaseJob,
@@ -98,7 +102,6 @@ Then("タグ push 用の公開処理と競合せず初回版を完了できる",
       initialJobOnly: true,
       tagJobsOnlyOnPush: 2,
       npmCheckedBeforeTag: true,
-      exactTarballChecked: true,
       createsTag: true,
       createsRelease: true,
       releaseTitle: true,
@@ -108,6 +111,38 @@ Then("タグ push 用の公開処理と競合せず初回版を完了できる",
       initialProvenanceException: true,
     },
   );
+});
+
+Given(
+  "同じ tar ストリームを異なる圧縮レベルで gzip にした二つの tarball がある",
+  function () {
+    this.releaseDirectory = mkdtempSync(join(tmpdir(), "pi-formula-tarball-"));
+    const packageDirectory = join(this.releaseDirectory, "package");
+    const tarPath = join(this.releaseDirectory, "package.tar");
+    mkdirSync(packageDirectory);
+    writeFileSync(
+      join(packageDirectory, "contents.txt"),
+      "verified release contents\n".repeat(1024),
+    );
+    spawnSync("tar", ["-cf", tarPath, "-C", this.releaseDirectory, "package"]);
+    const tarStream = readFileSync(tarPath);
+    this.firstTarball = join(this.releaseDirectory, "first.tgz");
+    this.secondTarball = join(this.releaseDirectory, "second.tgz");
+    writeFileSync(this.firstTarball, gzipSync(tarStream, { level: 1 }));
+    writeFileSync(this.secondTarball, gzipSync(tarStream, { level: 9 }));
+  },
+);
+
+When("tarball の中身を照合する", function () {
+  this.tarballComparison = spawnSync(
+    "scripts/compare-tarball-contents.sh",
+    [this.firstTarball, this.secondTarball],
+    { cwd: root, encoding: "utf8" },
+  );
+});
+
+Then("tarball の中身は一致する", function () {
+  assert.equal(this.tarballComparison.status, 0, this.tarballComparison.stderr);
 });
 
 Given("package.json と異なる版の公開タグがある", function () {
