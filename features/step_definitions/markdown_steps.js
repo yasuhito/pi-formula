@@ -739,8 +739,8 @@ Then("画像は引用の階層に残る", function () {
   assert.equal(placeholderLines(this.rendered)[0]?.startsWith("> "), true);
 });
 
-Then("閉じた表示数式は原文のまま残る", function () {
-  assert.equal(this.rendered, this.source);
+Then("閉じた表示数式は画像経路で描かれる", function () {
+  assert.equal(imageCount(this.rendered), 1);
 });
 
 Then("未完成な数式は原文のまま残る", function () {
@@ -1160,36 +1160,44 @@ When(
   },
 );
 
-Then("逐次更新中は文字を保ち確定後に3式の転送と配置が対応する", function () {
-  const blocks = inspectPlacementBlocks(this.issue26Updates.finalized);
+Then("先行するツール描画が残る", function () {
+  assert.equal(
+    this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
+    true,
+  );
+});
+
+Then("画像経路で描く表示数式が1件ずつ増える", function () {
+  assert.deepEqual(this.issue26Updates.streaming.map(imageCount), [1, 2, 3]);
+});
+
+Then("各差分描画は新しい表示数式を1件ずつ転送する", function () {
   assert.deepEqual(
-    {
-      precedingToolDrawn:
-        this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
-      streamingImages: this.issue26Updates.streaming.map(imageCount),
-      streamingTuiImages:
-        this.issue26Updates.tuiWrites.streaming.map(imageCount),
-      finalizedTuiImages: imageCount(this.issue26Updates.tuiWrites.finalized),
-      placements: blocks.length,
-      multipleRows: blocks.some((block) => block.rows > 1),
-      matching: blocks.every(
+    [
+      ...this.issue26Updates.tuiWrites.streaming.map(imageCount),
+      imageCount(this.issue26Updates.tuiWrites.finalized),
+    ],
+    [1, 1, 1, 0],
+  );
+});
+
+Then("各更新の転送と配置が対応する", function () {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    this.issue26Updates.finalized,
+  ];
+  const matching = frames
+    .map(inspectPlacementBlocks)
+    .every((blocks) =>
+      blocks.every(
         (block) =>
           block.id === block.transferId &&
           block.rows === block.declaredRows &&
           block.completeTransfer &&
           block.adjacentTransfer,
       ),
-    },
-    {
-      precedingToolDrawn: true,
-      streamingImages: [0, 0, 0],
-      streamingTuiImages: [0, 0, 0],
-      finalizedTuiImages: 3,
-      placements: 3,
-      multipleRows: true,
-      matching: true,
-    },
-  );
+    );
+  assert.equal(matching, true);
 });
 
 When("同じ複数行表示数式を一回の確定応答内に二回配置する", function () {

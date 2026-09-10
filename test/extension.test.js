@@ -241,19 +241,52 @@ test("展開後に Pi が描けないインライン数式は原文を残す", a
   assert.equal(rendered, markdown);
 });
 
-test("追加マクロを表示数式とコードと URL では展開しない", async () => {
+test("ストリーミング中に追加マクロを含む閉じた表示数式を描く", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   require("../dist/api.js").registerFormula(pi.api, {
     ket: [String.raw`\left|#1\right\rangle`, 1],
   });
   await startWithKitty(pi);
-  const markdown = [
-    String.raw`$$\ket{s}$$`,
-    String.raw`\[\ket{s}\]`,
-    "code: `$\\ket{s}$`",
-    String.raw`https://example.com/$\ket{s}$`,
-  ].join("\n");
+  const markdown = [String.raw`$$\ket{s}$$`, String.raw`\[\ket{s}\]`].join(
+    "\n",
+  );
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal((rendered.match(/\x1b_Ga=T,f=100/gu) ?? []).length, 2);
+});
+
+test("ストリーミング中もコード内の追加マクロを変更しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = "code: `$\\ket{s}$`";
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("ストリーミング中も URL 内の追加マクロを変更しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  require("../dist/api.js").registerFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = String.raw`https://example.com/$\ket{s}$`;
 
   const rendered = pi.transformer()(markdown, {
     messageType: "assistant",
@@ -289,7 +322,7 @@ test("display formulas use a Kitty PNG transfer and placeholder rows", async () 
   );
 });
 
-test("streaming display formulas stay in the text path until finalized", async () => {
+test("streaming display formulas use the image path when complete", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   await startWithKitty(pi);
@@ -301,7 +334,7 @@ test("streaming display formulas stay in the text path until finalized", async (
     availableWidth: 80,
   });
 
-  assert.equal(streaming, markdown);
+  assert.equal((streaming.match(/\x1b_Ga=T,f=100/gu) ?? []).length, 3);
 });
 
 test("the same display formula transfers before every placement", async () => {

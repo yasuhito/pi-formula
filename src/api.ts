@@ -278,7 +278,7 @@ export function registerFormula(
     if (context.messageType === "assistant-thinking") return markdown;
     const macros = effectiveMacros(state);
     const withInlineMacros = transformInlineMath(markdown, macros);
-    if (context.isStreaming || state.path === "text") return withInlineMacros;
+    if (state.path === "text") return withInlineMacros;
     const renderFormula = state.imageRenderer.createMarkdownRenderer({
       availableWidth: context.availableWidth,
       color: state.textColor(),

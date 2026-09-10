@@ -7,6 +7,7 @@ const { resolveVtTool } = require("./vt-tool");
 
 const root = path.resolve(__dirname, "..");
 const corpusPath = path.join(root, "docs/agents/verify-corpus/issue-26.md");
+const expectedStreamingUpdates = 3;
 
 function displayFormulaCount(markdown) {
   return (markdown.match(/^\$\$\s*$[\s\S]*?^\$\$\s*$/gmu) ?? []).length;
@@ -27,33 +28,51 @@ function number(state, pattern) {
   return Number(pattern.exec(state)?.[1]);
 }
 
-function inspect(output, raw, expected) {
+function imageIds(state, pattern) {
+  return new Set([...state.matchAll(pattern)].map((match) => match[1]));
+}
+
+function placementImageIds(state) {
+  return imageIds(
+    state,
+    /^placement: image_id=(0x[0-9a-f]+).* virtual=1 .* image=\{/gmu,
+  );
+}
+
+function placeholderImageIds(state) {
+  return imageIds(state, /^placeholder: image_id=(0x[0-9a-f]+)/gmu);
+}
+
+function sameValues(left, right) {
+  return (
+    left.size === right.size && [...left].every((value) => right.has(value))
+  );
+}
+
+function virtualImageCount(state) {
+  return (state.match(/^placement: .* virtual=1 .* image=\{/gmu) ?? []).length;
+}
+
+function inspect(output, raw, displayFormulas) {
   const frames = sections(output, "frame");
   const completeFrames = frames.filter((frame) =>
     frame.includes("frame.complete=1"),
   );
   const final = sections(output, "final").at(-1) ?? "";
   const leaks = frames.map((frame) => number(frame, /cells\.apc_leak=(\d+)/u));
-  const textFrames = completeFrames.filter(
-    (frame) =>
-      number(frame, /kitty\.placements=(\d+)/u) === 0 &&
-      frame.includes(String.raw`\mathrm{QFT}_N`),
-  );
   const fragmentedTransfers = frames.filter((frame) =>
     frame.includes("frame.kitty_open=1"),
   );
-  const virtualImages = (
-    final.match(/^placement: .* virtual=1 .* image=\{/gmu) ?? []
-  ).length;
-  const finalPlaceholderImages = new Set(
-    [...final.matchAll(/^placeholder: image_id=(0x[0-9a-f]+)/gmu)].map(
-      (match) => match[1],
-    ),
-  ).size;
+  const unmatchedFrames = completeFrames.filter(
+    (frame) =>
+      !sameValues(placementImageIds(frame), placeholderImageIds(frame)),
+  );
+  const virtualImages = virtualImageCount(final);
+  const streamingUpdates = Math.max(0, completeFrames.length - 2);
 
   if (frames.length < 2) return "読み取りごとのフレームが記録されませんでした";
-  if (textFrames.length !== expected)
-    return `未完了本文の差分描画は ${expected} 回に対して ${textFrames.length} 回です`;
+  if (streamingUpdates !== expectedStreamingUpdates)
+    return `ストリーミング更新は ${expectedStreamingUpdates} 回に対して ${streamingUpdates} 回です`;
   if (completeFrames.some((frame) => !frame.includes("qni tool result")))
     return "差分描画で先行する tool 出力が失われました";
   if (raw.includes("\x1b[2J"))
@@ -62,20 +81,23 @@ function inspect(output, raw, expected) {
     return "読み取り境界をまたぐ Kitty APC を確認できませんでした";
   if (leaks.some((value) => value !== 0))
     return `本文セルに APC の断片があるフレームがあります: ${leaks.join(",")}`;
-  if (virtualImages !== expected || finalPlaceholderImages !== expected)
+  if (unmatchedFrames.length > 0)
+    return `${unmatchedFrames.length} 件の完了フレームで仮想配置と placeholder が対応しません`;
+  if (virtualImages !== displayFormulas)
     return (
-      `最終フレームの表示数式 ${expected} 件に対して ` +
-      `仮想配置 ${virtualImages} 件、placeholder の画像 ${finalPlaceholderImages} 件です`
+      `最終フレームの表示数式 ${displayFormulas} 件に対して ` +
+      `仮想配置 ${virtualImages} 件です`
     );
   return {
+    completeFrames: completeFrames.length,
     fragmentedTransfers: fragmentedTransfers.length,
     frames: frames.length,
-    streamingUpdates: textFrames.length,
+    streamingUpdates,
     virtualImages,
   };
 }
 
-function run(tool, expected, configHome) {
+function run(tool, displayFormulas, configHome) {
   const rawPath = path.join(configHome, "streaming.raw");
   const result = spawnSync(
     tool,
@@ -89,7 +111,7 @@ function run(tool, expected, configHome) {
       "--timeout-ms",
       "15000",
       "--wait-for-placements",
-      String(expected),
+      String(displayFormulas),
       "--frames",
       "--raw",
       rawPath,
@@ -122,7 +144,7 @@ function run(tool, expected, configHome) {
   const inspected = inspect(
     result.stdout,
     fs.readFileSync(rawPath, "utf8"),
-    expected,
+    displayFormulas,
   );
   if (typeof inspected === "string") {
     console.error(inspected);
@@ -135,9 +157,12 @@ function run(tool, expected, configHome) {
   console.log(
     `streaming-protocol: fragmented_transfers=${inspected.fragmentedTransfers}`,
   );
+  console.log(
+    `streaming-protocol: complete_frames=${inspected.completeFrames} placement_placeholders=matched`,
+  );
   console.log("streaming-protocol: apc_leak=0");
   console.log(
-    `streaming-protocol: final display_formulas=${expected} virtual_images=${inspected.virtualImages}`,
+    `streaming-protocol: final display_formulas=${displayFormulas} virtual_images=${inspected.virtualImages}`,
   );
   return 0;
 }
@@ -150,12 +175,14 @@ function main() {
     );
     return 0;
   }
-  const expected = displayFormulaCount(fs.readFileSync(corpusPath, "utf8"));
+  const displayFormulas = displayFormulaCount(
+    fs.readFileSync(corpusPath, "utf8"),
+  );
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-streaming-protocol-"),
   );
   try {
-    return run(tool, expected, directory);
+    return run(tool, displayFormulas, directory);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

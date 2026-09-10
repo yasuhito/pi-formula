@@ -519,6 +519,20 @@ Then("先行する tool 出力を保った3回の差分描画が報告される"
   );
 });
 
+Then(
+  "各完了フレームの仮想配置と placeholder の画像 ID が対応すると報告される",
+  function () {
+    assert.equal(
+      this.nativeResult.status === 0 &&
+        /streaming-protocol: complete_frames=\d+ placement_placeholders=matched/u.test(
+          this.nativeResult.stdout,
+        ),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
+
 Then("途中のどのフレームにも APC の断片がないと報告される", function () {
   assert.equal(
     this.nativeResult.status === 0 &&

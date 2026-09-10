@@ -173,6 +173,13 @@ pi-formula の worker として
 - Then 先行する tool 出力を保った3回の差分描画が報告される
 
 `@native-vt`
+## Scenario: 各完了フレームで仮想配置と placeholder が対応する
+
+- Given Pi の未完了本文と確定本文を順に描く検査がある
+- When ストリーミング中のプロトコル検査を実行する
+- Then 各完了フレームの仮想配置と placeholder の画像 ID が対応すると報告される
+
+`@native-vt`
 ## Scenario: ストリーミング中の本文セルに APC の断片がない
 
 - Given Pi の未完了本文と確定本文を順に描く検査がある
