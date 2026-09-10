@@ -1033,7 +1033,10 @@ Then("テーマ色と表示幅の各変更が別の一時保存項目になる",
 Given("正確な RGB を返さない画像経路の Pi がある", async function () {
   this.pi = fakePi();
   registerFormula(this.pi.api);
-  await startWithKitty(this.pi, { foregroundAnsi: "\x1b[38;5;250m" });
+  await startWithKitty(this.pi, {
+    foregroundAnsi: "\x1b[38;5;250m",
+    foregroundResponse: "rgb:invalid",
+  });
 });
 
 When("表示数式を変換する", function () {

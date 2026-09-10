@@ -60,6 +60,16 @@ async function startSession(pi, options = {}) {
     terminal: {
       write(query) {
         terminalWrites += 1;
+        if (query === "\x1b]10;?\x1b\\") {
+          const foreground = options.foregroundResponse ?? "rgb:d4d4/d4d4/d4d4";
+          queueMicrotask(() => inputListener?.(`\x1b]10;${foreground}\x1b\\`));
+          return;
+        }
+        if (query === "\x1b]11;?\x1b\\") {
+          const background = options.backgroundResponse ?? "rgb:invalid";
+          queueMicrotask(() => inputListener?.(`\x1b]11;${background}\x1b\\`));
+          return;
+        }
         const id = /i=(\d+)/u.exec(query)?.[1];
         if (options.response !== undefined) {
           queueMicrotask(() =>

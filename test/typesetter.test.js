@@ -34,6 +34,13 @@ test("MathJax display formula becomes a transparent PNG", () => {
   );
 });
 
+test("a formula using boldsymbol becomes an image", () => {
+  const latex = String.raw`\ket{\psi(\theta)} \longmapsto \boldsymbol c(\theta)`;
+  const macros = { ket: [String.raw`\left|#1\right\rangle`, 1] };
+
+  assert.doesNotThrow(() => typesetMath(latex, "#d4d4d4", 80, cell, macros));
+});
+
 test("simple display formula uses 65 percent of the terminal cell height", () => {
   const image = typesetMath("x", "#d4d4d4", 80, cell);
   const ratio = image.heightPx / cell.heightPx;

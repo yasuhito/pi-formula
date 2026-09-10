@@ -96,6 +96,7 @@ function prepareTypesetter(): PreparedTypesetter {
   };
   require("@mathjax/src/js/input/tex/ams/AmsConfiguration.js");
   require("@mathjax/src/js/input/tex/base/BaseConfiguration.js");
+  require("@mathjax/src/js/input/tex/boldsymbol/BoldsymbolConfiguration.js");
   require("@mathjax/src/js/input/tex/configmacros/ConfigMacrosConfiguration.js");
   require("@mathjax/src/js/input/tex/newcommand/NewcommandConfiguration.js");
   const { mathjax } = require("@mathjax/src/js/mathjax.js") as {
@@ -127,7 +128,7 @@ function prepareTypesetter(): PreparedTypesetter {
     adaptor,
     createDocument: (macros) => {
       const tex = new TeX({
-        packages: ["base", "ams", "newcommand", "configmacros"],
+        packages: ["base", "ams", "boldsymbol", "newcommand", "configmacros"],
         macros: configuredMacros(macros),
         formatError: (_jax: unknown, error: unknown) => {
           throw error;

@@ -1,13 +1,16 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { probePngSupport } = require("../dist/terminal-probe.js");
+const {
+  probePngSupport,
+  queryTerminalForeground,
+} = require("../dist/terminal-probe.js");
 const { decodePng } = require("../scripts/detect-display-bands.js");
 
-function probeHarness() {
+function terminalQueryHarness(queryTerminal) {
   let listener;
   let query;
-  const result = probePngSupport({
+  const result = queryTerminal({
     addInputListener(value) {
       listener = value;
       return () => {
@@ -20,9 +23,7 @@ function probeHarness() {
       },
     },
   });
-  const imageId = /i=(\d+)/u.exec(query)[1];
   return {
-    imageId,
     query,
     input(data) {
       return listener(data);
@@ -31,11 +32,30 @@ function probeHarness() {
   };
 }
 
+function probeHarness() {
+  const harness = terminalQueryHarness(probePngSupport);
+  return {
+    ...harness,
+    imageId: /i=(\d+)/u.exec(harness.query)[1],
+  };
+}
+
+function foregroundHarness() {
+  return terminalQueryHarness(queryTerminalForeground);
+}
+
 function returnedInput(results) {
   return results
     .map((result) => (result && "data" in result ? result.data : ""))
     .join("");
 }
+
+test("the terminal foreground query returns an exact RGB color", async () => {
+  const probe = foregroundHarness();
+  probe.input("\x1b]10;rgb:d4d4/d4d4/d4d4\x1b\\");
+
+  assert.equal(await probe.result, "#d4d4d4");
+});
 
 for (const responseValue of ["OK", "EINVAL"]) {
   const responseKind = responseValue === "OK" ? "successful" : "rejected";

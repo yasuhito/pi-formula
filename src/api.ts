@@ -12,6 +12,11 @@ import {
   saveDefaultPath,
 } from "./config";
 import {
+  resolveFormulaColor,
+  rgbFromAnsi,
+  type TerminalColors,
+} from "./formula-color";
+import {
   FormulaImageRenderer,
   type FormulaPng,
   type PngRenderResult,
@@ -27,6 +32,8 @@ import { formulaSerifStatus } from "./system-font";
 import {
   multiplexerProbeResult,
   probePngSupport,
+  queryTerminalBackground,
+  queryTerminalForeground,
   type TerminalProbe,
 } from "./terminal-probe";
 
@@ -57,7 +64,8 @@ interface FormulaState {
   terminal: string;
   hasTerminalScreen: boolean;
   imagePathForbidden: boolean;
-  textColor: () => string | undefined;
+  terminalColors: TerminalColors;
+  themeTextColor: () => string | undefined;
   userMacros: FormulaMacros;
   additionalMacros: Record<string, MacroDefinition>;
   imageRenderer: FormulaImageRenderer;
@@ -75,18 +83,6 @@ function sharedStore(): SharedStore {
   const created: SharedStore = {};
   Reflect.set(globalThis, SHARED_KEY, created);
   return created;
-}
-
-function rgbFromAnsi(ansi: string): string | undefined {
-  const match = ansi.match(
-    /(?:^|[;[])38;2;(\d{1,3});(\d{1,3});(\d{1,3})(?=m|;)/u,
-  );
-  if (!match) return undefined;
-  const channels = match.slice(1).map(Number);
-  if (channels.some((channel) => !Number.isInteger(channel) || channel > 255)) {
-    return undefined;
-  }
-  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function effectiveMacros(state: FormulaState): FormulaMacros {
@@ -153,7 +149,8 @@ function newState(): FormulaState {
     terminal: "unknown",
     hasTerminalScreen: false,
     imagePathForbidden: true,
-    textColor: () => undefined,
+    terminalColors: {},
+    themeTextColor: () => undefined,
     userMacros: {},
     additionalMacros: Object.create(null) as Record<string, MacroDefinition>,
     imageRenderer: new FormulaImageRenderer(),
@@ -205,7 +202,8 @@ export function createFormulaPng(
   if (state.path === "text") return undefined;
   return state.imageRenderer.createPng(latex, {
     availableWidth,
-    color: state.textColor(),
+    color: resolveFormulaColor(state.themeTextColor(), state.terminalColors)
+      .value,
     macros: effectiveMacros(state),
   });
 }
@@ -233,7 +231,8 @@ export function registerFormula(
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    state.textColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
+    state.terminalColors = {};
+    state.themeTextColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
     const config = loadFormulaConfig(process.env);
     state.configPath = config.filePath;
     state.defaultPath = config.defaultPath;
@@ -251,18 +250,28 @@ export function registerFormula(
     if (multiplexer) {
       state.probe = multiplexer;
     } else if (state.hasTerminalScreen) {
-      let pending: Promise<TerminalProbe> | undefined;
+      let pending:
+        | Promise<{
+            probe: TerminalProbe;
+            colors: TerminalColors;
+          }>
+        | undefined;
       ctx.ui.setWidget("pi-formula-probe", (tui) => {
-        pending = probePngSupport(tui);
+        pending = (async () => {
+          const probe = await probePngSupport(tui);
+          const foreground = await queryTerminalForeground(tui);
+          const background = await queryTerminalBackground(tui);
+          return { probe, colors: { foreground, background } };
+        })();
         return { render: () => [], invalidate: () => {} };
       });
-      state.probe = pending
-        ? await pending
-        : {
-            path: "text",
-            reason: "terminal UI unavailable",
-            response: "not queried",
-          };
+      const result = pending ? await pending : undefined;
+      state.probe = result?.probe ?? {
+        path: "text",
+        reason: "terminal UI unavailable",
+        response: "not queried",
+      };
+      state.terminalColors = result?.colors ?? {};
       ctx.ui.setWidget("pi-formula-probe", undefined);
     } else {
       state.probe = {
@@ -281,7 +290,8 @@ export function registerFormula(
     if (state.path === "text") return withInlineMacros;
     const renderFormula = state.imageRenderer.createMarkdownRenderer({
       availableWidth: context.availableWidth,
-      color: state.textColor(),
+      color: resolveFormulaColor(state.themeTextColor(), state.terminalColors)
+        .value,
       macros,
     });
     return transformDisplayMath(withInlineMacros, renderFormula);
@@ -335,6 +345,10 @@ export function registerFormula(
       }
 
       const stats = state.imageRenderer.stats();
+      const color = resolveFormulaColor(
+        state.themeTextColor(),
+        state.terminalColors,
+      );
       ctx.ui.setWidget(
         "pi-formula-status",
         [
@@ -344,6 +358,7 @@ export function registerFormula(
           `terminal: ${state.terminal}`,
           `serif: ${formulaSerifStatus()}`,
           `macros: ${Object.keys(effectiveMacros(state)).length}`,
+          `color: ${color.value ?? "unavailable"} (${color.source})`,
           `cache: ${stats.entries} entries, ${stats.bytes} bytes`,
           `last failure: ${stats.lastFailure ?? "none"}`,
         ],

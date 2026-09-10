@@ -46,6 +46,13 @@ async function selectedPathAndReason(pi, started) {
     .filter((line) => line.startsWith("path:") || line.startsWith("reason:"));
 }
 
+async function reportedColor(pi, started) {
+  await pi.commands.get("formula").handler("status", started.ctx);
+  return started.widgets
+    .get("pi-formula-status")
+    .find((line) => line.startsWith("color:"));
+}
+
 test("inline formulas stay in Pi Markdown without image transfer", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
@@ -641,6 +648,53 @@ test("invalid config is preserved when changing or clearing the default path", a
     if (original === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = original;
   }
+});
+
+test("terminal foreground overrides a mismatched Pi theme color", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi, {
+    textColor: "\x1b[38;2;0;0;0m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
+});
+
+test("terminal foreground is used when the Pi theme color is unavailable", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi, {
+    textColor: "\x1b[39m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
+});
+
+test("terminal foreground is available when the default forces the image path", async (t) => {
+  configureDefaultPath(t, "image");
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startSession(pi, {
+    response: "EINVAL",
+    textColor: "\x1b[38;2;0;0;0m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
 });
 
 test("/formula status reports the package version and image path in English", async () => {
