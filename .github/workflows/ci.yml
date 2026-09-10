@@ -52,7 +52,7 @@ jobs:
 
       - name: Run full check
         env:
-          QNI_CLI_TYPESETTER: ${{ github.workspace }}/.qni-cli-reference/src/qni-math/typesetter.ts
+          QNI_CLI_MACROS: ${{ github.workspace }}/.qni-cli-reference/src/qni-tools/quantum-macros.ts
         run: npm run check
 
   native-vt:

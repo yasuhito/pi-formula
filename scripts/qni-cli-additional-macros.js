@@ -88,7 +88,9 @@ function extractQniCliAdditionalMacros(source, sourcePath = "<source>") {
   const parsed = parseSync(sourcePath, source, { sourceType: "module" });
   if (parsed.errors.length > 0)
     throw new Error(`qni-cli の TypeScript を解析できません: ${sourcePath}`);
-  const macrosObject = findMacrosObject(parsed.program);
+  const macrosObject =
+    findMacrosObject(parsed.program) ??
+    topLevelNamedObject(parsed.program, "quantumMacros");
   if (!macrosObject)
     throw new Error(`qni-cli の macros 定義が見つかりません: ${sourcePath}`);
 
