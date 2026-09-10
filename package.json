@@ -1,6 +1,6 @@
 {
   "name": "pi-formula",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Readable LaTeX in Pi: terminal-native inline math and MathJax display images.",
   "license": "MIT",
   "author": "Yasuhito Takamiya <yasuhito@hey.com> (https://github.com/yasuhito)",

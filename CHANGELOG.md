@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2026-09-11
+
+- Keep display formulas visible when the Pi theme color has insufficient contrast with the terminal background.
+- Use the terminal foreground when the Pi theme does not provide an exact RGB color, including when the image path is selected after a rejected terminal probe.
+- Render display formulas that use `\\boldsymbol`.
+
 ## 0.1.0 - 2026-09-09
 
 - Add the CommonJS TypeScript foundation for rendering display formulas as transparent MathJax PNG images.

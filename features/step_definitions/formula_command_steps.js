@@ -248,7 +248,7 @@ Then(
       },
       {
         fields: [
-          "pi-formula 0.1.0",
+          "pi-formula 0.1.1",
           "path",
           "reason",
           "terminal",
