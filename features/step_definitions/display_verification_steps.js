@@ -420,7 +420,7 @@ Given(
   function () {
     const sourcePath =
       process.env.QNI_CLI_TYPESETTER ??
-      path.join(root, "features/fixtures/qni-cli-typesetter.txt");
+      path.join(root, "features/fixtures/qni-cli-typesetter.ts");
     this.verifyDisplayMacros =
       require("../../scripts/verify-display-macros.js").VERIFY_DISPLAY_MACROS;
     this.qniCliMacros = readQniCliAdditionalMacros(sourcePath);
@@ -430,10 +430,13 @@ Given(
 Given("検証ハーネスと値が異なる qni-cli の追加マクロ定義がある", function () {
   const source = fs
     .readFileSync(
-      path.join(root, "features/fixtures/qni-cli-typesetter.txt"),
+      path.join(root, "features/fixtures/qni-cli-typesetter.ts"),
       "utf8",
     )
-    .replace("      1,", "      2,");
+    .replace(
+      'bra: ["\\\\left\\\\langle#1\\\\right|", 1]',
+      'bra: ["\\\\left\\\\langle#1\\\\right|", 2]',
+    );
   setMacroDefinitions(this, source);
 });
 

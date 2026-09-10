@@ -42,6 +42,41 @@ function findMacrosObject(program) {
   return macros;
 }
 
+function objectExpression(node) {
+  const value = node?.type === "TSAsExpression" ? node.expression : node;
+  return value?.type === "ObjectExpression" ? value : undefined;
+}
+
+function topLevelNamedObject(program, name) {
+  for (const statement of program.body) {
+    const declaration =
+      statement.type === "ExportNamedDeclaration"
+        ? statement.declaration
+        : statement;
+    if (declaration?.type !== "VariableDeclaration") continue;
+    const binding = declaration.declarations.find(
+      (candidate) =>
+        candidate.id.type === "Identifier" && candidate.id.name === name,
+    );
+    const object = objectExpression(binding?.init);
+    if (object) return object;
+  }
+  return undefined;
+}
+
+function macroProperties(program, macrosObject) {
+  return macrosObject.properties.flatMap((property) => {
+    if (property.type !== "SpreadElement") return [property];
+    if (property.argument.type !== "Identifier") return [];
+    const spreadObject = topLevelNamedObject(program, property.argument.name);
+    return (
+      spreadObject?.properties.filter(
+        (candidate) => candidate.type !== "SpreadElement",
+      ) ?? []
+    );
+  });
+}
+
 function literalValue(node, sourcePath) {
   if (node?.type === "Literal") return node.value;
   if (node?.type === "TemplateLiteral" && node.expressions.length === 0)
@@ -58,8 +93,7 @@ function extractQniCliAdditionalMacros(source, sourcePath = "<source>") {
     throw new Error(`qni-cli の macros 定義が見つかりません: ${sourcePath}`);
 
   const macros = {};
-  for (const property of macrosObject.properties) {
-    if (property.type === "SpreadElement") continue;
+  for (const property of macroProperties(parsed.program, macrosObject)) {
     const name = propertyName(property);
     if (!name || property.value.type !== "ArrayExpression")
       throw new Error(
