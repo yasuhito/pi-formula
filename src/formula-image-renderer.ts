@@ -10,6 +10,7 @@ import { loadPng, type PngSource } from "./png-source";
 import { RenderCache, type RenderCacheStats } from "./render-cache";
 import {
   FORMULA_SAFETY_LIMITS,
+  MINIMUM_READABLE_SCALE,
   type TypesetImage,
   typesetMath,
 } from "./typesetter";
@@ -231,7 +232,7 @@ export class FormulaImageRenderer {
           cell,
           options.macros,
         ),
-      (value) => value.scale >= 0.5,
+      (value) => value.scale >= MINIMUM_READABLE_SCALE,
     );
     return image ? { image, key } : undefined;
   }

@@ -101,7 +101,16 @@ if (command === "realpath") {
     process.exit(73);
   }
 } else if (command === "jq") {
-  console.log("80");
+  const plan = JSON.parse(fs.readFileSync(0, "utf8"));
+  fs.writeFileSync(process.env.PI_FORMULA_FIXTURE_PLAN, JSON.stringify(plan));
+  const field = args.at(-1).slice(1);
+  const fixtureDimensions = {
+    height: 80 + (plan.height % 97),
+    initialWidth: 100 + (plan.initialWidth % 1_000),
+    reflowWidth:
+      plan.reflowWidth === null ? null : 100 + (plan.reflowWidth % 700),
+  };
+  console.log(fixtureDimensions[field]);
 } else if (command === "wlr-randr") {
   if (args.length === 0) {
     console.log("HEADLESS-1 connected");
@@ -335,6 +344,7 @@ Given("実表示検証用コマンドの stub 環境がある", function () {
   this.fixtureModes = path.join(this.directory, "modes");
   this.fixturePaths = path.join(this.directory, "paths");
   this.fixtureCapture = path.join(this.directory, "capture.png");
+  this.fixturePlanFile = path.join(this.directory, "plan.json");
   this.fixtureEnvironment = {
     ...process.env,
     PATH: this.commandDirectory,
@@ -342,6 +352,7 @@ Given("実表示検証用コマンドの stub 環境がある", function () {
     PI_FORMULA_FIXTURE_DIMENSIONS: this.fixtureDimensions,
     PI_FORMULA_FIXTURE_MODES: this.fixtureModes,
     PI_FORMULA_FIXTURE_PATHS: this.fixturePaths,
+    PI_FORMULA_FIXTURE_PLAN: this.fixturePlanFile,
     PI_FORMULA_FIXTURE_PNG_MODULE: path.join(
       root,
       "test/support/png-fixture.js",
@@ -356,6 +367,9 @@ function runFullFixture(world, ...options) {
     [...options, path.join(root, "docs/agents/verify-corpus/issue-21.md")],
     { encoding: "utf8", env: world.fixtureEnvironment, timeout: 30_000 },
   );
+  world.fixturePlan = fs.existsSync(world.fixturePlanFile)
+    ? JSON.parse(fs.readFileSync(world.fixturePlanFile, "utf8"))
+    : null;
   world.fixtureObservation = {
     status: world.verifyDisplayResult.status,
     modes: fs.existsSync(world.fixtureModes)
@@ -379,17 +393,50 @@ function runFullFixture(world, ...options) {
   fs.rmSync(world.directory, { recursive: true, force: true });
 }
 
+When("既定の条件で実表示検証する", function () {
+  runFullFixture(this);
+});
+
+Then("検証セッションへ表示計画の出力高を適用する", function () {
+  assert.deepEqual(
+    {
+      status: this.fixtureObservation.status,
+      plannedHeight: this.fixturePlan?.height,
+      plannedWidth: this.fixturePlan?.initialWidth,
+      modes: this.fixtureObservation.modes,
+      captureSize: this.fixtureObservation.captureSize,
+    },
+    {
+      status: 0,
+      plannedHeight: 8000,
+      plannedWidth: 1920,
+      modes: ["1020x126"],
+      captureSize: "1020x126",
+    },
+  );
+});
+
 When("100 列へ描き直して実表示検証する", function () {
   runFullFixture(this, "--reflow", "100");
 });
 
 Then("幅変更後のキャプチャが残る", function () {
-  assert.deepEqual(this.fixtureObservation, {
-    status: 0,
-    modes: ["1920x80", "816x80"],
-    paths: ["image"],
-    captureSize: "816x80",
-  });
+  assert.deepEqual(
+    {
+      ...this.fixtureObservation,
+      plannedDimensions: {
+        initialWidth: this.fixturePlan?.initialWidth,
+        reflowWidth: this.fixturePlan?.reflowWidth,
+      },
+    },
+    {
+      status: 0,
+      modes: ["1020x126", "216x126"],
+      paths: ["image"],
+      captureSize: "216x126",
+      plannedDimensions: { initialWidth: 1920, reflowWidth: 816 },
+    },
+  );
 });
 
 When("テキスト経路で実表示検証する", function () {
@@ -397,10 +444,19 @@ When("テキスト経路で実表示検証する", function () {
 });
 
 Then("画像経路を要求せずテキスト経路のキャプチャが残る", function () {
-  assert.deepEqual(this.fixtureObservation, {
-    status: 0,
-    modes: ["1920x80"],
-    paths: ["text"],
-    captureSize: "1920x80",
-  });
+  assert.deepEqual(
+    {
+      ...this.fixtureObservation,
+      plannedImageRows: this.fixturePlan?.imageRows,
+      plannedFailures: this.fixturePlan?.failedFormulas,
+    },
+    {
+      status: 0,
+      modes: ["1020x126"],
+      paths: ["text"],
+      captureSize: "1020x126",
+      plannedImageRows: 0,
+      plannedFailures: 0,
+    },
+  );
 });

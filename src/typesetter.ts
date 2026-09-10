@@ -6,6 +6,8 @@ const EX_TO_CELL_HEIGHT = 0.65;
 const CONTENT_BLEED_PX = 1;
 const DEVICE_SCALE = 2;
 
+export const MINIMUM_READABLE_SCALE = 0.5;
+
 export const FORMULA_SAFETY_LIMITS = Object.freeze({
   latexCharacters: 16_384,
   imageColumns: 255,

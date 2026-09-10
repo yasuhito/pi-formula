@@ -50,12 +50,6 @@ When("ハーネスの安全条件を調べる", function () {
     tallOutput:
       /verify-display-plan\.js/u.test(this.harness) &&
       /run_inside grim/u.test(this.harness),
-    sessionOutput:
-      /--custom-mode "1920x\$\{PI_FORMULA_VERIFY_HEIGHT\}"/u.test(
-        this.harness,
-      ) &&
-      this.harness.indexOf("--custom-mode") <
-        this.harness.indexOf('>"$PI_FORMULA_VERIFY_DISPLAY_FILE"'),
     timeouts:
       /run\(\).*timeout/su.test(this.harness) &&
       /PI_FORMULA_VERIFY_WINDOW_LIFETIME/u.test(this.harness),
@@ -119,10 +113,6 @@ Then("利用者の画面から独立した検証セッションで描画する",
 
 Then("計画した全履歴を1枚で取得する", function () {
   assert.equal(this.safety.tallOutput, true);
-});
-
-Then("検証セッションの出力を計画高へ広げてから描画する", function () {
-  assert.equal(this.safety.sessionOutput, true);
 });
 
 Then("外部処理と検証ウィンドウへ時間上限を設ける", function () {

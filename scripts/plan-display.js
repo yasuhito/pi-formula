@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
 const fs = require("node:fs");
+const { Markdown } = require("@earendil-works/pi-tui");
 const { transformDisplayMath } = require("../dist/markdown.js");
-const { typesetMath } = require("../dist/typesetter.js");
+const {
+  MINIMUM_READABLE_SCALE,
+  typesetMath,
+} = require("../dist/typesetter.js");
 const { VERIFY_DISPLAY_MACROS } = require("./verify-display-macros.js");
 
 const MIN_HEIGHT = 8000;
@@ -11,55 +15,108 @@ const FIXED_UI_HEIGHT = 3000;
 const TEXT_LINE_HEIGHT = 24;
 const IMAGE_ROW_HEIGHT = 20;
 const HISTORY_COPIES = 2;
-const AVAILABLE_COLUMNS = 220;
+const INITIAL_WIDTH = 1920;
+const INITIAL_TEXT_COLUMNS = 120;
+const INITIAL_IMAGE_COLUMNS = 220;
 const CELL = Object.freeze({ widthPx: 8, heightPx: 16 });
+const identity = (text) => text;
+const PLAN_THEME = Object.freeze({
+  heading: identity,
+  link: identity,
+  linkUrl: identity,
+  code: identity,
+  codeBlock: identity,
+  codeBlockBorder: identity,
+  quote: identity,
+  quoteBorder: identity,
+  hr: identity,
+  listBullet: identity,
+  bold: identity,
+  italic: identity,
+  strikethrough: identity,
+  underline: identity,
+});
 
-function sourceRows(markdown) {
-  return markdown
-    .split("\n")
-    .reduce(
-      (sum, line) =>
-        sum + Math.max(1, Math.ceil(Array.from(line).length / 120)),
-      0,
-    );
+function renderedTextRows(markdown, columns) {
+  return new Markdown(markdown, 0, 0, PLAN_THEME).render(columns).length;
 }
 
-function planDisplay(input, options = {}) {
-  const markdown = options.source ? input : fs.readFileSync(input, "utf8");
+function planForWidth(markdown, rendering) {
   let displayFormulas = 0;
   let failedFormulas = 0;
   let imageRows = 0;
   transformDisplayMath(markdown, (latex, original) => {
     displayFormulas += 1;
-    try {
-      const image = typesetMath(
-        latex,
-        "#282823",
-        AVAILABLE_COLUMNS,
-        CELL,
-        VERIFY_DISPLAY_MACROS,
-      );
-      imageRows += image.rows;
-    } catch {
-      failedFormulas += 1;
+    if (rendering.path === "image") {
+      try {
+        const image = typesetMath(
+          latex,
+          "#282823",
+          rendering.imageColumns,
+          CELL,
+          VERIFY_DISPLAY_MACROS,
+        );
+        if (image.scale < MINIMUM_READABLE_SCALE) {
+          failedFormulas += 1;
+        } else {
+          imageRows += image.rows;
+        }
+      } catch {
+        failedFormulas += 1;
+      }
     }
     return original;
   });
-  const textRows = sourceRows(markdown);
-  const required =
+  const textRows = renderedTextRows(markdown, rendering.textColumns);
+  const successfulFormulas = displayFormulas - failedFormulas;
+  const imageTransportRows =
+    rendering.path === "image" ? successfulFormulas * 2 : 0;
+  const requiredHeight =
     FIXED_UI_HEIGHT +
     HISTORY_COPIES *
-      (textRows * TEXT_LINE_HEIGHT + imageRows * IMAGE_ROW_HEIGHT);
-  if (required > MAX_HEIGHT) {
+      ((textRows + imageTransportRows) * TEXT_LINE_HEIGHT +
+        imageRows * IMAGE_ROW_HEIGHT);
+  return { requiredHeight, imageRows, displayFormulas, failedFormulas };
+}
+
+function planDisplay(input, options = {}) {
+  const markdown = options.source ? input : fs.readFileSync(input, "utf8");
+  const displayPath = options.path ?? "image";
+  const reflow = options.reflow ?? null;
+  const initialPlan = planForWidth(markdown, {
+    path: displayPath,
+    textColumns: INITIAL_TEXT_COLUMNS,
+    imageColumns: INITIAL_IMAGE_COLUMNS,
+  });
+  const reflowPlan =
+    reflow === null
+      ? null
+      : planForWidth(markdown, {
+          path: displayPath,
+          textColumns: reflow,
+          imageColumns: reflow,
+        });
+  const tallestPlan =
+    reflowPlan !== null &&
+    reflowPlan.requiredHeight >= initialPlan.requiredHeight
+      ? { ...reflowPlan, label: `${reflow}列へのリフロー後` }
+      : { ...initialPlan, label: `通常幅${INITIAL_WIDTH}px` };
+  if (tallestPlan.requiredHeight > MAX_HEIGHT) {
+    const pathLabel = displayPath === "image" ? "画像経路" : "テキスト経路";
     throw new Error(
-      `コーパス全体の表示には ${required}px 必要なため ${MAX_HEIGHT}px に収まりません`,
+      `${tallestPlan.label}（${pathLabel}）には ${tallestPlan.requiredHeight}px 必要なため ${MAX_HEIGHT}px に収まりません`,
     );
   }
   return {
-    height: Math.max(MIN_HEIGHT, Math.ceil(required)),
-    imageRows,
-    displayFormulas,
-    failedFormulas,
+    height: Math.max(MIN_HEIGHT, Math.ceil(tallestPlan.requiredHeight)),
+    initialWidth: INITIAL_WIDTH,
+    reflowWidth: reflow === null ? null : reflow * CELL.widthPx + 16,
+    imageRows: Math.max(initialPlan.imageRows, reflowPlan?.imageRows ?? 0),
+    displayFormulas: initialPlan.displayFormulas,
+    failedFormulas: Math.max(
+      initialPlan.failedFormulas,
+      reflowPlan?.failedFormulas ?? 0,
+    ),
   };
 }
 

@@ -116,11 +116,6 @@ esac
 if [[ -n "$REFLOW" && ! "$REFLOW" =~ ^[1-9][0-9]*$ ]]; then
   argument_error "--reflow $REFLOW"
 fi
-REFLOW_WIDTH=
-if [[ -n "$REFLOW" ]]; then
-  REFLOW_WIDTH=$((REFLOW * 8 + 16))
-fi
-
 if [[ "$DESCRIBE" == true ]]; then
   node - "$THEME" "$THEME_FILE" "$TERMINAL" "$EXTENSION" \
     "${REFLOW:-null}" "$DISPLAY_PATH" <<'NODE'
@@ -219,10 +214,20 @@ if [[ "$DISPLAY_PATH" == text ]]; then
 fi
 "$ROOT/scripts/run-display-command" infrastructure npm \
   timeout --signal=TERM "$BUILD_TIMEOUT" npm run build
-if ! PLAN=$(run node "$ROOT/scripts/verify-display-plan.js" "$CORPUS"); then
+plan_arguments=(--path "$DISPLAY_PATH")
+if [[ -n "$REFLOW" ]]; then
+  plan_arguments+=(--reflow "$REFLOW")
+fi
+if ! PLAN=$(run node "$ROOT/scripts/verify-display-plan.js" \
+  "${plan_arguments[@]}" "$CORPUS"); then
   exit 2
 fi
 HEIGHT=$(printf '%s' "$PLAN" | run jq -r '.height')
+INITIAL_WIDTH=$(printf '%s' "$PLAN" | run jq -r '.initialWidth')
+REFLOW_WIDTH=
+if [[ -n "$REFLOW" ]]; then
+  REFLOW_WIDTH=$(printf '%s' "$PLAN" | run jq -r '.reflowWidth')
+fi
 
 if [[ "$TERMINAL" == ghostty ]]; then
   run cat >"$TERMINAL_CONFIG" <<CONFIG
@@ -289,16 +294,17 @@ RUNNER
 run chmod +x "$RUNNER"
 
 # 検証セッションの中で走る。出力を計画高へ広げ、その WAYLAND_DISPLAY を外へ伝える。
-printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_HEIGHT=%q\nPI_FORMULA_VERIFY_DISPLAY_FILE=%q\nPI_FORMULA_VERIFY_OUTPUT_FILE=%q\nPI_FORMULA_VERIFY_TERMINAL=%q\nPI_FORMULA_VERIFY_TERMINAL_CONFIG=%q\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_RUNNER=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\n' \
-  "$HEIGHT" "$DISPLAY_FILE" "$OUTPUT_FILE" "$TERMINAL" "$TERMINAL_CONFIG" \
-  "$WINDOW_TITLE" "$RUNNER" "$WINDOW_LIFETIME" >"$LAUNCHER"
+printf '#!/usr/bin/env bash\nset -Eeuo pipefail\nPI_FORMULA_VERIFY_HEIGHT=%q\nPI_FORMULA_VERIFY_INITIAL_WIDTH=%q\nPI_FORMULA_VERIFY_DISPLAY_FILE=%q\nPI_FORMULA_VERIFY_OUTPUT_FILE=%q\nPI_FORMULA_VERIFY_TERMINAL=%q\nPI_FORMULA_VERIFY_TERMINAL_CONFIG=%q\nPI_FORMULA_VERIFY_TITLE=%q\nPI_FORMULA_VERIFY_RUNNER=%q\nPI_FORMULA_VERIFY_WINDOW_LIFETIME=%q\n' \
+  "$HEIGHT" "$INITIAL_WIDTH" "$DISPLAY_FILE" "$OUTPUT_FILE" "$TERMINAL" \
+  "$TERMINAL_CONFIG" "$WINDOW_TITLE" "$RUNNER" "$WINDOW_LIFETIME" >"$LAUNCHER"
 run cat >>"$LAUNCHER" <<'LAUNCHER'
 output=$(wlr-randr | grep -oE '^[A-Za-z0-9-]+' | head -1)
 [[ -n "$output" ]] || {
   printf 'verify-display: 検証セッションの出力名を解決できませんでした\n' >&2
   exit 2
 }
-wlr-randr --output "$output" --custom-mode "1920x${PI_FORMULA_VERIFY_HEIGHT}" || {
+wlr-randr --output "$output" \
+  --custom-mode "${PI_FORMULA_VERIFY_INITIAL_WIDTH}x${PI_FORMULA_VERIFY_HEIGHT}" || {
   printf 'verify-display: 検証セッションの出力を広げられませんでした\n' >&2
   exit 2
 }
@@ -349,13 +355,13 @@ capture_size=
 for ((elapsed = 0; elapsed < SESSION_READY_TIMEOUT; elapsed += 1)); do
   if run_inside grim "$CAPTURE_FILE" >/dev/null 2>&1 && capture_size=$(run node \
     "$ROOT/scripts/verify-display-dimensions.js" size "$CAPTURE_FILE" 2>/dev/null); then
-    [[ "$capture_size" == "1920x$HEIGHT" ]] && break
+    [[ "$capture_size" == "${INITIAL_WIDTH}x$HEIGHT" ]] && break
   fi
   capture_size=
   run sleep 1
 done
-[[ "$capture_size" == "1920x$HEIGHT" ]] \
-  || fail "検証セッションの出力を 1920x${HEIGHT} で用意できませんでした"
+[[ "$capture_size" == "${INITIAL_WIDTH}x$HEIGHT" ]] \
+  || fail "検証セッションの出力を ${INITIAL_WIDTH}x${HEIGHT} で用意できませんでした"
 
 "$ROOT/scripts/run-display-command" infrastructure wait-for-display-path \
   timeout --signal=TERM "$((IMAGE_PATH_TIMEOUT + COMMAND_TIMEOUT))" \
@@ -415,7 +421,7 @@ wait_for_rendered_capture() {
     || fail "$TERMINAL_LABEL の描画完了をキャプチャで確認できませんでした"
 }
 
-wait_for_rendered_capture 1920
+wait_for_rendered_capture "$INITIAL_WIDTH"
 if [[ -n "$REFLOW" ]]; then
   run_inside wlr-randr --output "$VERIFY_OUTPUT" \
     --custom-mode "${REFLOW_WIDTH}x${HEIGHT}" \

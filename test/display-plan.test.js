@@ -36,6 +36,8 @@ test("組版できない表示数式だけをテキスト経路へ戻して計�
 
   assert.deepEqual(planDisplay(corpus, { source: true }), {
     height: 8000,
+    initialWidth: 1920,
+    reflowWidth: null,
     imageRows: 1,
     displayFormulas: 2,
     failedFormulas: 1,
@@ -45,7 +47,7 @@ test("組版できない表示数式だけをテキスト経路へ戻して計�
 test("組版できない表示数式のテキスト行を出力高へ一度だけ加える", () => {
   const corpus = `${"本文\n".repeat(100)}$$\n\\undefinedcommandhere\n$$\n\n$$x$$`;
 
-  assert.equal(planDisplay(corpus, { source: true }).height, 8080);
+  assert.equal(planDisplay(corpus, { source: true }).height, 8224);
 });
 
 test("文字数上限を超える表示数式の出力高が収まれば計画を続ける", () => {
@@ -53,21 +55,25 @@ test("文字数上限を超える表示数式の出力高が収まれば計画�
   const corpus = ["$$x$$", `$$${tooLong}$$`].join("\n\n");
 
   assert.deepEqual(planDisplay(corpus, { source: true }), {
-    height: 9712,
+    height: 9856,
+    initialWidth: 1920,
+    reflowWidth: null,
     imageRows: 1,
     displayFormulas: 2,
     failedFormulas: 1,
   });
 });
 
-test("既存の Issue 48 コーパスの計画結果を変えない", () => {
+test("Issue 48 コーパスの全角文字幅を出力高へ含める", () => {
   const issue48Corpus = path.resolve(
     __dirname,
     "../docs/agents/verify-corpus/issue-48.md",
   );
 
   assert.deepEqual(planDisplay(issue48Corpus), {
-    height: 9176,
+    height: 10760,
+    initialWidth: 1920,
+    reflowWidth: null,
     imageRows: 38,
     displayFormulas: 12,
     failedFormulas: 0,
