@@ -7,35 +7,61 @@ read_when:
 
 # 表示数式の実表示検証
 
-`scripts/verify-display` は、保存済み Markdown を Ghostty または Kitty 上の Pi に一字一句そのまま描画させ、履歴全体を1枚の PNG に撮るローカル専用ハーネスである。この**コーパスモード**は、表示の異常と検証作業の失敗を区別する。
+実表示検証は、保存済み Markdown を Ghostty または Kitty 上の Pi に一字一句そのまま描画させ、履歴全体を PNG に撮る。この**コーパスモード**は、表示の異常と検証作業の失敗を区別する。
 
 ## 実行
 
-cage、wlr-randr、選択する端末、grim、jq、Node.js、Pi が必要になる。引数を省略すると、明るいテーマ、Ghostty、現在の checkout の `src/extension.ts` を使う。
+Linux、cage、wlr-randr、選択する端末、grim、Node.js、Pi が必要になる。引数を省略すると、明るいテーマ、Ghostty、画像経路、現在の checkout の `src/extension.ts` を使う。
 
 ```sh
-scripts/verify-display docs/agents/verify-corpus/issue-21.md
-scripts/verify-display --theme dark --terminal kitty docs/agents/verify-corpus/issue-21.md
-scripts/verify-display --extension /tmp/package/src/extension.ts docs/agents/verify-corpus/issue-21.md
-scripts/verify-display --reflow 100 docs/agents/verify-corpus/issue-21.md
-scripts/verify-display --path text docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- --theme dark --terminal kitty docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- --extension /tmp/package/src/extension.ts docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- --reflow 100 docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- --path text docs/agents/verify-corpus/issue-21.md
+npm run verify:display -- --artifacts /tmp/pi-formula-captures docs/agents/verify-corpus/issue-21.md
 ```
 
-`--theme` は `light` または `dark`、`--terminal` は `ghostty` または `kitty` を受け付ける。暗いテーマでは、Pi と端末の両方へ暗い背景と明るい文字色を設定する。必要な端末コマンドは選択したものだけを検査する。
+`--theme` は `light` または `dark`、`--terminal` は `ghostty` または `kitty`、`--path` は `image` または `text` を受け付ける。`--reflow <cols>` は最初の撮影後に出力幅を変更し、描き直し後も撮影する。
 
-`--reflow <cols>` は最初の描画が安定した後、出力幅を 1 セル 8px と左右余白 16px から求めた列数相当へ変え、描き直しが安定してから撮る。表示計画は通常幅と変更後の幅の両方を計算し、履歴全体が収まる方の高さを最初から使う。`--path` の既定は `image` で、従来どおり画像経路を確認する。`text` を指定すると隔離設定でテキスト経路を選び、その経路が選ばれたことを確認して撮る。テキスト経路の表示計画は画像を組版しない。
+## 実行結果
 
-検証の役割、プロトコル層の検査入口、解決後のテーマ・テーマファイル・端末・拡張パス・描き直す列数・表示経路は道具から取得できる。
+標準出力は machine-readable な JSON 1件だけである。
 
-```sh
-scripts/verify-display --describe
-scripts/verify-display --describe --theme dark --terminal kitty
-scripts/verify-display --describe --reflow 100 --path text
+| kind | code | 意味 |
+| --- | ---: | --- |
+| `captured` | 0 | 撮影が完了し、目視確認用 artifact がある |
+| `rejected` | 1 | 入力または表示計画を描画前に拒否した |
+| `failed` | 2 | 準備、起動、応答確認、撮影、後片付けのいずれかが失敗した |
+
+`failed.stage` は `prepare`、`launch`、`verify-response`、`capture`、`cleanup` のいずれかである。個別 command の情報は診断へ入り、stage にはしない。先行する失敗と後片付け失敗が重なった場合、先行する stage を保ち、`cleanupDiagnostics` を追加する。
+
+## Artifact
+
+既定では次の下に実行ごとの directory を作る。
+
+```text
+${XDG_STATE_HOME:-$HOME/.local/state}/pi-formula/verify-display/
 ```
 
-## プロトコル層の検証
+`--artifacts` で親 directory を変更できる。各実行は `result.json` を残し、進行した stage に応じて `plan.json`、`protocol.json`、`session.jsonl`、端末設定、診断記録、`initial.png` を加える。`--reflow` を使って撮影まで進むと `reflow.png` も残す。既存の実行結果は上書きしない。
 
-画像経路の転送、仮想配置、placeholder セルは、libghostty-vt を使う Tier A / Tier B で決定的に検査する。
+## 判定の役割
+
+自動検査は次の事実だけを扱う。
+
+- Pi の最後の完了した assistant 応答がコーパスと一致する
+- 要求した画像経路またはテキスト経路が選ばれた
+- キャプチャが PNG である
+- キャプチャ寸法が表示計画と一致する
+- 連続するキャプチャが一致して描画が安定した
+- 画像プロトコルの状態が別の検査入口を通る
+
+ピクセルから表示の正しさを判定しない。表示数式の組版品質、色、字形、配置の最終判断は、`captured` が返した画像を人が見て行う。
+
+## プロトコルの検証
+
+画像経路の転送、仮想配置、placeholder セルは libghostty-vt を使って決定的に検査する。実表示検証は撮影前に次の三つを実行し、成功した検査を `protocol.json` と `captured.protocolChecks` に記録する。
 
 ```sh
 npm run verify:encoder-protocol
@@ -43,64 +69,14 @@ npm run verify:pi-protocol
 npm run verify:streaming-protocol
 ```
 
-エンコーダ層は Pi とモデルを起動せず、Markdown transformer の出力を直接検査する。Pi を通す検査は保存済みコーパスセッションを `--offline` で開き、1回の描画が終わった時点のプロトコル状態を検査する。ストリーミング中の検査は、未完了本文から確定本文までの各フレームで APC の断片が本文セルへ漏れないこと、各完了フレームで仮想配置と placeholder が対応すること、最終フレームで表示数式の仮想配置が揃うことを検査する。詳しい検査項目と native ツールがない場合の skip は、[libghostty-vt のプロトコル検査](libghostty-vt.md)を参照する。
+詳しい検査項目は[libghostty-vt のプロトコル検査](libghostty-vt.md)を参照する。
 
-フォントと字形の問題はプロトコル状態では分からない。動的字形は公開 API から PNG を作る `features/api.feature.md` のシナリオで回帰検査する。最終的な見た目はコーパスモードのキャプチャを人が確認する。
+## 隔離と安全性
 
-## 終了コード
+利用者の `WAYLAND_DISPLAY` と `DISPLAY` を使わず、`WLR_BACKENDS=headless` の cage を専用 process group で起動する。利用者の拡張、theme、設定、tool は読み込まず、現在の pi-formula、検証用の追加マクロ、経路確認だけを読み込む。
 
-| code | 意味 |
-| --- | --- |
-| 0 | ピクセル一次判定で帯を検出しなかった |
-| 1 | 水平帯を検出した |
-| 2 | 準備・描画・キャプチャ・判定に失敗した |
+`SIGINT`、`SIGTERM`、`SIGHUP`、例外、timeout のすべてで専用 process group を停止する。取得済み artifact は後片付けの対象にしない。production の実表示検証は Linux headless Wayland だけを対象とし、それ以外の環境は `prepare` stage で失敗する。
 
-終了コード1を返すのはピクセル一次判定が帯を検出した場合だけとする。コマンド失敗と判定器の timeout・実行失敗は、実コマンド名を標準エラーへ示して2にする。
+## 表示計画
 
-## キャプチャと目視
-
-キャプチャは `$XDG_STATE_HOME/pi-formula/verify-display-capture.png`、`XDG_STATE_HOME` がなければ `~/.local/state/pi-formula/verify-display-capture.png` へ残す。保存先は `PI_FORMULA_VERIFY_CAPTURE` で変更できる。
-
-```sh
-PI_FORMULA_VERIFY_CAPTURE=/tmp/issue-21.png \
-  scripts/verify-display docs/agents/verify-corpus/issue-21.md
-```
-
-`scripts/detect-display-bands.js` は色帯と黒帯を決定的な一次判定として検出する。表示数式の組版品質や内容の正しさは判定しない。合否の最終判断はキャプチャを人が見て行う。
-
-## モデルと設定の隔離
-
-```sh
-PI_FORMULA_VERIFY_MODEL=openrouter/z-ai/glm-5.3-flash \
-  scripts/verify-display docs/agents/verify-corpus/issue-21.md
-```
-
-既定ではプロジェクトの Pi 設定にあるモデルを使う。別のモデルは `PI_FORMULA_VERIFY_MODEL` で指定する。
-
-拡張は利用者・project の設定から読み込まない。実行中の checkout にある `src/extension.ts`、検証用の追加マクロ、画像経路確認だけを明示して、tool を無効にする。pi-formula の設定は一時 `XDG_CONFIG_HOME` へ隔離し、利用者マクロを空に固定する。
-
-検証用の追加マクロは qni-cli の `ket`、`bra`、`braket` と同じ定義を使う。CI は qni-cli の TypeScript を解析して名前、展開値、引数数を照合する。
-
-現在の checkout の公開 API で試験用 PNG を作り、選択した表示経路を確認してから撮影する。画像経路では PNG 署名が一致しなければ、テキスト経路では PNG が返れば終了コード2にする。
-
-## 安全性
-
-`WAYLAND_DISPLAY` と `DISPLAY` を外し、`WLR_BACKENDS=headless` の cage を専用 process group で起動する。検証セッションの中だけで選択した端末を描画し、その Wayland display だけを grim で撮る。利用者の compositor、フォーカス、ワークスペースは使わない。
-
-cage の出力は、表示計画が決めた 1920 x 8000〜16000 px へ広げる。表示計画はコーパス、表示経路、通常幅とリフロー幅を使い、全角文字のセル幅、Markdown の折り返し、画像経路での画像転送行と各表示数式の画像行数、Pi の画面部品を含めて高さを決める。安全側の計画が16000pxに収まらないコーパスは、原因になった表示経路、リフロー幅、必要な高さを示して描画前に拒否する。`--reflow` では最初の描画完了後に同じ headless 出力の幅だけを変更する。
-
-通常の外部処理には8秒、ビルドには120秒、ピクセル判定には30秒の上限を使う。Ghostty の寿命は270秒とする。`EXIT`、`INT`、`TERM`、`HUP` では検証セッションの process group を停止する。
-
-## 撮影条件
-
-キャプチャ前に、セッション記録の最後の完了した assistant message とコーパスを照合する。末尾の改行だけを除き、一字一句一致しなければ終了コード2にする。
-
-描画完了は次の3条件で決める。
-
-- 専用の端末背景がキャプチャの1%以上を占める
-- 背景以外の描画が0.1%以上ある
-- 前回のキャプチャとピクセルが完全に一致する
-
-2秒間隔で撮り直し、30秒以内に条件を満たさなければ終了コード2にする。キャプチャの寸法が計画と一致することも確認する。
-
-水平帯判定は専用 theme の背景色、本文色、UI 色を候補から除く。残る ID 色と黒色について、一定幅と密度を持つ同色領域が3行以上連続する場合を水平帯とする。詳しい閾値の正本は `scripts/detect-display-bands.js` に置く。
+表示計画は通常幅とリフロー幅について、Markdown の折り返し、表示数式の画像行、Pi の画面部分を含む必要高を求める。16000px に収まらないコーパスは描画前に `rejected` とする。表示計画の詳細は現在も `scripts/verify-display-plan.js` が担う。

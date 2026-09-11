@@ -5,7 +5,7 @@ const {
   probePngSupport,
   queryTerminalForeground,
 } = require("../dist/terminal-probe.js");
-const { decodePng } = require("../scripts/detect-display-bands.js");
+const { loadPng } = require("../dist/png-source.js");
 
 function terminalQueryHarness(queryTerminal) {
   let listener;
@@ -90,11 +90,11 @@ for (const responseValue of ["OK", "EINVAL"]) {
   });
 }
 
-test("the PNG query contains strictly decodable image data", () => {
+test("the PNG query contains readable PNG image data", () => {
   const probe = probeHarness();
   const payload = /;([^;]+)\x1b\\$/u.exec(probe.query)?.[1] ?? "";
 
-  assert.doesNotThrow(() => decodePng(Buffer.from(payload, "base64")));
+  assert.equal(loadPng(Buffer.from(payload, "base64")).loaded, true);
 });
 
 test("a partial PNG prefix returns preceding user input before timing out", async () => {

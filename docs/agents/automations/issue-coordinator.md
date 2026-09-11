@@ -417,7 +417,7 @@ gh pr create -R yasuhito/pi-formula --base main --head "$branch" \
 
 - 本文で `![alt](./file.png)` のように添付ファイルを参照する場合、その参照は**アップロード先の URL へ書き換えられる**。参照と `--attach` の両方を書いても画像は 1 枚だけになる。参照を書かずに `--attach` だけを使うと本文末尾へ追加される。どちらか一方にし、同じ画像が二重に表示されないようにする。
 
-pi-formula では、`dist/typesetter.js` の `typesetMath(latex, color, availableWidth, cell, macros)` を直接呼べば数式 1 つの PNG を作れる。マクロ定義や色を変えた前後を同じ引数で描けば、修正前後の比較画像になる。端末全体の見た目が変わる修正では `scripts/verify-display` のキャプチャを使い、変化した箇所だけを切り出す。
+pi-formula では、`dist/typesetter.js` の `typesetMath(latex, color, availableWidth, cell, macros)` を直接呼べば数式 1 つの PNG を作れる。マクロ定義や色を変えた前後を同じ引数で描けば、修正前後の比較画像になる。端末全体の見た目が変わる修正では `npm run verify:display -- <corpus>` のキャプチャを使い、変化した箇所だけを切り出す。
 
 画像を作れない場合（見た目の変化が無い、生成手段が無い）は、その理由を PR 本文に1行書く。
 

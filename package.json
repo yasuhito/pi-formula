@@ -65,6 +65,7 @@
     "test": "npm run coverage && npm run test:cucumber",
     "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
     "verify:vt": "node scripts/run-vt-pty.js",
+    "verify:display": "npm run build --silent >/dev/null && node scripts/verify-display.js",
     "verify:encoder-protocol": "npm run build && node scripts/verify-encoder-protocol.js",
     "verify:pi-protocol": "node scripts/verify-pi-protocol.js",
     "verify:streaming-protocol": "npm run build && node scripts/verify-streaming-protocol.js",

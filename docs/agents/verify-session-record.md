@@ -48,9 +48,9 @@ npm run verify:session-record -- \
 
 ## 表示検査との関係
 
-実表示検証は、表示数式の色帯や黒帯をピクセルで検出する。セッション記録検査は、表示が正常でも道具が期待どおり働かなかった状態を検出する。検査面は異なる。
+実表示検証は目視確認用の画面を撮影し、セッション記録検査は道具が期待どおり働いたかを記録から検査する。検査面は異なる。
 
-`scripts/verify-display` のコーパスモードは `--no-tools` で Pi を起動し、session JSONL を一時ディレクトリに置いて終了時に削除する。そのため、実表示検証の実行後にその記録を `verify:session-record` へ渡すことはできない。この制約が問題になる検証では、session JSONL を保存する別の headless ハーネスを使い、その保存先を次のように検査する。
+実表示検証のコーパスモードは `--no-tools` で Pi を起動し、session JSONL を実行ごとの artifact directory に残す。`captured` または `failed` の結果にある directory から、その記録を次のように検査する。
 
 ```sh
 npm run verify:session-record -- path/to/persisted-session.jsonl

@@ -16,6 +16,11 @@ const ADAM7 = [
 
 export type PngSource = Buffer | string;
 
+export interface PngSafetyLimits {
+  bytes: number;
+  pixels: number;
+}
+
 export type PngLoadResult =
   | { loaded: true; data: Buffer; width: number; height: number }
   | { loaded: false; reason: "invalid-png" | "safety-limit" };
@@ -37,7 +42,10 @@ function failed(reason: "invalid-png" | "safety-limit"): PngLoadResult {
   return { loaded: false, reason };
 }
 
-function readRegularFile(path: string): PngLoadResult | Buffer {
+function readRegularFile(
+  path: string,
+  limits: PngSafetyLimits,
+): PngLoadResult | Buffer {
   let descriptor: number | undefined;
   try {
     descriptor = openSync(
@@ -46,7 +54,7 @@ function readRegularFile(path: string): PngLoadResult | Buffer {
     );
     const stats = fstatSync(descriptor);
     if (!stats.isFile()) return failed("invalid-png");
-    if (stats.size > FORMULA_SAFETY_LIMITS.pngBytes) {
+    if (stats.size > limits.bytes) {
       return failed("safety-limit");
     }
     const buffer = Buffer.allocUnsafe(stats.size + 1);
@@ -62,7 +70,7 @@ function readRegularFile(path: string): PngLoadResult | Buffer {
       if (count === 0) break;
       bytesRead += count;
     }
-    if (bytesRead > FORMULA_SAFETY_LIMITS.pngBytes) {
+    if (bytesRead > limits.bytes) {
       return failed("safety-limit");
     }
     return buffer.subarray(0, bytesRead);
@@ -73,9 +81,12 @@ function readRegularFile(path: string): PngLoadResult | Buffer {
   }
 }
 
-function sourceBuffer(source: PngSource): PngLoadResult | Buffer {
+function sourceBuffer(
+  source: PngSource,
+  limits: PngSafetyLimits,
+): PngLoadResult | Buffer {
   if (Buffer.isBuffer(source)) {
-    if (source.length > FORMULA_SAFETY_LIMITS.pngBytes) {
+    if (source.length > limits.bytes) {
       return failed("safety-limit");
     }
     return Buffer.from(source);
@@ -83,7 +94,7 @@ function sourceBuffer(source: PngSource): PngLoadResult | Buffer {
   if (typeof source !== "string" || source.length === 0) {
     return failed("invalid-png");
   }
-  return readRegularFile(source);
+  return readRegularFile(source, limits);
 }
 
 function parseHeader(data: Buffer): PngHeader | undefined {
@@ -201,13 +212,14 @@ function readChunk(png: Buffer, offset: number): PngChunk | undefined {
   return { name, type, data, end };
 }
 
-function initialHeader(chunk: PngChunk): PngHeader | PngLoadResult {
+function initialHeader(
+  chunk: PngChunk,
+  limits: PngSafetyLimits,
+): PngHeader | PngLoadResult {
   if (chunk.name !== "IHDR") return failed("invalid-png");
   const header = parseHeader(chunk.data);
   if (!header) return failed("invalid-png");
-  if (
-    header.width > Math.floor(FORMULA_SAFETY_LIMITS.pngPixels / header.height)
-  ) {
+  if (header.width > Math.floor(limits.pixels / header.height)) {
     return failed("safety-limit");
   }
   return header;
@@ -271,8 +283,14 @@ function acceptOtherChunk(state: PngParserState, chunk: PngChunk): boolean {
   return first < 65 || first > 90;
 }
 
-export function loadPng(source: PngSource): PngLoadResult {
-  const loaded = sourceBuffer(source);
+export function loadPng(
+  source: PngSource,
+  limits: PngSafetyLimits = {
+    bytes: FORMULA_SAFETY_LIMITS.pngBytes,
+    pixels: FORMULA_SAFETY_LIMITS.pngPixels,
+  },
+): PngLoadResult {
+  const loaded = sourceBuffer(source, limits);
   if (!Buffer.isBuffer(loaded)) return loaded;
   const png = loaded;
   if (
@@ -292,7 +310,7 @@ export function loadPng(source: PngSource): PngLoadResult {
     const chunk = readChunk(png, offset);
     if (!chunk) return failed("invalid-png");
     if (!state.header) {
-      const header = initialHeader(chunk);
+      const header = initialHeader(chunk, limits);
       if ("loaded" in header) return header;
       state.header = header;
     } else if (chunk.name === "IHDR") {
