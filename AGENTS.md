@@ -1,16 +1,6 @@
 # AGENTS.md
 
-## Agent skills
-
-### Issue tracker
-
-課題と仕様は GitHub Issues で管理する。詳細は `docs/agents/issue-tracker.md` を参照する。
-
-### Triage labels
-
-標準の triage 役割は同名の GitHub label に対応させる。詳細は `docs/agents/triage-labels.md` を参照する。
-
-### Domain docs
+## Domain docs
 
 このリポジトリは single-context として扱い、ルートの `CONTEXT.md` と `docs/adr/` を使う。詳細は `docs/agents/domain.md` を参照する。
 
@@ -21,3 +11,10 @@
 - 件数を満たすためだけに、無関係な期待値を 1 つの集約アサーションへまとめない。Given と When は準備に限定し、結果のアサーションは Then に置く。
 - 検証の道具のテストは、道具を実行して結果を観察する。終了コード、出力、生成物を確かめる。実装・CI 設定・文書を `readFileSync` で読み、文字列の出現や順序を検査するテストは新しく書かない。字面はふるまいではないので、変数名を変える・コマンドを整形する・文書を書き直すだけでテストが落ちる。確かめたいことが設定や文書にしか無い場合は、道具へ「解決した設定を出力する」経路を足し、その出力を見る。
 - ピクセルの合否はコードで判定しない。`npm run verify:display -- <corpus>` は「撮るまでを自動化し、合否は目で見る」道具なので、画像の正しさを判定するロジックへ投資しない。プロトコル状態のように仕様で定まる事実は、コードで検査してよい。
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.
