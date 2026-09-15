@@ -13,11 +13,15 @@ const {
 const root = path.resolve(__dirname, "..");
 
 function run(...args) {
-  return spawnSync("npm", ["run", "--silent", "verify:display", "--", ...args], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: 30_000,
-  });
+  return spawnSync(
+    "npm",
+    ["run", "--silent", "verify:display", "--", ...args],
+    {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 30_000,
+    },
+  );
 }
 
 test("CLIは入力拒否を終了コード1で返す", () => {
