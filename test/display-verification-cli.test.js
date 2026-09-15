@@ -12,12 +12,19 @@ const {
 } = require("../dist/display-verification-process.js");
 const root = path.resolve(__dirname, "..");
 
+// npm run verify:display は dist/ を消して再ビルドするため、並列に走る
+// 他のテストファイルが dist/ を require できなくなる。ビルド済みの
+// スクリプトを直接起動する。
 function run(...args) {
-  return spawnSync("npm", ["run", "verify:display", "--", ...args], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: 30_000,
-  });
+  return spawnSync(
+    process.execPath,
+    [path.join(root, "scripts", "verify-display.js"), ...args],
+    {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 30_000,
+    },
+  );
 }
 
 test("CLIは入力拒否を終了コード1で返す", () => {

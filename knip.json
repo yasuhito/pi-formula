@@ -5,6 +5,8 @@
     "scripts/plan-display.js",
     "scripts/streaming-protocol-fixture.js",
     "scripts/verify-display-plan.js",
+    "src/display-verification-cli.ts",
+    "src/display-verification.ts",
     "src/extension.ts"
   ],
   "project": [

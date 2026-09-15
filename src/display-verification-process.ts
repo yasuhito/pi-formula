@@ -39,8 +39,12 @@ export interface DisplayProcessAdapter {
 
 const TERMINATION_GRACE_MS = 1_000;
 
+// ESRCH: the process group is gone. EPERM: on macOS, signalling a process
+// group whose members have all exited but are not yet reaped fails with EPERM
+// instead of ESRCH, so nothing in the group is still running either way.
 function alreadyStopped(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException).code === "ESRCH";
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "ESRCH" || code === "EPERM";
 }
 
 function killProcess(pid: number, signal: NodeJS.Signals): void {

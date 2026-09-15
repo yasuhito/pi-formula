@@ -130,3 +130,33 @@ test("direct childの終了後も同じprocess groupの子孫を停止する", a
     (error) => error.code === "ESRCH",
   );
 });
+
+test("停止後にprocess groupへの探査がEPERMを返してもabortは完了する", async () => {
+  const originalKill = process.kill;
+  const terminated = new Set();
+  process.kill = (pid, signal) => {
+    if (pid < 0 && signal === "SIGTERM") terminated.add(pid);
+    if (pid < 0 && signal === 0 && terminated.has(pid)) {
+      const error = new Error("kill EPERM");
+      error.code = "EPERM";
+      throw error;
+    }
+    return originalKill.call(process, pid, signal);
+  };
+  try {
+    const controller = new AbortController();
+    const pending = adapter.run(
+      {
+        label: "eperm-probe",
+        command: process.execPath,
+        args: ["-e", "setTimeout(() => {}, 10_000)"],
+        timeoutMs: 10_000,
+      },
+      controller.signal,
+    );
+    controller.abort();
+    assert.equal((await pending).status, 2);
+  } finally {
+    process.kill = originalKill;
+  }
+});
