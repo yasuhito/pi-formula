@@ -13,7 +13,7 @@ const {
 const root = path.resolve(__dirname, "..");
 
 function run(...args) {
-  return spawnSync("npm", ["run", "verify:display", "--", ...args], {
+  return spawnSync("npm", ["run", "--silent", "verify:display", "--", ...args], {
     cwd: root,
     encoding: "utf8",
     timeout: 30_000,
