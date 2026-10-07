@@ -118,162 +118,163 @@ When("100 列と画像経路の表示計画境界を実行する", function () {
   runPlanBoundary(this, "verify-display-plan.js", "--reflow", "100");
 });
 
-Then("表示計画は両方の描画が収まる寸法を返す", function () {
-  const plan = JSON.parse(this.planResult.stdout);
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      height: plan.height,
-      initialWidth: plan.initialWidth,
-      reflowWidth: plan.reflowWidth,
-    },
-    { status: 0, height: 8856, initialWidth: 1920, reflowWidth: 816 },
-  );
+Then("100列へのテキスト表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
 });
 
-Then("表示計画はリフロー幅と必要な高さを示して描画前に拒否する", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsPath: /テキスト経路/u.test(this.planResult.stderr),
-      reportsReflow: /100列へのリフロー後/u.test(this.planResult.stderr),
-      reportsRequiredHeight: /16056px/u.test(this.planResult.stderr),
-    },
-    {
-      status: 2,
-      reportsPath: true,
-      reportsReflow: true,
-      reportsRequiredHeight: true,
-    },
-  );
+Then("100列へのリフローを含む計画高は8856pxである", function () {
+  const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.height, 8856);
+});
+
+Then("リフロー前の計画幅は1920pxである", function () {
+  const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.initialWidth, 1920);
+});
+
+Then("100列へのリフロー後の計画幅は816pxである", function () {
+  const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.reflowWidth, 816);
+});
+
+Then("リフロー後に収まらない表示計画は終了コード2を返す", function () {
+  assert.deepEqual(this.planResult.status, 2);
+});
+
+Then("高さ超過の診断にテキスト経路が示される", function () {
+  assert.deepEqual(/テキスト経路/u.test(this.planResult.stderr), true);
+});
+
+Then("高さ超過の診断に100列へのリフローが示される", function () {
+  assert.deepEqual(/100列へのリフロー後/u.test(this.planResult.stderr), true);
+});
+
+Then("高さ超過の診断に必要な高さ16056pxが示される", function () {
+  assert.deepEqual(/16056px/u.test(this.planResult.stderr), true);
 });
 
 Then("表示計画は Markdown 表の折り返しを含む", function () {
   assert.equal(JSON.parse(this.planResult.stdout).height, 9000);
 });
 
-Then("表示計画は読めない縮尺を組版失敗として報告する", function () {
+Then("読めない縮尺の数式を含む表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("読めない縮尺の数式が組版失敗1件として計画される", function () {
+  assert.deepEqual(JSON.parse(this.planResult.stdout).failedFormulas, 1);
+});
+
+Then("読めない縮尺の数式の組版失敗1件が診断に示される", function () {
   assert.deepEqual(
-    {
-      status: this.planResult.status,
-      failedFormulas: JSON.parse(this.planResult.stdout).failedFormulas,
-      reportsFailures: /組版に失敗した表示数式: 1/u.test(
-        this.planResult.stderr,
-      ),
-    },
-    { status: 0, failedFormulas: 1, reportsFailures: true },
+    /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+    true,
   );
 });
 
-Then("表示計画は画像転送行を含む高さ超過を報告する", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsPath: /画像経路/u.test(this.planResult.stderr),
-      reportsLimit: /16000px/u.test(this.planResult.stderr),
-    },
-    { status: 2, reportsPath: true, reportsLimit: true },
-  );
+Then("画像転送行で高さを超えた表示計画は終了コード2を返す", function () {
+  assert.deepEqual(this.planResult.status, 2);
 });
 
-Then("表示計画は画像の組版結果を含まない", function () {
+Then("転送行の高さ超過の診断に画像経路が示される", function () {
+  assert.deepEqual(/画像経路/u.test(this.planResult.stderr), true);
+});
+
+Then("転送行の高さ超過の診断に16000px上限が示される", function () {
+  assert.deepEqual(/16000px/u.test(this.planResult.stderr), true);
+});
+
+Then("テキスト経路の表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("テキスト経路の表示計画に画像行は含まれない", function () {
   const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.imageRows, 0);
+});
+
+Then("テキスト経路の表示計画に画像組版失敗は含まれない", function () {
+  const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.failedFormulas, 0);
+});
+
+Then("組版失敗を含む検証用表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("検証用表示計画は組版失敗を1件数える", function () {
+  assert.deepEqual(JSON.parse(this.planResult.stdout).failedFormulas, 1);
+});
+
+Then("検証用表示計画の診断に組版失敗1件が示される", function () {
   assert.deepEqual(
-    {
-      status: this.planResult.status,
-      imageRows: plan.imageRows,
-      failedFormulas: plan.failedFormulas,
-    },
-    { status: 0, imageRows: 0, failedFormulas: 0 },
+    /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+    true,
   );
 });
 
-Then("verify-display は組版に失敗した表示数式の数を出す", function () {
+Then("画像行のない検証用表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("全数式の組版失敗後もテキスト用の表示計画が返る", function () {
+  assert.deepEqual(JSON.parse(this.planResult.stdout), {
+    height: 8000,
+    initialWidth: 1920,
+    reflowWidth: null,
+    imageRows: 0,
+    displayFormulas: 1,
+    failedFormulas: 1,
+  });
+});
+
+Then("全数式の組版失敗後も失敗1件が診断に示される", function () {
   assert.deepEqual(
-    {
-      status: this.planResult.status,
-      failedFormulas: JSON.parse(this.planResult.stdout).failedFormulas,
-      reportsFailures: /組版に失敗した表示数式: 1/u.test(
-        this.planResult.stderr,
-      ),
-    },
-    { status: 0, failedFormulas: 1, reportsFailures: true },
+    /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+    true,
   );
 });
 
-Then("画像行がなくても組版失敗を報告して計画を続ける", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      plan: JSON.parse(this.planResult.stdout),
-      reportsFailures: /組版に失敗した表示数式: 1/u.test(
-        this.planResult.stderr,
-      ),
-    },
-    {
-      status: 0,
-      plan: {
-        height: 8000,
-        initialWidth: 1920,
-        reflowWidth: null,
-        imageRows: 0,
-        displayFormulas: 1,
-        failedFormulas: 1,
-      },
-      reportsFailures: true,
-    },
-  );
+Then("読めないコーパスの表示計画は終了コード2を返す", function () {
+  assert.deepEqual(this.planResult.status, 2);
 });
 
-Then("verify-display は高さ超過と決めつけず planner の理由を出す", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsMissing: /missing\.md/u.test(this.planResult.stderr),
-      reportsLimit: /16000px/u.test(this.planResult.stderr),
-    },
-    { status: 2, reportsMissing: true, reportsLimit: false },
-  );
+Then("表示計画の診断に読めないコーパスのファイル名が示される", function () {
+  assert.deepEqual(/missing\.md/u.test(this.planResult.stderr), true);
 });
 
-Then("組版失敗を数えて残りの表示数式の計画を続ける", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      plan: JSON.parse(this.planResult.stdout),
-    },
-    {
-      status: 0,
-      plan: {
-        height: 8000,
-        initialWidth: 1920,
-        reflowWidth: null,
-        imageRows: 1,
-        displayFormulas: 2,
-        failedFormulas: 1,
-      },
-    },
-  );
+Then("読取失敗の診断に高さ超過は示されない", function () {
+  assert.deepEqual(/16000px/u.test(this.planResult.stderr), false);
 });
 
-Then("テキスト経路の行数を二重に数えず計画を続ける", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      plan: JSON.parse(this.planResult.stdout),
-    },
-    {
-      status: 0,
-      plan: {
-        height: 9856,
-        initialWidth: 1920,
-        reflowWidth: null,
-        imageRows: 1,
-        displayFormulas: 2,
-        failedFormulas: 1,
-      },
-    },
-  );
+Then("組版失敗を含む出力高の計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("組版失敗と残りの画像行を含む表示計画が返る", function () {
+  assert.deepEqual(JSON.parse(this.planResult.stdout), {
+    height: 8000,
+    initialWidth: 1920,
+    reflowWidth: null,
+    imageRows: 1,
+    displayFormulas: 2,
+    failedFormulas: 1,
+  });
+});
+
+Then("入力文字数上限による失敗を含む表示計画は正常終了する", function () {
+  assert.deepEqual(this.planResult.status, 0);
+});
+
+Then("長い数式をテキストとして一度だけ数えた表示計画が返る", function () {
+  assert.deepEqual(JSON.parse(this.planResult.stdout), {
+    height: 9856,
+    initialWidth: 1920,
+    reflowWidth: null,
+    imageRows: 1,
+    displayFormulas: 2,
+    failedFormulas: 1,
+  });
 });
 
 Given("16000px を超える高い表示数式を含む短いコーパスがある", function () {
@@ -284,13 +285,14 @@ Given("16000px を超える高い表示数式を含む短いコーパスがあ�
   );
 });
 
-Then("全履歴が収まらないコーパスは描画前に拒否される", function () {
-  assert.deepEqual(
-    {
-      status: this.planResult.status,
-      reportsLimit: /16000px/u.test(this.planResult.stderr),
-      reportsOtherReason: /missing\.md/u.test(this.planResult.stderr),
-    },
-    { status: 2, reportsLimit: true, reportsOtherReason: false },
-  );
+Then("高い表示数式の計画は描画前に終了コード2を返す", function () {
+  assert.deepEqual(this.planResult.status, 2);
+});
+
+Then("高い表示数式の診断に16000px上限が示される", function () {
+  assert.deepEqual(/16000px/u.test(this.planResult.stderr), true);
+});
+
+Then("高い表示数式の診断に読取失敗は示されない", function () {
+  assert.deepEqual(/missing\.md/u.test(this.planResult.stderr), false);
 });

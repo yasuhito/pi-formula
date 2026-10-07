@@ -31,27 +31,32 @@ When("1Password から npm 認証情報を渡す方法を調べる", function ()
   this.initialPublishInstructions = `${this.releaseGuide}\n${this.initialPublisher}`;
 });
 
-Then("秘密情報を表示もログ保存もせず初回公開できる", function () {
+Then("初回公開手順は1Passwordのop runを使う", function () {
+  assert.deepEqual(/\bop run\b/u.test(this.initialPublishInstructions), true);
+});
+
+Then("初回公開手順はtokenとOTPの秘密参照を使う", function () {
   assert.deepEqual(
-    {
-      onePassword: /\bop run\b/u.test(this.initialPublishInstructions),
-      secretReferences:
-        /OP_NPM_TOKEN_REF/u.test(this.initialPublishInstructions) &&
-        /OP_NPM_OTP_REF/u.test(this.initialPublishInstructions),
-      noTrace: /set \+x/u.test(this.initialPublisher),
-      temporaryNpmrc:
-        /mktemp/u.test(this.initialPublisher) &&
-        /trap/u.test(this.initialPublisher),
-      noReveal: !/--reveal/u.test(this.initialPublisher),
-    },
-    {
-      onePassword: true,
-      secretReferences: true,
-      noTrace: true,
-      temporaryNpmrc: true,
-      noReveal: true,
-    },
+    /OP_NPM_TOKEN_REF/u.test(this.initialPublishInstructions) &&
+      /OP_NPM_OTP_REF/u.test(this.initialPublishInstructions),
+    true,
   );
+});
+
+Then("初回公開スクリプトはshell traceを止める", function () {
+  assert.deepEqual(/set \+x/u.test(this.initialPublisher), true);
+});
+
+Then("初回公開スクリプトは一時npmrcを作って終了時に削除する", function () {
+  assert.deepEqual(
+    /mktemp/u.test(this.initialPublisher) &&
+      /trap/u.test(this.initialPublisher),
+    true,
+  );
+});
+
+Then("初回公開スクリプトは秘密の値を表示する指定を使わない", function () {
+  assert.deepEqual(!/--reveal/u.test(this.initialPublisher), true);
 });
 
 Given("初回版が 1Password で npm に公開済みである", function () {
@@ -65,51 +70,81 @@ When("初回版の遠隔タグと Release を作る経路を調べる", function
   );
 });
 
-Then("タグ push 用の公開処理と競合せず初回版を完了できる", function () {
+Then("初回Releaseを手動で起動できる", function () {
+  assert.deepEqual(/workflow_dispatch:/u.test(this.releaseWorkflow), true);
+});
+
+Then("初回Releaseジョブは手動起動時だけ動く", function () {
+  assert.deepEqual(
+    /if: github\.event_name == 'workflow_dispatch'/u.test(
+      this.initialReleaseJob,
+    ),
+    true,
+  );
+});
+
+Then("二つのタグ公開ジョブはpush時だけ動く", function () {
+  assert.deepEqual(
+    (this.releaseWorkflow.match(/if: github\.event_name == 'push'/gu) ?? [])
+      .length,
+    2,
+  );
+});
+
+Then("初回Releaseはnpm公開を確認してからタグを作る", function () {
   const npmCheck = this.initialReleaseJob.indexOf("npm view");
   const tagCreation = this.initialReleaseJob.indexOf("git/refs");
+  assert.deepEqual(npmCheck !== -1 && npmCheck < tagCreation, true);
+});
+
+Then("初回Releaseは同じ版の遠隔タグを作る", function () {
   assert.deepEqual(
-    {
-      manualTrigger: /workflow_dispatch:/u.test(this.releaseWorkflow),
-      initialJobOnly: /if: github\.event_name == 'workflow_dispatch'/u.test(
-        this.initialReleaseJob,
-      ),
-      tagJobsOnlyOnPush: (
-        this.releaseWorkflow.match(/if: github\.event_name == 'push'/gu) ?? []
-      ).length,
-      npmCheckedBeforeTag: npmCheck !== -1 && npmCheck < tagCreation,
-      createsTag: /refs\/tags\/\$\{RELEASE_TAG\}/u.test(this.initialReleaseJob),
-      createsRelease: /gh release create "\$\{RELEASE_TAG\}"/u.test(
-        this.initialReleaseJob,
-      ),
-      releaseTitle: /--title "pi-formula \$\{VERSION\}"/u.test(
-        this.initialReleaseJob,
-      ),
-      releaseNotes: /--notes-file \.release\/release-notes\.md/u.test(
-        this.initialReleaseJob,
-      ),
-      noRepublish: !/npm publish/u.test(this.initialReleaseJob),
-      tokenDoesNotRetrigger:
-        /GITHUB_TOKEN[^\n]*タグ push 用の公開処理は新しく起動せず/u.test(
-          this.releaseGuide,
-        ),
-      initialProvenanceException: /初回版[^。]*由来証明は付かない/u.test(
+    /refs\/tags\/\$\{RELEASE_TAG\}/u.test(this.initialReleaseJob),
+    true,
+  );
+});
+
+Then("初回Releaseは同じ版のGitHub Releaseを作る", function () {
+  assert.deepEqual(
+    /gh release create "\$\{RELEASE_TAG\}"/u.test(this.initialReleaseJob),
+    true,
+  );
+});
+
+Then("初回Releaseの題名には同じ版が含まれる", function () {
+  assert.deepEqual(
+    /--title "pi-formula \$\{VERSION\}"/u.test(this.initialReleaseJob),
+    true,
+  );
+});
+
+Then("初回Releaseの本文には作成したリリースノートを使う", function () {
+  assert.deepEqual(
+    /--notes-file \.release\/release-notes\.md/u.test(this.initialReleaseJob),
+    true,
+  );
+});
+
+Then("初回Releaseはnpmへ再公開しない", function () {
+  assert.deepEqual(!/npm publish/u.test(this.initialReleaseJob), true);
+});
+
+Then(
+  "初回Releaseのタグ作成はタグ公開処理を再起動しないと案内される",
+  function () {
+    assert.deepEqual(
+      /GITHUB_TOKEN[^\n]*タグ push 用の公開処理は新しく起動せず/u.test(
         this.releaseGuide,
       ),
-    },
-    {
-      manualTrigger: true,
-      initialJobOnly: true,
-      tagJobsOnlyOnPush: 2,
-      npmCheckedBeforeTag: true,
-      createsTag: true,
-      createsRelease: true,
-      releaseTitle: true,
-      releaseNotes: true,
-      noRepublish: true,
-      tokenDoesNotRetrigger: true,
-      initialProvenanceException: true,
-    },
+      true,
+    );
+  },
+);
+
+Then("初回版には由来証明がない例外が案内される", function () {
+  assert.deepEqual(
+    /初回版[^。]*由来証明は付かない/u.test(this.releaseGuide),
+    true,
   );
 });
 
@@ -163,44 +198,51 @@ When("公開準備を実行する", function () {
   );
 });
 
-Then("公開準備は tarball を作らず失敗する", function () {
+Then("版が異なるタグの公開準備は終了コード1を返す", function () {
+  assert.deepEqual(this.preparation.status, 1);
+});
+
+Then("公開準備はpackageの版とタグの不一致を表示する", function () {
   assert.deepEqual(
-    {
-      status: this.preparation.status,
-      mismatch: /does not match package\.json version/u.test(
-        this.preparation.stderr,
-      ),
-      files: require("node:fs").readdirSync(this.releaseDirectory),
-    },
-    { status: 1, mismatch: true, files: [] },
+    /does not match package\.json version/u.test(this.preparation.stderr),
+    true,
   );
 });
 
-Then(
-  "全チェック後の tarball と CHANGELOG の箇条書きが公開用に用意される",
-  function () {
-    const manifest = JSON.parse(readProjectFile("package.json"));
-    const packageScripts = manifest.scripts;
-    const files = require("node:fs").readdirSync(this.releaseDirectory).sort();
-    assert.deepEqual(
-      {
-        preparationStatus: this.preparation.status,
-        checkBeforePrepare: packageScripts["release:prepare"],
-        files,
-        workflowUsesCommand: /npm run release:prepare --/u.test(
-          readProjectFile(".github/workflows/release.yml"),
-        ),
-      },
-      {
-        preparationStatus: 0,
-        checkBeforePrepare: "npm run check && node scripts/prepare-release.js",
-        files: [`pi-formula-${manifest.version}.tgz`, "release-notes.md"],
-        workflowUsesCommand: true,
-      },
-      this.preparation.stderr,
-    );
-  },
-);
+Then("版が異なるタグの公開準備では配布ファイルを作らない", function () {
+  assert.deepEqual(require("node:fs").readdirSync(this.releaseDirectory), []);
+});
+
+Then("版が一致する公開準備は正常終了する", function () {
+  assert.deepEqual(this.preparation.status, 0);
+});
+
+Then("公開準備コマンドは全チェックを通してから配布物を作る", () => {
+  const manifest = JSON.parse(readProjectFile("package.json"));
+  const packageScripts = manifest.scripts;
+  assert.deepEqual(
+    packageScripts["release:prepare"],
+    "npm run check && node scripts/prepare-release.js",
+  );
+});
+
+Then("公開準備では同じ版のtarballとリリースノートが用意される", function () {
+  const manifest = JSON.parse(readProjectFile("package.json"));
+  const files = require("node:fs").readdirSync(this.releaseDirectory).sort();
+  assert.deepEqual(files, [
+    `pi-formula-${manifest.version}.tgz`,
+    "release-notes.md",
+  ]);
+});
+
+Then("公開workflowは公開準備コマンドを使う", () => {
+  assert.deepEqual(
+    /npm run release:prepare --/u.test(
+      readProjectFile(".github/workflows/release.yml"),
+    ),
+    true,
+  );
+});
 
 Given("npm 公開用の GitHub Actions がある", function () {
   this.releaseWorkflow = readProjectFile(".github/workflows/release.yml");
@@ -211,33 +253,37 @@ When("公開ジョブの権限と環境を調べる", function () {
   this.publishJob = this.releaseWorkflow;
 });
 
-Then(
-  "人間の承認、npm の信頼された公開、由来証明が必須になっている",
-  function () {
-    assert.deepEqual(
-      {
-        tagTrigger: /tags:\s*\n\s*- ['"]v\*\.\*\.\*['"]/u.test(this.publishJob),
-        approvalEnvironment: /environment:\s*npm/u.test(this.publishJob),
-        allowedAction: /Allowed actions: `npm publish`/u.test(
-          this.releaseGuide,
-        ),
-        oidc: /id-token:\s*write/u.test(this.publishJob),
-        provenance: /npm publish .*--provenance/u.test(this.publishJob),
-        noToken: !/NODE_AUTH_TOKEN|NPM_TOKEN/u.test(this.publishJob),
-      },
-      {
-        tagTrigger: true,
-        approvalEnvironment: true,
-        allowedAction: true,
-        oidc: true,
-        provenance: true,
-        noToken: true,
-      },
-    );
-  },
-);
+Then("公開workflowは版のタグpushで起動する", function () {
+  assert.deepEqual(
+    /tags:\s*\n\s*- ['"]v\*\.\*\.\*['"]/u.test(this.publishJob),
+    true,
+  );
+});
 
-Then("Release の題名と本文は同じ版の CHANGELOG に一致する", function () {
+Then("公開workflowは承認用のnpm環境を使う", function () {
+  assert.deepEqual(/environment:\s*npm/u.test(this.publishJob), true);
+});
+
+Then("npm環境で許可する操作はnpm publishと案内される", function () {
+  assert.deepEqual(
+    /Allowed actions: `npm publish`/u.test(this.releaseGuide),
+    true,
+  );
+});
+
+Then("公開workflowにはOIDCのtoken発行権限がある", function () {
+  assert.deepEqual(/id-token:\s*write/u.test(this.publishJob), true);
+});
+
+Then("npm公開では由来証明を付ける", function () {
+  assert.deepEqual(/npm publish .*--provenance/u.test(this.publishJob), true);
+});
+
+Then("公開workflowにはnpm tokenを設定しない", function () {
+  assert.deepEqual(!/NODE_AUTH_TOKEN|NPM_TOKEN/u.test(this.publishJob), true);
+});
+
+Then("リリースノートは同じ版のCHANGELOGの本文と一致する", function () {
   const manifest = JSON.parse(readProjectFile("package.json"));
   const changelogLines = readProjectFile("CHANGELOG.md").split("\n");
   const headingIndex = changelogLines.findIndex(
@@ -255,19 +301,17 @@ Then("Release の題名と本文は同じ版の CHANGELOG に一致する", func
     join(this.releaseDirectory, "release-notes.md"),
     "utf8",
   );
+  assert.deepEqual(notes, expectedNotes);
+});
+
+Then("Releaseの題名にはpackageの版が含まれる", () => {
   const workflow = readProjectFile(".github/workflows/release.yml");
-  assert.deepEqual(
-    {
-      notes,
-      title: /--title "pi-formula \$\{VERSION\}"/u.test(workflow),
-      notesFile: /--notes-file .*release-notes\.md/u.test(workflow),
-    },
-    {
-      notes: expectedNotes,
-      title: true,
-      notesFile: true,
-    },
-  );
+  assert.deepEqual(/--title "pi-formula \$\{VERSION\}"/u.test(workflow), true);
+});
+
+Then("Releaseの本文には同じ版のリリースノートを使う", () => {
+  const workflow = readProjectFile(".github/workflows/release.yml");
+  assert.deepEqual(/--notes-file .*release-notes\.md/u.test(workflow), true);
 });
 
 Given("CHANGELOG に現在の版から始まる別の版だけがある", function () {
@@ -350,26 +394,29 @@ When("公開後と公開失敗時の手順を調べる", function () {
   this.operations = this.releaseGuide;
 });
 
-Then(
-  "npm、タグ、Release、由来証明を確認し外部条件不足では再試行せず報告できる",
-  function () {
-    assert.deepEqual(
-      {
-        npm: /npm view pi-formula/u.test(this.operations),
-        tag: /git ls-remote[^\n]*refs\/tags/u.test(this.operations),
-        release: /gh release view/u.test(this.operations),
-        provenance: /npm audit signatures/u.test(this.operations),
-        noRetry: /再試行しない/u.test(this.operations),
-        reportMissingCondition: /不足条件/u.test(this.operations),
-      },
-      {
-        npm: true,
-        tag: true,
-        release: true,
-        provenance: true,
-        noRetry: true,
-        reportMissingCondition: true,
-      },
-    );
-  },
-);
+Then("公開後にnpmの版を確認する手順がある", function () {
+  assert.deepEqual(/npm view pi-formula/u.test(this.operations), true);
+});
+
+Then("公開後に遠隔タグを確認する手順がある", function () {
+  assert.deepEqual(
+    /git ls-remote[^\n]*refs\/tags/u.test(this.operations),
+    true,
+  );
+});
+
+Then("公開後にGitHub Releaseを確認する手順がある", function () {
+  assert.deepEqual(/gh release view/u.test(this.operations), true);
+});
+
+Then("公開後に由来証明を確認する手順がある", function () {
+  assert.deepEqual(/npm audit signatures/u.test(this.operations), true);
+});
+
+Then("外部条件が不足した公開は再試行しないと案内される", function () {
+  assert.deepEqual(/再試行しない/u.test(this.operations), true);
+});
+
+Then("公開条件の不足を報告する手順がある", function () {
+  assert.deepEqual(/不足条件/u.test(this.operations), true);
+});

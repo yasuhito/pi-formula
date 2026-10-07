@@ -4,17 +4,86 @@ PR reviewer として
 完了済みの独立レビュー判定を失わずに再利用し
 同じ HEAD の review worker を重ねて起動したくない
 
-## Scenario: 有効な判定では review terminal を作らない
+## Scenario: 有効な独立レビューの解決は正常終了する
 
 - Given 現 HEAD の有効な PASS レポートが残っている
 - When レビュー判定フローを解決する
-- Then レポートを残して terminal を作らず判定へ進む
+- Then 有効な独立レビューの解決は正常終了する
 
-## Scenario Outline: 無効な判定ではレポートを削除して worker を起動する
+## Scenario: 有効な独立レビューのレポートは保持される
+
+- Given 現 HEAD の有効な PASS レポートが残っている
+- When レビュー判定フローを解決する
+- Then 有効な独立レビューのレポートは保持される
+
+## Scenario: 現HEADの有効なレポートは有効と判定される
+
+- Given 現 HEAD の有効な PASS レポートが残っている
+- When レビュー判定フローを解決する
+- Then 現HEADの有効なレポートは有効と判定される
+
+## Scenario: 有効な独立レビューではterminal作成を要求しない
+
+- Given 現 HEAD の有効な PASS レポートが残っている
+- When レビュー判定フローを解決する
+- Then 有効な独立レビューではterminal作成を要求しない
+
+## Scenario: 有効な独立レビューの次の段階は6.2である
+
+- Given 現 HEAD の有効な PASS レポートが残っている
+- When レビュー判定フローを解決する
+- Then 有効な独立レビューの次の段階は6.2である
+
+## Scenario Outline: 無効な独立レビューの解決は正常終了する
 
 - Given 現 HEAD のレポートが「<欠陥>」である
 - When レビュー判定フローを解決する
-- Then 無効なレポートを削除して terminal を作る
+- Then 無効な独立レビューの解決は正常終了する
+
+### Examples:
+
+  | 欠陥 |
+  | --- |
+  | ファイルなし |
+  | HEAD 不一致 |
+  | VERDICT なし |
+  | COMPLETE なし |
+
+## Scenario Outline: 無効な独立レビューのレポートは削除される
+
+- Given 現 HEAD のレポートが「<欠陥>」である
+- When レビュー判定フローを解決する
+- Then 無効な独立レビューのレポートは削除される
+
+### Examples:
+
+  | 欠陥 |
+  | --- |
+  | ファイルなし |
+  | HEAD 不一致 |
+  | VERDICT なし |
+  | COMPLETE なし |
+
+## Scenario Outline: 欠陥のあるレポートは無効と判定される
+
+- Given 現 HEAD のレポートが「<欠陥>」である
+- When レビュー判定フローを解決する
+- Then 欠陥のあるレポートは無効と判定される
+
+### Examples:
+
+  | 欠陥 |
+  | --- |
+  | ファイルなし |
+  | HEAD 不一致 |
+  | VERDICT なし |
+  | COMPLETE なし |
+
+## Scenario Outline: 無効な独立レビューではterminal作成を要求する
+
+- Given 現 HEAD のレポートが「<欠陥>」である
+- When レビュー判定フローを解決する
+- Then 無効な独立レビューではterminal作成を要求する
 
 ### Examples:
 

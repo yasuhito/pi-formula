@@ -22,7 +22,7 @@ const {
   isInside,
   PACKAGE_TRIAL_STEP_TIMEOUT_MS,
 } = require("../../test/support/package-trial");
-const { installPackedPackage } = require("../../test/support/packed-install");
+const { createRequire } = require("node:module");
 
 setDefaultTimeout(30_000);
 
@@ -67,43 +67,36 @@ When("利用者向けの導入、設定、対応範囲を調べる", function ()
   };
 });
 
-Then(
-  "両言語から導入方法、表示見本、formula コマンド、設定、対応端末、対応 OS、未対応範囲、他の数式拡張との併用注意が分かる",
-  function () {
-    const sharedChecks = (readme) => ({
-      primaryInstall: /pi install npm:pi-formula(?!@)/u.test(readme),
-      preview: /assets\/ghostty-formulas\.png/u.test(readme),
-      command: /\/formula/u.test(readme),
-      config: /PI_FORMULA_MACROS/u.test(readme) && /config\.json/u.test(readme),
-      terminals: /Ghostty/u.test(readme) && /Kitty/u.test(readme),
-      operatingSystems: /Linux/u.test(readme) && /macOS/u.test(readme),
-    });
-    const checks = {
-      reciprocalLinks:
-        /README\.ja\.md/u.test(this.englishReadme) &&
-        /README\.md/u.test(this.japaneseReadme),
-      english: {
-        ...sharedChecks(this.readmes.english),
-        unsupported: /not supported/iu.test(this.readmes.english),
-        coexistence: /other math (?:rendering )?extensions/iu.test(
-          this.readmes.english,
-        ),
-      },
-      japanese: {
-        ...sharedChecks(this.readmes.japanese),
-        unsupported: /未対応/u.test(this.readmes.japanese),
-        coexistence: /他の数式拡張/u.test(this.readmes.japanese),
-      },
-    };
-    assert.equal(
-      checks.reciprocalLinks &&
-        Object.values(checks.english).every(Boolean) &&
-        Object.values(checks.japanese).every(Boolean),
-      true,
-      JSON.stringify(checks),
-    );
-  },
-);
+Then("{word} のREADMEに {word} の案内がある", function (language, topic) {
+  const common = {
+    primaryInstall: /pi install npm:pi-formula(?!@)/u,
+    preview: /assets\/ghostty-formulas\.png/u,
+    command: /\/formula/u,
+    environmentConfig: /PI_FORMULA_MACROS/u,
+    configFile: /config\.json/u,
+    ghostty: /Ghostty/u,
+    kitty: /Kitty/u,
+    linux: /Linux/u,
+    macOS: /macOS/u,
+  };
+  const localized = {
+    english: {
+      unsupported: /not supported/iu,
+      coexistence: /other math (?:rendering )?extensions/iu,
+      languageLink: /README\.ja\.md/u,
+    },
+    japanese: {
+      unsupported: /未対応/u,
+      coexistence: /他の数式拡張/u,
+      languageLink: /README\.md/u,
+    },
+  };
+  if (!Object.hasOwn(localized, language))
+    throw new Error(`unknown README language: ${language}`);
+  const pattern = { ...common, ...localized[language] }[topic];
+  if (!pattern) throw new Error(`unknown README topic: ${topic}`);
+  assert.equal(pattern.test(this.readmes[language]), true);
+});
 
 Given("pi-formula の Pi パッケージ情報がある", function () {
   this.manifest = JSON.parse(readProjectFile("package.json"));
@@ -114,32 +107,33 @@ When("画像情報を調べる", function () {
   this.preview = readProjectBinary("assets/ghostty-formulas.png");
 });
 
-Then(
-  "Unicode のインライン数式と画像の表示数式を含む Ghostty 表示見本が設定されている",
-  function () {
-    // Update these fixed values only after visually approving a replacement Ghostty preview.
-    assert.deepEqual(
-      {
-        galleryImage: this.galleryImage,
-        pngSignature: this.preview.subarray(1, 4).toString("ascii"),
-        width: this.preview.readUInt32BE(16),
-        height: this.preview.readUInt32BE(20),
-        sha256: createHash("sha256").update(this.preview).digest("hex"),
-      },
-      {
-        galleryImage:
-          "https://raw.githubusercontent.com/yasuhito/pi-formula/main/assets/ghostty-formulas.png",
-        pngSignature: "PNG",
-        width: 775,
-        height: 830,
-        sha256:
-          "e2366c3079f342604783945c98f9e3994b011d08806984ee7a8338d67baf47a1",
-      },
-    );
-  },
-);
+Then("Piパッケージの画像URLはGhostty表示見本を指す", function () {
+  assert.deepEqual(
+    this.galleryImage,
+    "https://raw.githubusercontent.com/yasuhito/pi-formula/main/assets/ghostty-formulas.png",
+  );
+});
 
-Given("pi-formula の npm tarball を作る", function () {
+Then("Ghostty表示見本はPNG形式である", function () {
+  assert.deepEqual(this.preview.subarray(1, 4).toString("ascii"), "PNG");
+});
+
+Then("Ghostty表示見本の幅は775pxである", function () {
+  assert.deepEqual(this.preview.readUInt32BE(16), 775);
+});
+
+Then("Ghostty表示見本の高さは830pxである", function () {
+  assert.deepEqual(this.preview.readUInt32BE(20), 830);
+});
+
+Then("Ghostty表示見本は目視承認済みの画像と一致する", function () {
+  assert.deepEqual(
+    createHash("sha256").update(this.preview).digest("hex"),
+    "e2366c3079f342604783945c98f9e3994b011d08806984ee7a8338d67baf47a1",
+  );
+});
+
+When("pi-formula の npm tarball を作る", function () {
   const packed = spawnSync("npm", ["pack", "--json"], {
     cwd: root,
     encoding: "utf8",
@@ -192,7 +186,11 @@ When("pi-formula を build する", function () {
   });
 });
 
-Then("生成後の dist に古い成果物が残らない", function () {
+Then("古い成果物があるcheckoutでもbuildは正常終了する", function () {
+  assert.deepEqual(this.build.status, 0);
+});
+
+Then("生成後のdistには削除済みソースの成果物が残らない", () => {
   const staleFiles = [
     "dist/macro-settings.js",
     "dist/macro-settings.d.ts",
@@ -204,11 +202,7 @@ Then("生成後の dist に古い成果物が残らない", function () {
       return false;
     }
   });
-  assert.deepEqual(
-    { buildStatus: this.build.status, staleFiles },
-    { buildStatus: 0, staleFiles: [] },
-    this.build.stderr || this.build.stdout,
-  );
+  assert.deepEqual(staleFiles, []);
 });
 
 Then("tarball に古い成果物が配布されない", function () {
@@ -218,9 +212,13 @@ Then("tarball に古い成果物が配布されない", function () {
   );
 });
 
-Given("pi-formula の npm tarball を一時環境へ導入する", function () {
+Given("公開APIを試す新しいnpm導入先がある", function () {
   this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-exports-"));
-  this.installedRequire = installPackedPackage(root, this.packageTrialRoot);
+  this.packageRelease = join(this.packageTrialRoot, "release");
+  this.packageWork = join(this.packageTrialRoot, "work");
+  mkdirSync(this.packageRelease);
+  mkdirSync(this.packageWork);
+  writeFileSync(join(this.packageWork, "package.json"), '{"private":true}\n');
 });
 
 When("導入したパッケージのルートを読み込む", function () {
@@ -231,11 +229,12 @@ When("導入したパッケージのルートを読み込む", function () {
   };
 });
 
-Then("拡張登録と同期的な PNG 作成が使える", function () {
-  assert.deepEqual(this.publicOperations, {
-    registerFormula: "function",
-    createFormulaPng: "function",
-  });
+Then("導入したパッケージの拡張登録APIを呼び出せる", function () {
+  assert.deepEqual(this.publicOperations.registerFormula, "function");
+});
+
+Then("導入したパッケージのPNG作成APIを呼び出せる", function () {
+  assert.deepEqual(this.publicOperations.createFormulaPng, "function");
 });
 
 When("導入したパッケージの内部 Markdown subpath を読み込む", function () {
@@ -250,160 +249,118 @@ Then("内部 subpath は公開されていない", function () {
   assert.equal(this.subpathErrorCode, "ERR_PACKAGE_PATH_NOT_EXPORTED");
 });
 
-Given("pi-formula の公開候補 tarball がある", function () {
+Given("本物のPiを試す新しい導入先と利用者設定がある", function () {
   this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-candidate-"));
-  const release = join(this.packageTrialRoot, "release");
-  mkdirSync(release);
-  const packed = spawnSync(
-    "npm",
-    ["pack", "--json", "--pack-destination", release],
-    {
-      cwd: root,
-      encoding: "utf8",
-    },
-  );
-  this.packageTrial = { packed };
-  if (packed.status === 0) {
-    const candidate = packedPackage(JSON.parse(packed.stdout));
-    this.packageTrial.tarball = join(release, candidate.filename);
-  }
+  this.packageWork = join(this.packageTrialRoot, "work");
+  const home = join(this.packageTrialRoot, "home");
+  const config = join(this.packageTrialRoot, "config");
+  const agentDirectory = join(this.packageTrialRoot, "agent");
+  for (const directory of [this.packageWork, home, config, agentDirectory])
+    mkdirSync(directory, { recursive: true });
+  this.packageEnvironment = {
+    ...process.env,
+    HOME: home,
+    XDG_CONFIG_HOME: config,
+    PI_CODING_AGENT_DIR: agentDirectory,
+  };
 });
 
 When(
-  "tarball を新しい一時環境へ導入して本物の Pi で調べる",
+  "公開候補のtarballを本物のPiへ導入する",
   {
     timeout: PACKAGE_TRIAL_STEP_TIMEOUT_MS,
   },
-  async function () {
-    const work = join(this.packageTrialRoot, "work");
-    const home = join(this.packageTrialRoot, "home");
-    const config = join(this.packageTrialRoot, "config");
-    const agentDirectory = join(this.packageTrialRoot, "agent");
-    for (const directory of [work, home, config, agentDirectory]) {
-      mkdirSync(directory, { recursive: true });
-    }
-    const env = {
-      ...process.env,
-      HOME: home,
-      XDG_CONFIG_HOME: config,
-      PI_CODING_AGENT_DIR: agentDirectory,
-    };
+  function () {
     if (!this.packageTrial.tarball) return;
-    const installed = spawnSync(
+    this.packageTrial.installed = spawnSync(
       "pi",
       ["install", `npm:pi-formula@file:${this.packageTrial.tarball}`],
       {
-        cwd: work,
-        env,
+        cwd: this.packageWork,
+        env: this.packageEnvironment,
         encoding: "utf8",
       },
     );
-    this.packageTrial.installed = installed;
-    if (installed.status !== 0) return;
-
-    const packagePath = join(
-      agentDirectory,
-      "npm",
-      "node_modules",
-      "pi-formula",
-    );
-    const probeScript = `
-    const { createRequire } = require('node:module');
-    const { join } = require('node:path');
-    const packagePath = process.env.PI_FORMULA_PACKAGE_PATH;
-    const installedRequire = createRequire(join(packagePath, 'package.json'));
-    const { Resvg } = installedRequire('@resvg/resvg-js');
-    const png = Buffer.from(new Resvg(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">' +
-      '<rect width="1" height="1"/></svg>'
-    ).render().asPng());
-    const nativePath = Object.keys(require.cache).find((path) => path.endsWith('.node'));
-    process.stdout.write(JSON.stringify({
-      apiPath: installedRequire.resolve(packagePath),
-      nativePath,
-      pngSignature: png.subarray(1, 4).toString('ascii'),
-      platform: process.platform,
-      architecture: process.arch
-    }));
-  `;
-    const probe = spawnSync(process.execPath, ["--eval", probeScript], {
-      cwd: work,
-      env: { ...env, PI_FORMULA_PACKAGE_PATH: packagePath },
-      encoding: "utf8",
-    });
-    this.packageTrial.packagePath = packagePath;
-    this.packageTrial.probe = probe;
-    if (probe.status === 0)
-      this.packageTrial.probeResult = JSON.parse(probe.stdout);
-    this.packageTrial.pi = await commandsFromRealPi(work, env);
   },
 );
 
+Then("公開候補のnpm packは正常終了する", function () {
+  const { packed } = this.packageTrial;
+  assert.deepEqual(packed.status, 0);
+});
+
+Then("公開候補のPiへの導入は正常終了する", function () {
+  const { installed } = this.packageTrial;
+  assert.deepEqual(installed?.status, 0);
+});
+
+Then("導入した配布物のResvg検査は正常終了する", function () {
+  const { probe } = this.packageTrial;
+  assert.deepEqual(probe?.status, 0);
+});
+
+Then("公開APIは一時環境へ導入した配布物から読み込まれる", function () {
+  const { packagePath, probeResult } = this.packageTrial;
+  assert.deepEqual(
+    probeResult?.apiPath ? isInside(packagePath, probeResult.apiPath) : false,
+    true,
+  );
+});
+
 Then(
-  "導入した配布物だけから OS 用 Resvg が読み込まれ formula コマンドが発見される",
+  "Resvgのnative部品は一時環境へ導入した配布物から読み込まれる",
   function () {
-    const { packed, installed, packagePath, pi, probe, probeResult } =
-      this.packageTrial;
+    const { probeResult } = this.packageTrial;
     const nodeModules = join(
       this.packageTrialRoot,
       "agent",
       "npm",
       "node_modules",
     );
-    const actual = {
-      packStatus: packed.status,
-      installStatus: installed?.status,
-      probeStatus: probe?.status,
-      apiFromTemporaryInstall: probeResult?.apiPath
-        ? isInside(packagePath, probeResult.apiPath)
-        : false,
-      nativeResvgFromTemporaryInstall: probeResult?.nativePath
+    assert.deepEqual(
+      probeResult?.nativePath
         ? isInside(nodeModules, probeResult.nativePath)
         : false,
-      nativeResvgMatchesOs: probeResult?.nativePath
-        ? probeResult.nativePath.includes(
-            `resvg-js-${probeResult.platform}-${probeResult.architecture}`,
-          )
-        : false,
-      pngSignature: probeResult?.pngSignature,
-      piClosed: pi?.closed,
-      piResponseTimedOut: pi?.responseTimedOut,
-      formulaDiscovered:
-        pi?.response?.data?.commands?.some(({ name }) => name === "formula") ??
-        false,
-    };
-    assert.deepEqual(
-      actual,
-      {
-        packStatus: 0,
-        installStatus: 0,
-        probeStatus: 0,
-        apiFromTemporaryInstall: true,
-        nativeResvgFromTemporaryInstall: true,
-        nativeResvgMatchesOs: true,
-        pngSignature: "PNG",
-        piClosed: true,
-        piResponseTimedOut: false,
-        formulaDiscovered: true,
-      },
-      JSON.stringify({
-        actual,
-        packError: packed.stderr,
-        installError: installed?.stderr || installed?.stdout,
-        probeError: probe?.stderr || probe?.stdout,
-        piError: pi?.error || pi?.stderr || pi?.stdout,
-        piLifecycle: pi && {
-          closed: pi.closed,
-          code: pi.code,
-          signal: pi.signal,
-          responseTimedOut: pi.responseTimedOut,
-          sentSigterm: pi.sentSigterm,
-          sentSigkill: pi.sentSigkill,
-        },
-      }),
+      true,
     );
   },
 );
+
+Then("導入したResvgのnative部品は現在のOSとCPUに対応する", function () {
+  const { probeResult } = this.packageTrial;
+  assert.deepEqual(
+    probeResult?.nativePath
+      ? probeResult.nativePath.includes(
+          `resvg-js-${probeResult.platform}-${probeResult.architecture}`,
+        )
+      : false,
+    true,
+  );
+});
+
+Then("導入したResvgでPNGデータを作れる", function () {
+  const { probeResult } = this.packageTrial;
+  assert.deepEqual(probeResult?.pngSignature, "PNG");
+});
+
+Then("配布物を調べた本物のPiは終了する", function () {
+  const { pi } = this.packageTrial;
+  assert.deepEqual(pi?.closed, true);
+});
+
+Then("本物のPiのコマンド一覧の応答は時間切れにならない", function () {
+  const { pi } = this.packageTrial;
+  assert.deepEqual(pi?.responseTimedOut, false);
+});
+
+Then("本物のPiが導入したformulaコマンドを発見する", function () {
+  const { pi } = this.packageTrial;
+  assert.deepEqual(
+    pi?.response?.data?.commands?.some(({ name }) => name === "formula") ??
+      false,
+    true,
+  );
+});
 
 Given("pi-formula のライセンスと第三者部品情報がある", function () {
   this.license = readProjectFile("LICENSE");
@@ -431,68 +388,147 @@ When("由来、版、更新状況、ライセンス、既知の脆弱性を調�
   );
 });
 
-Then(
-  "MIT License、取り込み元、すべての直接依存の監査結果と確認日が分かる",
-  function () {
-    const expectedRows = {
-      "@mathjax/src": [
-        "`^4.1.3` (lockfile: `4.1.3`)",
-        "`4.1.3`",
-        "2026-07-03",
-        "Current",
-        "Apache-2.0",
-        "None (`npm audit`)",
-      ],
-      "@resvg/resvg-js": [
-        "`^2.6.2` (lockfile: `2.6.2`)",
-        "`2.6.2`",
-        "2024-03-26",
-        "Current stable; next `2.7.0-alpha.2` (2026-01-28)",
-        "MPL-2.0",
-        "None (`npm audit`)",
-      ],
-      "@earendil-works/pi-coding-agent": [
-        "`*` (verified: `0.84.4`)",
-        "`0.84.4`",
-        "2026-08-28",
-        "Current",
-        "MIT",
-        "None (`npm audit`)",
-      ],
-      "@earendil-works/pi-tui": [
-        "`*` (verified: `0.84.4`)",
-        "`0.84.4`",
-        "2026-08-28",
-        "Current",
-        "MIT",
-        "None (`npm audit`)",
-      ],
-    };
-    const auditedRows = Object.fromEntries(
-      Object.keys(expectedRows).map((name) => [
-        name,
-        this.auditRows.get(name)?.slice(1),
-      ]),
+Then("パッケージのライセンスはMITである", function () {
+  assert.deepEqual(this.license.startsWith("MIT License"), true);
+});
+
+Then("第三者部品情報にqni-cliの取り込み元commitが示される", function () {
+  assert.deepEqual(
+    this.notices.includes("yasuhito/qni-cli") &&
+      this.notices.includes("2f12594e80b9e7baff0c85ecfecb4dd34d06f737"),
+    true,
+  );
+});
+
+Then("依存監査の確認日は2026年8月31日である", function () {
+  assert.deepEqual(/2026-08-31/u.test(this.notices), true);
+});
+
+Then("監査対象の直接依存がpackage情報と一致する", function () {
+  assert.deepEqual(
+    Object.keys(this.directDependencies).sort(),
+    [
+      "@mathjax/src",
+      "@resvg/resvg-js",
+      "@earendil-works/pi-coding-agent",
+      "@earendil-works/pi-tui",
+    ].sort(),
+  );
+});
+
+Then("すべての直接依存が監査表に含まれる", function () {
+  assert.deepEqual(
+    [...this.auditRows.keys()].sort(),
+    [
+      "@mathjax/src",
+      "@resvg/resvg-js",
+      "@earendil-works/pi-coding-agent",
+      "@earendil-works/pi-tui",
+    ].sort(),
+  );
+});
+
+Then("直接依存の監査記録は次のとおりである", function (table) {
+  const expectedRows = Object.fromEntries(
+    table
+      .raw()
+      .slice(1)
+      .map(([name, ...values]) => [name, values]),
+  );
+  const auditedRows = Object.fromEntries(
+    Object.keys(expectedRows).map((name) => [
+      name,
+      this.auditRows.get(name)?.slice(1),
+    ]),
+  );
+  assert.deepEqual(auditedRows, expectedRows);
+});
+
+When("公開API試験用のtarballを作る", function () {
+  const packed = spawnSync(
+    "npm",
+    ["pack", "--json", "--pack-destination", this.packageRelease],
+    { cwd: root, encoding: "utf8" },
+  );
+  if (packed.error || packed.status !== 0)
+    throw new Error(packed.error?.message ?? packed.stderr);
+  this.tarball = join(
+    this.packageRelease,
+    packedPackage(JSON.parse(packed.stdout)).filename,
+  );
+});
+
+When("公開API試験用のtarballをnpmで導入する", function () {
+  const installed = spawnSync(
+    "npm",
+    ["install", "--ignore-scripts", "--no-audit", "--no-fund", this.tarball],
+    { cwd: this.packageWork, encoding: "utf8" },
+  );
+  if (installed.error || installed.status !== 0)
+    throw new Error(
+      installed.error?.message ?? (installed.stderr || installed.stdout),
     );
-    assert.deepEqual(
-      {
-        mitLicense: this.license.startsWith("MIT License"),
-        provenance:
-          this.notices.includes("yasuhito/qni-cli") &&
-          this.notices.includes("2f12594e80b9e7baff0c85ecfecb4dd34d06f737"),
-        auditDate: /2026-08-31/u.test(this.notices),
-        directDependencyNames: Object.keys(this.directDependencies).sort(),
-        auditedNames: [...this.auditRows.keys()].sort(),
-        auditedRows,
-      },
-      {
-        mitLicense: true,
-        provenance: true,
-        auditDate: true,
-        directDependencyNames: Object.keys(expectedRows).sort(),
-        auditedNames: Object.keys(expectedRows).sort(),
-        auditedRows: expectedRows,
-      },
-    );
-  },
-);
+  this.installedRequire = createRequire(join(this.packageWork, "package.json"));
+});
+
+When("公開候補のtarballを作る", function () {
+  const release = join(this.packageTrialRoot, "release");
+  mkdirSync(release);
+  const packed = spawnSync(
+    "npm",
+    ["pack", "--json", "--pack-destination", release],
+    {
+      cwd: root,
+      encoding: "utf8",
+    },
+  );
+  this.packageTrial = { packed };
+  if (packed.status === 0) {
+    const candidate = packedPackage(JSON.parse(packed.stdout));
+    this.packageTrial.tarball = join(release, candidate.filename);
+  }
+});
+
+When("導入した配布物のResvgと公開APIの由来を調べる", function () {
+  if (this.packageTrial.installed?.status !== 0) return;
+  const agentDirectory = this.packageEnvironment.PI_CODING_AGENT_DIR;
+  const work = this.packageWork;
+  const env = this.packageEnvironment;
+  const packagePath = join(agentDirectory, "npm", "node_modules", "pi-formula");
+  const probeScript = `
+    const { createRequire } = require('node:module');
+    const { join } = require('node:path');
+    const packagePath = process.env.PI_FORMULA_PACKAGE_PATH;
+    const installedRequire = createRequire(join(packagePath, 'package.json'));
+    const { Resvg } = installedRequire('@resvg/resvg-js');
+    const png = Buffer.from(new Resvg(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">' +
+      '<rect width="1" height="1"/></svg>'
+    ).render().asPng());
+    const nativePath = Object.keys(require.cache).find((path) => path.endsWith('.node'));
+    process.stdout.write(JSON.stringify({
+      apiPath: installedRequire.resolve(packagePath),
+      nativePath,
+      pngSignature: png.subarray(1, 4).toString('ascii'),
+      platform: process.platform,
+      architecture: process.arch
+    }));
+  `;
+  const probe = spawnSync(process.execPath, ["--eval", probeScript], {
+    cwd: work,
+    env: { ...env, PI_FORMULA_PACKAGE_PATH: packagePath },
+    encoding: "utf8",
+  });
+  this.packageTrial.packagePath = packagePath;
+  this.packageTrial.probe = probe;
+  if (probe.status === 0)
+    this.packageTrial.probeResult = JSON.parse(probe.stdout);
+});
+
+When("導入先で本物のPiのコマンド一覧を問い合わせる", async function () {
+  if (this.packageTrial.installed?.status !== 0) return;
+  this.packageTrial.pi = await commandsFromRealPi(
+    this.packageWork,
+    this.packageEnvironment,
+  );
+});

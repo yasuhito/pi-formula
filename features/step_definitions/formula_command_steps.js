@@ -2,20 +2,14 @@ const assert = require("node:assert/strict");
 const {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   writeFileSync,
 } = require("node:fs");
-const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { Given, Then, When } = require("@cucumber/cucumber");
 
 const registerFormula = require("../../dist/extension.js").default;
-const {
-  fakePi,
-  resetFormulaState,
-  startSession,
-} = require("../../test/support/fake-pi");
+const { fakePi, startSession } = require("../../test/support/fake-pi");
 
 function withEnvironment(changes, run) {
   const original = {};
@@ -80,216 +74,203 @@ Then("`{word}`経路が選ばれる", async function (path) {
   );
 });
 
-Given("画像を使えない端末環境がある", function () {
-  this.fallbacks = [];
+function preparePi(world, startOptions = {}) {
+  world.pi = fakePi();
+  registerFormula(world.pi.api);
+  world.startOptions = startOptions;
+}
+
+Given("端末でPiを使っている", function () {
+  preparePi(this);
 });
 
-When("各環境でセッションを開始する", async function () {
-  const cases = [
-    { env: { TMUX: "1", TERM: "xterm-kitty" }, options: { response: "OK" } },
-    {
-      env: { TMUX: undefined, TERM: "screen-256color" },
-      options: { response: "OK" },
-    },
-    {
-      env: { TMUX: undefined, TERM: "xterm-kitty" },
-      options: { response: "EINVAL" },
-    },
-    { env: { TMUX: undefined, TERM: "xterm-kitty" }, options: {} },
-    { env: { TMUX: undefined, TERM: "xterm-kitty" }, options: { mode: "rpc" } },
-  ];
-  for (const item of cases) {
-    resetFormulaState();
-    const pi = fakePi();
-    registerFormula(pi.api);
-    const started = await withEnvironment(item.env, () =>
-      startSession(pi, item.options),
-    );
-    this.fallbacks.push(await statusLines(pi, started));
+Given("PNG画像を表示できる端末でPiを使っている", function () {
+  preparePi(this, { response: "OK" });
+});
+
+Given("Piを非対話モード（RPC）で使っている", function () {
+  preparePi(this, { mode: "rpc" });
+});
+
+Given("端末はPNG画像を表示できると返答する", function () {
+  this.startOptions.response = "OK";
+});
+
+Given("端末はPNG画像表示の問い合わせにエラーを返す", function () {
+  this.startOptions.response = "EINVAL";
+});
+
+Given("端末はPNG画像表示の問い合わせに応答しない", function () {
+  delete this.startOptions.response;
+});
+
+Given("端末の種類は {string}", function (term) {
+  this.term = term;
+});
+
+Given("tmuxの中でPiを使っている", function () {
+  this.tmux = "1";
+});
+
+Given("全体の既定の表示経路は設定されていない", function () {
+  if (existsSync(join(this.xdg, "pi-formula", "config.json"))) {
+    throw new Error("Expected an unset global path fixture");
   }
 });
 
-Then("すべての環境でテキスト経路が選ばれる", function () {
-  assert.equal(
-    this.fallbacks.every((lines) => lines.includes("path: text")),
-    true,
-  );
+Given("全体の設定ファイルは存在しない", function () {
+  if (existsSync(join(this.xdg, "pi-formula", "config.json"))) {
+    throw new Error("Expected no global config file");
+  }
 });
 
-When(
-  "formula コマンドの image と text と auto を順に実行する",
-  async function () {
-    this.started = await startSession(this.pi, { response: "OK" });
-    this.selectedPaths = [];
-    for (const action of ["image", "text", "auto"]) {
-      await this.pi.commands.get("formula").handler(action, this.started.ctx);
-      const lines = await statusLines(this.pi, this.started);
-      this.selectedPaths.push(lines.find((line) => line.startsWith("path:")));
-    }
-  },
-);
-
-Then(
-  "経路が切り替わり、すべての指定が現在のセッションへ保存される",
-  function () {
-    assert.deepEqual(
-      {
-        selectedPaths: this.selectedPaths,
-        savedPaths: this.pi.entries.map((entry) => entry.data.path),
-      },
-      {
-        selectedPaths: ["path: image", "path: text", "path: image"],
-        savedPaths: ["image", "text", "auto"],
-      },
-    );
-  },
-);
-
-Given("テキスト経路の全体既定と画像対応端末がある", function () {
+Given("全体の既定の表示経路はテキスト経路である", function () {
   const directory = join(this.xdg, "pi-formula");
   mkdirSync(directory, { recursive: true });
   writeFileSync(
     join(directory, "config.json"),
     JSON.stringify({ path: "text" }),
   );
-  this.pi = fakePi();
-  registerFormula(this.pi.api);
 });
 
-When("セッションで formula auto を実行する", async function () {
-  this.started = await startSession(this.pi, { response: "OK" });
-  await this.pi.commands.get("formula").handler("auto", this.started.ctx);
-  this.lines = await statusLines(this.pi, this.started);
+Given("利用者マクロを1個設定している", () => {
+  process.env.PI_FORMULA_MACROS = JSON.stringify({ secret: "x" });
 });
 
-Then("PNG 問い合わせによる画像経路へ戻る", function () {
-  assert.deepEqual(
-    this.lines.filter(
-      (line) => line.startsWith("path:") || line.startsWith("reason:"),
-    ),
-    ["path: image", "reason: PNG query returned OK"],
-  );
+Given("マクロの内容に秘密の文字列が含まれる", () => {
+  process.env.PI_FORMULA_MACROS = JSON.stringify({
+    secret: "do-not-show-this",
+  });
 });
 
-Given("一時的な XDG 設定を使う Pi がある", function () {
-  this.xdg = mkdtempSync(join(tmpdir(), "pi-formula-xdg-"));
+When("formula {word}を実行する", async function (action) {
+  await this.pi.commands.get("formula").handler(action, this.started.ctx);
+  if (action === "status")
+    this.lines = this.started.widgets.get("pi-formula-status");
 });
 
-When(
-  "default なしとありの表示経路指定を実行してから auto default を実行する",
-  async function () {
-    await withEnvironment({ XDG_CONFIG_HOME: this.xdg }, async () => {
-      const pi = fakePi();
-      registerFormula(pi.api);
-      const started = await startSession(pi, { response: "OK" });
-      const command = pi.commands.get("formula");
-      await command.handler("text", started.ctx);
-      this.existsAfterSessionOnly = existsSync(
-        join(this.xdg, "pi-formula", "config.json"),
-      );
-      await command.handler("image --default", started.ctx);
-      this.savedDefault = JSON.parse(
-        readFileSync(join(this.xdg, "pi-formula", "config.json")),
-      ).path;
-      await command.handler("auto --default", started.ctx);
-      this.existsAfterAuto = existsSync(
-        join(this.xdg, "pi-formula", "config.json"),
-      );
-    });
-  },
-);
-
-Then("default 指定だけが XDG 設定を変更する", function () {
-  assert.deepEqual(
-    {
-      existsAfterSessionOnly: this.existsAfterSessionOnly,
-      savedDefault: this.savedDefault,
-      existsAfterAuto: this.existsAfterAuto,
-    },
-    {
-      existsAfterSessionOnly: false,
-      savedDefault: "image",
-      existsAfterAuto: false,
-    },
-  );
+When("formula {word} --defaultを実行する", async function (action) {
+  await this.pi.commands
+    .get("formula")
+    .handler(`${action} --default`, this.started.ctx);
 });
 
-Given("画像の一時保存がある Pi がある", async function () {
-  this.pi = fakePi();
-  registerFormula(this.pi.api);
-  this.started = await startSession(this.pi, { response: "OK" });
-  this.pi.transformer()("$$x$$", {
+When("数式 {string} を画像へ変換する", function (markdown) {
+  this.rendered = this.pi.transformer()(markdown, {
     messageType: "assistant",
     isStreaming: false,
     availableWidth: 80,
   });
 });
 
-When("formula clear を実行する", async function () {
-  await this.pi.commands.get("formula").handler("clear", this.started.ctx);
+Then("画像経路が選ばれる", async function () {
+  assert.equal(
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("path:"),
+    ),
+    "path: image",
+  );
+});
+
+Then("テキスト経路が選ばれる", async function () {
+  assert.equal(
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("path:"),
+    ),
+    "path: text",
+  );
+});
+
+Then("表示経路の指定が次の順に記録される", function (table) {
+  assert.deepEqual(
+    this.pi.entries.map((entry) => entry.data.path),
+    table.rows().map(([action]) => action),
+  );
+});
+
+Then("選択理由はPNG画像表示の問い合わせの成功になる", async function () {
+  assert.equal(
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("reason:"),
+    ),
+    "reason: PNG query returned OK",
+  );
+});
+
+Then("全体の設定ファイルは作られない", function () {
+  assert.equal(existsSync(join(this.xdg, "pi-formula", "config.json")), false);
+});
+
+Then("全体の既定の表示経路は画像経路として保存される", function () {
+  assert.equal(
+    JSON.parse(readFileSync(join(this.xdg, "pi-formula", "config.json"))).path,
+    "image",
+  );
+});
+
+Then("表示経路だけを持つ全体の設定ファイルは削除される", function () {
+  assert.equal(existsSync(join(this.xdg, "pi-formula", "config.json")), false);
+});
+
+Then("画像の一時保存に1件以上が含まれる", async function () {
+  assert.match(
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("cache:"),
+    ),
+    /^cache: [1-9]\d* entries, [1-9]\d* bytes$/u,
+  );
 });
 
 Then("画像の一時保存が空になる", async function () {
   assert.equal(
-    (await statusLines(this.pi, this.started)).includes(
-      "cache: 0 entries, 0 bytes",
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("cache:"),
     ),
+    "cache: 0 entries, 0 bytes",
+  );
+});
+
+Then("診断には次の項目だけがこの順に含まれる", function (table) {
+  const fieldNames = new Map([
+    ["版", "pi-formula 0.1.1"],
+    ["経路", "path"],
+    ["理由", "reason"],
+    ["端末", "terminal"],
+    ["セリフ体", "serif"],
+    ["マクロ数", "macros"],
+    ["数式色", "color"],
+    ["一時保存", "cache"],
+    ["直近の失敗", "last failure"],
+  ]);
+  const expected = table.rows().map(([label]) => {
+    if (!fieldNames.has(label))
+      throw new Error(`Unknown diagnostic field: ${label}`);
+    return fieldNames.get(label);
+  });
+  assert.deepEqual(
+    this.lines.map((line) => line.split(":")[0]),
+    expected,
+  );
+});
+
+Then("診断情報はすべて印字可能なASCII文字である", function () {
+  assert.equal(
+    this.lines.every((line) => /^[\x20-\x7e]+$/u.test(line)),
     true,
   );
 });
 
-Given("秘密のマクロ設定がある Kitty の Pi がある", async function () {
-  this.pi = fakePi();
-  registerFormula(this.pi.api);
-  this.started = await withEnvironment(
-    {
-      TERM_PROGRAM: "kitty",
-      PI_FORMULA_MACROS: '{"secret":"do-not-show-this"}',
-    },
-    () => startSession(this.pi, { response: "OK" }),
+Then("診断に表示される利用者マクロの数は1である", function () {
+  assert.equal(
+    this.lines.find((line) => line.startsWith("macros:")),
+    "macros: 1",
   );
 });
 
-When("formula status を実行する", async function () {
-  this.lines = await statusLines(this.pi, this.started);
+Then("診断情報に秘密のマクロ内容は含まれない", function () {
+  assert.equal(this.lines.join("\n").includes("do-not-show-this"), false);
 });
 
-Then(
-  "版、経路、理由、端末、セリフ体、マクロ数、数式色、一時保存、直近の失敗だけを英語表示する",
-  function () {
-    assert.deepEqual(
-      {
-        fields: this.lines.map((line) => line.split(":")[0]),
-        english: this.lines.every((line) => /^[\x20-\x7e]+$/u.test(line)),
-        macroCount: this.lines.includes("macros: 1"),
-        leaksSecret: this.lines.join("\n").includes("do-not-show-this"),
-      },
-      {
-        fields: [
-          "pi-formula 0.1.1",
-          "path",
-          "reason",
-          "terminal",
-          "serif",
-          "macros",
-          "color",
-          "cache",
-          "last failure",
-        ],
-        english: true,
-        macroCount: true,
-        leaksSecret: false,
-      },
-    );
-  },
-);
-
-Given("画面のない Pi がある", function () {
-  this.pi = fakePi();
-  registerFormula(this.pi.api);
-  this.startOptions = { mode: "rpc", response: "OK" };
-});
-
-Then("待機せず制御文字も端末へ出さない", function () {
+Then("端末の画像表示機能を問い合わせない", function () {
   assert.equal(this.started.terminalWrites, 0);
 });

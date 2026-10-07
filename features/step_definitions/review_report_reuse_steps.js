@@ -59,40 +59,40 @@ When("レビュー判定フローを解決する", function () {
   this.reviewResolution = JSON.parse(this.reviewResolutionProcess.stdout);
 });
 
-Then("レポートを残して terminal を作らず判定へ進む", function () {
-  assert.deepEqual(
-    {
-      status: this.reviewResolutionProcess.status,
-      reportExists: existsSync(this.reviewReportPath),
-      reportValid: this.reviewResolution.reportValid,
-      createReviewTerminal: this.reviewResolution.createReviewTerminal,
-      nextStep: this.reviewResolution.nextStep,
-    },
-    {
-      status: 0,
-      reportExists: true,
-      reportValid: true,
-      createReviewTerminal: false,
-      nextStep: "6.2",
-    },
-  );
+Then("有効な独立レビューの解決は正常終了する", function () {
+  assert.deepEqual(this.reviewResolutionProcess.status, 0);
 });
 
-Then("無効なレポートを削除して terminal を作る", function () {
-  assert.deepEqual(
-    {
-      status: this.reviewResolutionProcess.status,
-      reportExists: existsSync(this.reviewReportPath),
-      reportValid: this.reviewResolution.reportValid,
-      createReviewTerminal: this.reviewResolution.createReviewTerminal,
-    },
-    {
-      status: 0,
-      reportExists: false,
-      reportValid: false,
-      createReviewTerminal: true,
-    },
-  );
+Then("有効な独立レビューのレポートは保持される", function () {
+  assert.deepEqual(existsSync(this.reviewReportPath), true);
+});
+
+Then("現HEADの有効なレポートは有効と判定される", function () {
+  assert.deepEqual(this.reviewResolution.reportValid, true);
+});
+
+Then("有効な独立レビューではterminal作成を要求しない", function () {
+  assert.deepEqual(this.reviewResolution.createReviewTerminal, false);
+});
+
+Then("有効な独立レビューの次の段階は6.2である", function () {
+  assert.deepEqual(this.reviewResolution.nextStep, "6.2");
+});
+
+Then("無効な独立レビューの解決は正常終了する", function () {
+  assert.deepEqual(this.reviewResolutionProcess.status, 0);
+});
+
+Then("無効な独立レビューのレポートは削除される", function () {
+  assert.deepEqual(existsSync(this.reviewReportPath), false);
+});
+
+Then("欠陥のあるレポートは無効と判定される", function () {
+  assert.deepEqual(this.reviewResolution.reportValid, false);
+});
+
+Then("無効な独立レビューではterminal作成を要求する", function () {
+  assert.deepEqual(this.reviewResolution.createReviewTerminal, true);
 });
 
 Then("再利用した PASS 判定の行き先は 7.5 である", function () {

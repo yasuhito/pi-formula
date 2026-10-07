@@ -22,44 +22,200 @@ Piの非対話モードでは、端末の画像表示機能を問い合わせず
   | Kitty | 画像 |
   | Alacritty | テキスト |
 
-## Scenario: 画像を使えない環境でテキスト経路を選ぶ
+## Scenario: tmux の中では画像に対応した端末でもテキスト経路を選ぶ
 
-- Given 画像を使えない端末環境がある
-- When 各環境でセッションを開始する
-- Then すべての環境でテキスト経路が選ばれる
+- Given 端末でPiを使っている
+- And 端末はPNG画像を表示できると返答する
+- And 端末の種類は "xterm-kitty"
+- And tmuxの中でPiを使っている
+- When セッションを開始する
+- Then テキスト経路が選ばれる
 
-## Scenario: formula コマンドで表示経路を手動指定して自動判定へ戻す
+## Scenario: screen の端末種別では画像に対応した端末でもテキスト経路を選ぶ
 
-- Given 画像経路で数式を描ける Pi がある
-- When formula コマンドの image と text と auto を順に実行する
-- Then 経路が切り替わり、すべての指定が現在のセッションへ保存される
+- Given 端末でPiを使っている
+- And 端末はPNG画像を表示できると返答する
+- And 端末の種類は "screen-256color"
+- When セッションを開始する
+- Then テキスト経路が選ばれる
 
-## Scenario: セッションの auto 指定で全体既定から自動判定へ戻す
+## Scenario: PNG画像表示を拒否した端末ではテキスト経路を選ぶ
 
-- Given テキスト経路の全体既定と画像対応端末がある
-- When セッションで formula auto を実行する
-- Then PNG 問い合わせによる画像経路へ戻る
+- Given 端末でPiを使っている
+- And 端末の種類は "xterm-kitty"
+- And 端末はPNG画像表示の問い合わせにエラーを返す
+- When セッションを開始する
+- Then テキスト経路が選ばれる
 
-## Scenario: default 指定だけを XDG 設定へ保存する
+## Scenario: PNG画像表示へ応答しない端末ではテキスト経路を選ぶ
 
-- Given 一時的な XDG 設定を使う Pi がある
-- When default なしとありの表示経路指定を実行してから auto default を実行する
-- Then default 指定だけが XDG 設定を変更する
+- Given 端末でPiを使っている
+- And 端末の種類は "xterm-kitty"
+- And 端末はPNG画像表示の問い合わせに応答しない
+- When セッションを開始する
+- Then テキスト経路が選ばれる
+
+## Scenario: 非対話モードではテキスト経路を選ぶ
+
+- Given Piを非対話モード（RPC）で使っている
+- And 端末の種類は "xterm-kitty"
+- When セッションを開始する
+- Then テキスト経路が選ばれる
+
+## Scenario: image 指定で画像経路へ切り替える
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And formula imageを実行する
+- Then 画像経路が選ばれる
+
+## Scenario: text 指定で画像経路からテキスト経路へ切り替える
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And formula imageを実行する
+- And formula textを実行する
+- Then テキスト経路が選ばれる
+
+## Scenario: auto 指定でテキスト経路から端末の自動判定へ戻す
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And formula imageを実行する
+- And formula textを実行する
+- And formula autoを実行する
+- Then 画像経路が選ばれる
+
+## Scenario: 手動指定を現在のセッションへ順に記録する
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And formula imageを実行する
+- And formula textを実行する
+- And formula autoを実行する
+- Then 表示経路の指定が次の順に記録される
+
+  | 指定 |
+  | ---- |
+  | image |
+  | text |
+  | auto |
+
+## Scenario: セッションの auto 指定で全体既定を上書きする
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路はテキスト経路である
+- When セッションを開始する
+- And formula autoを実行する
+- Then 画像経路が選ばれる
+
+## Scenario: auto 指定ではセッション開始時のPNG画像表示確認を選択理由にする
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路はテキスト経路である
+- When セッションを開始する
+- And formula autoを実行する
+- Then 選択理由はPNG画像表示の問い合わせの成功になる
+
+## Scenario: default のない指定は全体設定を作らない
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の設定ファイルは存在しない
+- When セッションを開始する
+- And formula textを実行する
+- Then 全体の設定ファイルは作られない
+
+## Scenario: default 指定で全体の既定を保存する
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の設定ファイルは存在しない
+- When セッションを開始する
+- And formula textを実行する
+- And formula image --defaultを実行する
+- Then 全体の既定の表示経路は画像経路として保存される
+
+## Scenario: auto default 指定で表示経路だけの全体設定を削除する
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の設定ファイルは存在しない
+- When セッションを開始する
+- And formula textを実行する
+- And formula image --defaultを実行する
+- And formula auto --defaultを実行する
+- Then 表示経路だけを持つ全体の設定ファイルは削除される
+
+## Scenario: 表示数式の画像を一時保存する
+
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And 数式 "$$x$$" を画像へ変換する
+- Then 画像の一時保存に1件以上が含まれる
 
 ## Scenario: formula clear で画像の一時保存を削除する
 
-- Given 画像の一時保存がある Pi がある
-- When formula clear を実行する
+- Given PNG画像を表示できる端末でPiを使っている
+- And 全体の既定の表示経路は設定されていない
+- When セッションを開始する
+- And 数式 "$$x$$" を画像へ変換する
+- And formula clearを実行する
 - Then 画像の一時保存が空になる
 
-## Scenario: formula status で安全な診断情報を英語表示する
+## Scenario: 診断項目を決まった順序で表示する
 
-- Given 秘密のマクロ設定がある Kitty の Pi がある
-- When formula status を実行する
-- Then 版、経路、理由、端末、セリフ体、マクロ数、数式色、一時保存、直近の失敗だけを英語表示する
-
-## Scenario: 画面のない Pi では端末問い合わせを行わない
-
-- Given 画面のない Pi がある
+- Given 端末 `Kitty` でPiを使っている
+- And 利用者マクロを1個設定している
+- And マクロの内容に秘密の文字列が含まれる
 - When セッションを開始する
-- Then 待機せず制御文字も端末へ出さない
+- And formula statusを実行する
+- Then 診断には次の項目だけがこの順に含まれる
+
+  | 項目 |
+  | ---- |
+  | 版 |
+  | 経路 |
+  | 理由 |
+  | 端末 |
+  | セリフ体 |
+  | マクロ数 |
+  | 数式色 |
+  | 一時保存 |
+  | 直近の失敗 |
+
+## Scenario: 診断情報を英語の印字可能な文字で表示する
+
+- Given 端末 `Kitty` でPiを使っている
+- And 利用者マクロを1個設定している
+- And マクロの内容に秘密の文字列が含まれる
+- When セッションを開始する
+- And formula statusを実行する
+- Then 診断情報はすべて印字可能なASCII文字である
+
+## Scenario: 診断には利用者マクロの個数を表示する
+
+- Given 端末 `Kitty` でPiを使っている
+- And 利用者マクロを1個設定している
+- And マクロの内容に秘密の文字列が含まれる
+- When セッションを開始する
+- And formula statusを実行する
+- Then 診断に表示される利用者マクロの数は1である
+
+## Scenario: 診断には秘密のマクロ内容を含めない
+
+- Given 端末 `Kitty` でPiを使っている
+- And 利用者マクロを1個設定している
+- And マクロの内容に秘密の文字列が含まれる
+- When セッションを開始する
+- And formula statusを実行する
+- Then 診断情報に秘密のマクロ内容は含まれない
+
+## Scenario: 非対話モードでは端末へ問い合わせを出さない
+
+- Given Piを非対話モード（RPC）で使っている
+- And 端末はPNG画像を表示できると返答する
+- When セッションを開始する
+- Then 端末の画像表示機能を問い合わせない

@@ -33,57 +33,96 @@ When("ASCII の text を含む表示数式を Resvg まで組版する", functio
   this.probe = runProbe(this.fontInventory, "otherwise");
 });
 
-Then("選んだセリフ体と日本語の組版尺度が Resvg へ渡る", function () {
-  assert.deepEqual(this.probe, {
-    image: true,
-    pngSignature: "89504e470d0a1a0a",
-    font: {
-      loadSystemFonts: true,
-      defaultFontFamily: "Noto Serif CJK JP",
-      serifFamily: "Noto Serif CJK JP",
-    },
-    pathCount: 19,
-    text: {
-      value: "それ以外",
-      family: "serif",
-      size: "884px",
-      baseline: "scale(1,-1)",
-    },
-    status: "serif: Noto Serif CJK JP",
+Then("優先候補の日本語の表示数式は画像になる", function () {
+  assert.deepEqual(this.probe.image, true);
+});
+
+Then("優先候補の日本語の画像にはPNG署名がある", function () {
+  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
+});
+
+Then("日本語の組版には優先候補のセリフ体設定がResvgへ渡る", function () {
+  assert.deepEqual(this.probe.font, {
+    loadSystemFonts: true,
+    defaultFontFamily: "Noto Serif CJK JP",
+    serifFamily: "Noto Serif CJK JP",
   });
+});
+
+Then("優先候補の日本語のSVGには19個のpathがある", function () {
+  assert.deepEqual(this.probe.pathCount, 19);
+});
+
+Then("日本語のtextの内容と尺度はResvgへ渡る", function () {
+  assert.deepEqual(this.probe.text, {
+    value: "それ以外",
+    family: "serif",
+    size: "884px",
+    baseline: "scale(1,-1)",
+  });
+});
+
+Then("診断には日本語に選んだ優先候補のセリフ体が表示される", function () {
+  assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
 });
 
 Then("{string} が表示数式のセリフ体に選ばれる", function (family) {
   assert.equal(this.probe.font.serifFamily, family);
 });
 
-Then("ASCII は従来どおりパスとして Resvg へ渡る", function () {
-  assert.deepEqual(this.probe, {
-    image: true,
-    pngSignature: "89504e470d0a1a0a",
-    font: {
-      loadSystemFonts: true,
-      defaultFontFamily: "Noto Serif CJK JP",
-      serifFamily: "Noto Serif CJK JP",
-    },
-    pathCount: 26,
-    text: null,
-    status: "serif: Noto Serif CJK JP",
+Then("ASCIIの表示数式は画像になる", function () {
+  assert.deepEqual(this.probe.image, true);
+});
+
+Then("ASCIIの画像にはPNG署名がある", function () {
+  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
+});
+
+Then("ASCIIの組版には優先候補のセリフ体設定がResvgへ渡る", function () {
+  assert.deepEqual(this.probe.font, {
+    loadSystemFonts: true,
+    defaultFontFamily: "Noto Serif CJK JP",
+    serifFamily: "Noto Serif CJK JP",
   });
 });
 
-Then("システムのセリフ体へ戻って日本語の PNG 描画を続ける", function () {
-  assert.deepEqual(this.probe, {
-    image: true,
-    pngSignature: "89504e470d0a1a0a",
-    font: { loadSystemFonts: true },
-    pathCount: 19,
-    text: {
-      value: "それ以外",
-      family: "serif",
-      size: "884px",
-      baseline: "scale(1,-1)",
-    },
-    status: "serif: system fallback",
+Then("ASCIIのSVGには26個のpathがある", function () {
+  assert.deepEqual(this.probe.pathCount, 26);
+});
+
+Then("ASCIIの組版にSVGのtextは含まれない", function () {
+  assert.deepEqual(this.probe.text, null);
+});
+
+Then("診断にはASCIIに選んだセリフ体が表示される", function () {
+  assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
+});
+
+Then("候補のセリフ体がなくても日本語の表示数式は画像になる", function () {
+  assert.deepEqual(this.probe.image, true);
+});
+
+Then("候補のセリフ体がない日本語の画像にもPNG署名がある", function () {
+  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
+});
+
+Then("候補のセリフ体がない組版はsystem fontを使う", function () {
+  assert.deepEqual(this.probe.font, { loadSystemFonts: true });
+});
+
+Then("候補のセリフ体がない日本語のSVGには19個のpathがある", function () {
+  assert.deepEqual(this.probe.pathCount, 19);
+});
+
+Then("system fontでも日本語のtextの内容と尺度はResvgへ渡る", function () {
+  assert.deepEqual(this.probe.text, {
+    value: "それ以外",
+    family: "serif",
+    size: "884px",
+    baseline: "scale(1,-1)",
   });
+});
+
+Then("診断にはsystem fontへのfallbackが表示される", function () {
+  assert.deepEqual(this.probe.status, "serif: system fallback");
 });

@@ -1,4 +1,3 @@
-const fs = require("node:fs");
 const { parseSync } = require("oxc-parser");
 
 function propertyName(property) {
@@ -118,14 +117,6 @@ function extractQniCliAdditionalMacros(source, sourcePath = "<source>") {
   return macros;
 }
 
-function readQniCliAdditionalMacros(sourcePath) {
-  return extractQniCliAdditionalMacros(
-    fs.readFileSync(sourcePath, "utf8"),
-    sourcePath,
-  );
-}
-
 module.exports = {
   extractQniCliAdditionalMacros,
-  readQniCliAdditionalMacros,
 };

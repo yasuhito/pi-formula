@@ -139,23 +139,19 @@ function inspectFrame(frame) {
   };
 }
 
-function renderStreamingRegression(pi) {
+function renderStreamingFrame(pi, count) {
   const passthroughTheme = new Proxy({}, { get: () => (value) => value });
-  return REPRODUCTION_PARTS.map((_part, index) => {
-    const source = REPRODUCTION_PARTS.slice(0, index + 1).join("\n\n");
-    const transformed = pi.transformer()(source, {
-      messageType: "assistant",
-      isStreaming: false,
-      availableWidth: 80,
-    });
-    return {
-      source,
-      transformed,
-      terminalLines: new Markdown(transformed, 0, 0, passthroughTheme).render(
-        80,
-      ),
-    };
+  const source = REPRODUCTION_PARTS.slice(0, count).join("\n\n");
+  const transformed = pi.transformer()(source, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
   });
+  return {
+    source,
+    transformed,
+    terminalLines: new Markdown(transformed, 0, 0, passthroughTheme).render(80),
+  };
 }
 
 function inspectStreamingRegression(frames) {
@@ -203,7 +199,7 @@ function inspectPlacementBlocks(markdown) {
   return blocks;
 }
 
-function renderTuiUpdates(precedingToolLines, streaming, finalized) {
+function tuiUpdates(precedingToolLines) {
   const writes = [];
   const terminal = {
     columns: 80,
@@ -235,14 +231,10 @@ function renderTuiUpdates(precedingToolLines, streaming, finalized) {
     tui.renderNow();
     return writes.slice(start).join("");
   };
-  const initial = render("");
-  const streamingWrites = streaming.map(render);
-  const finalizedWrite = render(finalized);
-  tui.stop({ preserveScreen: true });
-  return { initial, streaming: streamingWrites, finalized: finalizedWrite };
+  return { render, stop: () => tui.stop({ preserveScreen: true }) };
 }
 
-function issue26Updates(pi) {
+function issue26Source() {
   const corpus = fs.readFileSync(
     path.resolve(__dirname, "../../docs/agents/verify-corpus/issue-26.md"),
     "utf8",
@@ -251,6 +243,11 @@ function issue26Updates(pi) {
   const partials = delimiters
     .filter((_match, index) => index % 2 === 1)
     .map((match) => corpus.slice(0, match.index + match[0].length));
+  return { corpus, partials };
+}
+
+function issue26Updates(pi) {
+  const { corpus, partials } = issue26Source();
   const transform = (source, isStreaming) =>
     pi.transformer()(source, {
       messageType: "assistant",
@@ -260,17 +257,28 @@ function issue26Updates(pi) {
   const precedingToolLines = ["qni tool call", "qni tool result"];
   const streaming = partials.map((source) => transform(source, true));
   const finalized = transform(corpus, false);
-  return {
-    precedingToolLines,
-    streaming,
-    finalized,
-    tuiWrites: renderTuiUpdates(precedingToolLines, streaming, finalized),
-  };
+  const tui = tuiUpdates(precedingToolLines);
+  try {
+    return {
+      precedingToolLines,
+      streaming,
+      finalized,
+      tuiWrites: {
+        initial: tui.render(""),
+        streaming: streaming.map(tui.render),
+        finalized: tui.render(finalized),
+      },
+    };
+  } finally {
+    tui.stop();
+  }
 }
 
 module.exports = {
   inspectPlacementBlocks,
   inspectStreamingRegression,
+  issue26Source,
   issue26Updates,
-  renderStreamingRegression,
+  renderStreamingFrame,
+  tuiUpdates,
 };

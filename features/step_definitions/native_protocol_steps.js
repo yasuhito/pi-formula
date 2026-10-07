@@ -50,7 +50,7 @@ Given("環境変数で指定した vt-pty がある", function () {
   this.entranceArguments = ["--", "printf", "hello"];
 });
 
-Given("ホーム側の native prefix を指定する", function () {
+Given("ホーム側のnative prefix設定がある", function () {
   fs.mkdirSync(path.join(os.homedir(), ".cache"), { recursive: true });
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(os.homedir(), ".cache/pi-formula-native-plan-"),
@@ -115,42 +115,8 @@ Given("テキスト経路の利用者設定と tmux 端末環境がある", func
   };
 });
 
-Given("vt-pty で文字を出力する子プロセスを起動する", function () {
+Given("vt-ptyで文字を出力する子プロセスの命令がある", function () {
   this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
-});
-
-function terminalColorQuery(osc) {
-  const program = `
-process.stdin.setRawMode(true);
-process.stdin.setEncoding("utf8");
-let response = "";
-const timeout = setTimeout(() => process.exit(1), 1000);
-process.stdin.on("data", (data) => {
-  response += data;
-  if (!response.includes("\\x1b\\\\")) return;
-  clearTimeout(timeout);
-  process.stdout.write("terminal-color=" + JSON.stringify(response));
-  process.stdin.pause();
-});
-process.stdout.write("\\x1b]${osc};?\\x1b\\\\");
-`;
-  return ["--settle-ms", "20", "--", process.execPath, "-e", program];
-}
-
-Given("vt-pty の既定前景色を問い合わせる子プロセスがある", function () {
-  this.nativeCommand = terminalColorQuery(10);
-});
-
-Given("vt-pty の既定背景色を問い合わせる子プロセスがある", function () {
-  this.nativeCommand = terminalColorQuery(11);
-});
-
-Then("子プロセスが既定前景色の応答を受け取る", function () {
-  assert.match(this.nativeResult.stdout, /10;rgb:d8d8\/d8d8\/d8d8/u);
-});
-
-Then("子プロセスが既定背景色の応答を受け取る", function () {
-  assert.match(this.nativeResult.stdout, /11;rgb:2828\/2c2c\/3434/u);
 });
 
 Given(
@@ -242,16 +208,19 @@ Given("一部の仮想配置を出した後も出力を続ける子プロセス�
   this.nativeCommand = placementFollowedByContinuousOutput(2);
 });
 
-Given("vt-pty で16 codepointを超える grapheme cluster を出力する", function () {
-  this.nativeCommand = [
-    "--settle-ms",
-    "20",
-    "--",
-    process.execPath,
-    "-e",
-    'process.stdout.write("a" + "\\u0301".repeat(32))',
-  ];
-});
+Given(
+  "vt-ptyで長いgrapheme clusterを出力する子プロセスの命令がある",
+  function () {
+    this.nativeCommand = [
+      "--settle-ms",
+      "20",
+      "--",
+      process.execPath,
+      "-e",
+      'process.stdout.write("a" + "\\u0301".repeat(32))',
+    ];
+  },
+);
 
 Given("vt-pty の期限を超えて動く子プロセスがある", function () {
   this.nativeEnvironment = {
@@ -330,7 +299,7 @@ Given("描画が落ち着かない vt-pty がある", function () {
   this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
 });
 
-Given("保存済みコーパスセッションを Pi で開く", function () {
+Given("Piで開く保存済みコーパスセッションがある", function () {
   this.nativeEnvironment = {
     ...process.env,
     PI_FORMULA_VT_TOOL: this.vtTool,
@@ -494,49 +463,44 @@ When("ストリーミング中のプロトコル検査を実行する", function
   );
 });
 
-Then("成功として skip したことが出力される", function () {
+Then("vt-ptyのないプロトコル検査は正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
+});
+
+Then("プロトコル検査はvt-ptyがないためskipしたことを表示する", function () {
   assert.deepEqual(
-    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
-    {
-      status: 0,
-      stdout: "SKIP: libghostty-vt のプロトコル検査（vt-pty がありません）\n",
-    },
-    this.nativeResult.stderr,
+    this.nativeResult.stdout,
+    "SKIP: libghostty-vt のプロトコル検査（vt-pty がありません）\n",
   );
 });
 
-Then("Pi を通した検査を成功として skip したことが出力される", function () {
+Then("vt-ptyのないPiプロトコル検査は正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
+});
+
+Then("Piプロトコル検査はvt-ptyがないためskipしたことを表示する", function () {
   assert.deepEqual(
-    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
-    {
-      status: 0,
-      stdout: "SKIP: Pi を通したプロトコル検査（vt-pty がありません）\n",
-    },
-    this.nativeResult.stderr,
+    this.nativeResult.stdout,
+    "SKIP: Pi を通したプロトコル検査（vt-pty がありません）\n",
   );
 });
 
-Then(
-  "ストリーミング中の検査を成功として skip したことが出力される",
-  function () {
-    assert.deepEqual(
-      { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
-      {
-        status: 0,
-        stdout:
-          "SKIP: ストリーミング中のプロトコル検査（vt-pty がありません）\n",
-      },
-      this.nativeResult.stderr,
-    );
-  },
-);
+Then("vt-ptyのないストリーミング検査は正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
+});
+
+Then("ストリーミング検査はvt-ptyがないためskipしたことを表示する", function () {
+  assert.deepEqual(
+    this.nativeResult.stdout,
+    "SKIP: ストリーミング中のプロトコル検査（vt-pty がありません）\n",
+  );
+});
 
 Then("複数のフレームが時系列で検査されたと報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      /streaming-protocol: frames=([2-9]|[1-9][0-9]+)/u.test(
-        this.nativeResult.stdout,
-      ),
+    /streaming-protocol: frames=([2-9]|[1-9][0-9]+)/u.test(
+      this.nativeResult.stdout,
+    ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -544,10 +508,9 @@ Then("複数のフレームが時系列で検査されたと報告される", fu
 
 Then("先行する tool 出力を保った3回の差分描画が報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes(
-        "streaming-protocol: streaming_updates=3 preceding_tool=preserved full_clears=0",
-      ),
+    this.nativeResult.stdout.includes(
+      "streaming-protocol: streaming_updates=3 preceding_tool=preserved full_clears=0",
+    ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -557,10 +520,9 @@ Then(
   "各完了フレームの仮想配置と placeholder の画像 ID が対応すると報告される",
   function () {
     assert.equal(
-      this.nativeResult.status === 0 &&
-        /streaming-protocol: complete_frames=\d+ placement_placeholders=matched/u.test(
-          this.nativeResult.stdout,
-        ),
+      /streaming-protocol: complete_frames=\d+ placement_placeholders=matched/u.test(
+        this.nativeResult.stdout,
+      ),
       true,
       this.nativeResult.stderr || this.nativeResult.stdout,
     );
@@ -569,8 +531,7 @@ Then(
 
 Then("途中のどのフレームにも APC の断片がないと報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("streaming-protocol: apc_leak=0"),
+    this.nativeResult.stdout.includes("streaming-protocol: apc_leak=0"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -578,125 +539,150 @@ Then("途中のどのフレームにも APC の断片がないと報告される
 
 Then("最終フレームの表示数式と仮想配置の数が一致する", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      /streaming-protocol: final display_formulas=(\d+) virtual_images=\1/u.test(
-        this.nativeResult.stdout,
-      ),
+    /streaming-protocol: final display_formulas=(\d+) virtual_images=\1/u.test(
+      this.nativeResult.stdout,
+    ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
 
-Then("環境変数で指定した vt-pty が実行される", function () {
-  assert.deepEqual(
-    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
-    { status: 0, stdout: "selected vt-pty\n" },
-    this.nativeResult.stderr,
-  );
+Then("環境変数で指定したvt-ptyは正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
 });
 
-Then("エンコーダ層の検査を成功として skip したことが出力される", function () {
-  assert.deepEqual(
-    { status: this.nativeResult.status, stdout: this.nativeResult.stdout },
-    {
-      status: 0,
-      stdout: "SKIP: エンコーダ層のプロトコル検査（vt-pty がありません）\n",
-    },
-    this.nativeResult.stderr,
-  );
+Then("環境変数で指定したvt-ptyの出力が返る", function () {
+  assert.deepEqual(this.nativeResult.stdout, "selected vt-pty\n");
 });
 
-function assertEncoderCheck(world, message) {
+Then("vt-ptyのないエンコーダ検査は正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
+});
+
+Then("エンコーダ検査はvt-ptyがないためskipしたことを表示する", function () {
   assert.deepEqual(
-    { status: world.nativeResult.status, stdout: world.nativeResult.stdout },
-    { status: 0, stdout: `${message}\n` },
-    world.nativeResult.stderr,
+    this.nativeResult.stdout,
+    "SKIP: エンコーダ層のプロトコル検査（vt-pty がありません）\n",
   );
-}
+});
 
 Then("storage に計画どおりの PNG 画像が一件ある", function () {
-  assertEncoderCheck(this, "encoder-protocol: storage ok");
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: storage ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("隔離したエンコーダのstorage検査が報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes("encoder-protocol: storage ok"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("仮想配置の列数と行数が計画と一致する", function () {
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: placement ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("foreground RGB から復元した画像 ID が計画と一致する", function () {
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: image-id ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("diacritics から復元した座標が欠けも余りもなく並ぶ", function () {
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: coordinates ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("すべての placeholder セルの下線色タグが RGB である", function () {
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: underline ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("二回目も storage に画像がある", function () {
+  assert.equal(
+    this.nativeResult.stdout,
+    "encoder-protocol: cached ok\n",
+    this.nativeResult.stderr,
+  );
+});
+
+Then("画像転送のないエンコーダ出力の検査は終了コード1を返す", function () {
+  assert.deepEqual(this.nativeResult.status, 1);
 });
 
 Then(
-  "利用者設定を使わず現在のエンコーダをビルドしてプロトコル状態を検査する",
+  "エンコーダ検査はplaceholderのIDに仮想配置がないことを表示する",
   function () {
-    assert.equal(
-      this.nativeResult.status === 0 &&
-        this.nativeResult.stdout.includes("encoder-protocol: storage ok") &&
-        fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
-      true,
-      this.nativeResult.stderr || this.nativeResult.stdout,
+    assert.deepEqual(
+      this.nativeResult.stderr.trim(),
+      "placeholder が指す id に仮想配置がない",
     );
   },
 );
 
-Then("仮想配置の列数と行数が計画と一致する", function () {
-  assertEncoderCheck(this, "encoder-protocol: placement ok");
+Then("libghostty-vtのビルド計画は正常終了する", function () {
+  assert.deepEqual(this.nativeResult.status, 0);
 });
 
-Then("foreground RGB から復元した画像 ID が計画と一致する", function () {
-  assertEncoderCheck(this, "encoder-protocol: image-id ok");
-});
-
-Then("diacritics から復元した座標が欠けも余りもなく並ぶ", function () {
-  assertEncoderCheck(this, "encoder-protocol: coordinates ok");
-});
-
-Then("すべての placeholder セルの下線色タグが RGB である", function () {
-  assertEncoderCheck(this, "encoder-protocol: underline ok");
-});
-
-Then("二回目も storage に画像がある", function () {
-  assertEncoderCheck(this, "encoder-protocol: cached ok");
-});
-
-Then("placeholder が指す画像 ID に仮想配置がないと報告される", function () {
+Then("libghostty-vtのビルド計画は固定したcommitを使う", function () {
   assert.deepEqual(
-    {
-      status: this.nativeResult.status,
-      problem: this.nativeResult.stderr.trim(),
-    },
-    {
-      status: 1,
-      problem: "placeholder が指す id に仮想配置がない",
-    },
-    this.nativeResult.stdout,
+    this.buildPlan.pin,
+    "349f026087d948f8f898dca3231ff91438f83ab8",
   );
 });
 
-Then("pin と指定 prefix だけを使うビルド計画が得られる", function () {
+Then("libghostty-vtのビルド計画は指定したprefixを使う", function () {
+  assert.deepEqual(this.buildPlan.prefix, this.nativeTestDirectory);
+});
+
+Then("ビルド計画のheaderは指定prefixのincludeにある", function () {
   assert.deepEqual(
-    {
-      status: this.nativeResult.status,
-      pin: this.buildPlan.pin,
-      prefix: this.buildPlan.prefix,
-      include: this.buildPlan.include,
-      library: this.buildPlan.library,
-      vtTool: this.buildPlan["vt-tool"],
-      zigCommand: this.buildPlan["zig-command"],
-    },
-    {
-      status: 0,
-      pin: "349f026087d948f8f898dca3231ff91438f83ab8",
-      prefix: this.nativeTestDirectory,
-      include: path.join(this.nativeTestDirectory, "include"),
-      library: path.join(this.nativeTestDirectory, "lib"),
-      vtTool: path.join(this.nativeTestDirectory, "bin/vt-pty"),
-      zigCommand:
-        "zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix " +
-        this.nativeTestDirectory,
-    },
-    this.nativeResult.stderr,
+    this.buildPlan.include,
+    path.join(this.nativeTestDirectory, "include"),
   );
 });
 
-Then("libghostty-vt が解析したプロトコル状態が出力される", function () {
+Then("ビルド計画のlibraryは指定prefixのlibにある", function () {
+  assert.deepEqual(
+    this.buildPlan.library,
+    path.join(this.nativeTestDirectory, "lib"),
+  );
+});
+
+Then("ビルド計画のvt-ptyは指定prefixのbinにある", function () {
+  assert.deepEqual(
+    this.buildPlan["vt-tool"],
+    path.join(this.nativeTestDirectory, "bin/vt-pty"),
+  );
+});
+
+Then("Zigのビルド命令は指定prefixだけを使う", function () {
+  assert.deepEqual(
+    this.buildPlan["zig-command"],
+    "zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix " +
+      this.nativeTestDirectory,
+  );
+});
+
+Then("プロトコルの本文セルにhelloが報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes('row[0]: placeholders=0 "hello"') &&
-      this.nativeResult.stdout.includes("kitty.placements=0") &&
-      this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    this.nativeResult.stdout.includes('row[0]: placeholders=0 "hello"'),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -704,8 +690,7 @@ Then("libghostty-vt が解析したプロトコル状態が出力される", fun
 
 Then("必要な仮想配置を受け取ってからプロトコル状態が出力される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("kitty.placements=1"),
+    this.nativeResult.stdout.includes("kitty.placements=1"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -713,44 +698,33 @@ Then("必要な仮想配置を受け取ってからプロトコル状態が出�
 
 Then("出力の静止を待たずにプロトコル状態が出力される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("kitty.placements=1"),
+    this.nativeResult.stdout.includes("kitty.placements=1"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
 
-Then(
-  "仮想配置に続く placeholder と本文のプロトコル状態が出力される",
-  function () {
-    assert.equal(
-      this.nativeResult.status === 0 &&
-        this.nativeResult.stdout.includes(
-          "placeholder: image_id=0x000001 row=0 col=0",
-        ) &&
-        this.nativeResult.stdout.includes("after-placement"),
-      true,
-      this.nativeResult.stderr || this.nativeResult.stdout,
-    );
-  },
-);
+Then("遅れて届いたplaceholderの画像IDと座標が報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes(
+      "placeholder: image_id=0x000001 row=0 col=0",
+    ),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
 
 Then("timeout 時点の仮想配置数が出力される", function () {
   assert.equal(
-    this.nativeResult.status !== 0 &&
-      this.nativeResult.stderr.includes(
-        "waiting for 2 placements (observed 1)",
-      ),
+    this.nativeResult.stderr.includes("waiting for 2 placements (observed 1)"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
 
-Then("長い grapheme cluster のプロトコル状態が出力される", function () {
+Then("長いgrapheme clusterの本文セルにaが報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes('row[0]: placeholders=0 "a"') &&
-      this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    this.nativeResult.stdout.includes('row[0]: placeholders=0 "a"'),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -758,10 +732,7 @@ Then("長い grapheme cluster のプロトコル状態が出力される", funct
 
 Then("timeout は成功として扱われない", function () {
   assert.equal(
-    this.nativeResult.status !== 0 &&
-      this.nativeResult.stderr.includes(
-        "waiting for 1 placements (observed 0)",
-      ),
+    this.nativeResult.stderr.includes("waiting for 1 placements (observed 0)"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -769,8 +740,7 @@ Then("timeout は成功として扱われない", function () {
 
 Then("子プロセスの起動失敗は成功として扱われない", function () {
   assert.equal(
-    this.nativeResult.status !== 0 &&
-      this.nativeResult.stderr.includes("child exited with status 127"),
+    this.nativeResult.stderr.includes("child exited with status 127"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -778,8 +748,7 @@ Then("子プロセスの起動失敗は成功として扱われない", function
 
 Then("本文セルの APC 断片を検出して失敗する", function () {
   assert.equal(
-    this.nativeResult.status === 1 &&
-      /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+    /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -787,30 +756,25 @@ Then("本文セルの APC 断片を検出して失敗する", function () {
 
 Then("仮想配置に対応する placeholder の欠落を検出して失敗する", function () {
   assert.equal(
-    this.nativeResult.status === 1 &&
-      this.nativeResult.stderr.includes(
-        "仮想配置に対応する placeholder がありません",
-      ),
+    this.nativeResult.stderr.includes(
+      "仮想配置に対応する placeholder がありません",
+    ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
 });
 
-Then("描画が落ち着かない理由が出力される", function () {
-  assert.deepEqual(
-    {
-      status: this.nativeResult.status,
-      reason: this.nativeResult.stderr.trim(),
-    },
-    { status: 2, reason: "vt-pty: timeout 15000ms" },
-    this.nativeResult.stdout,
-  );
+Then("描画が落ち着かないPiプロトコル検査は終了コード2を返す", function () {
+  assert.deepEqual(this.nativeResult.status, 2);
+});
+
+Then("Piプロトコル検査は描画の時間切れの理由を表示する", function () {
+  assert.deepEqual(this.nativeResult.stderr.trim(), "vt-pty: timeout 15000ms");
 });
 
 Then("placeholder セルの汚れがないと報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("cells.dirty_placeholders=0"),
+    this.nativeResult.stdout.includes("cells.dirty_placeholders=0"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -818,8 +782,7 @@ Then("placeholder セルの汚れがないと報告される", function () {
 
 Then("本文セルに APC の断片がないと報告される", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    this.nativeResult.stdout.includes("cells.apc_leak=0"),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -827,10 +790,9 @@ Then("本文セルに APC の断片がないと報告される", function () {
 
 Then("表示数式と storage 付き仮想配置の数が一致する", function () {
   assert.equal(
-    this.nativeResult.status === 0 &&
-      /pi-protocol: display_formulas=(\d+) virtual_images=\1/u.test(
-        this.nativeResult.stdout,
-      ),
+    /pi-protocol: display_formulas=(\d+) virtual_images=\1/u.test(
+      this.nativeResult.stdout,
+    ),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
@@ -838,9 +800,98 @@ Then("表示数式と storage 付き仮想配置の数が一致する", function
 
 Then("placeholder セルの汚れを検出して失敗する", function () {
   assert.equal(
-    this.nativeResult.status === 1 &&
-      /Pi を通した placeholder セルに汚れ/u.test(this.nativeResult.stderr),
+    /Pi を通した placeholder セルに汚れ/u.test(this.nativeResult.stderr),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );
+});
+
+Then("プロトコル検査の終了コードは {int} である", function (expected) {
+  assert.equal(
+    this.nativeResult.status,
+    expected,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("プロトコル検査の終了コードは0ではない", function () {
+  assert.notEqual(
+    this.nativeResult.status,
+    0,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("隔離したcheckoutにextensionのビルド成果物が作られる", function () {
+  assert.equal(
+    fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("プロトコルの画像配置数は0件と報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes("kitty.placements=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("プロトコルのAPC漏れは0件と報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("仮想配置に続くafter-placement本文が報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes("after-placement"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+Then("長いgrapheme clusterのAPC漏れは0件と報告される", function () {
+  assert.equal(
+    this.nativeResult.stdout.includes("cells.apc_leak=0"),
+    true,
+    this.nativeResult.stderr || this.nativeResult.stdout,
+  );
+});
+
+function terminalColorQuery(osc) {
+  const program = `
+process.stdin.setRawMode(true);
+process.stdin.setEncoding("utf8");
+let response = "";
+const timeout = setTimeout(() => process.exit(1), 1000);
+process.stdin.on("data", (data) => {
+  response += data;
+  if (!response.includes("\\x1b\\\\")) return;
+  clearTimeout(timeout);
+  process.stdout.write("terminal-color=" + JSON.stringify(response));
+  process.stdin.pause();
+});
+process.stdout.write("\\x1b]${osc};?\\x1b\\\\");
+`;
+  return ["--settle-ms", "20", "--", process.execPath, "-e", program];
+}
+
+Given("vt-pty の既定前景色を問い合わせる子プロセスがある", function () {
+  this.nativeCommand = terminalColorQuery(10);
+});
+
+Given("vt-pty の既定背景色を問い合わせる子プロセスがある", function () {
+  this.nativeCommand = terminalColorQuery(11);
+});
+
+Then("子プロセスが既定前景色の応答を受け取る", function () {
+  assert.match(this.nativeResult.stdout, /10;rgb:d8d8\/d8d8\/d8d8/u);
+});
+
+Then("子プロセスが既定背景色の応答を受け取る", function () {
+  assert.match(this.nativeResult.stdout, /11;rgb:2828\/2c2c\/3434/u);
 });

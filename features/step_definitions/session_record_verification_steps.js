@@ -245,10 +245,14 @@ Then("セッション記録検査は終了コード1を返す", function () {
   assert.equal(this.result.status, 1);
 });
 
-Then("セッション記録は正常と判定される", function () {
+Then("正常なセッション記録の検査は終了コード0を返す", function () {
+  assert.deepEqual(this.result.status, 0);
+});
+
+Then("正常なセッション記録にはツール失敗がないことを表示する", function () {
   assert.deepEqual(
-    { status: this.result.status, stdout: this.result.stdout },
-    { status: 0, stdout: "セッション記録にツール失敗はありません\n" },
+    this.result.stdout,
+    "セッション記録にツール失敗はありません\n",
   );
 });
 

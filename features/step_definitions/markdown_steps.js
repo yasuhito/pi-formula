@@ -1,12 +1,6 @@
 const assert = require("node:assert/strict");
-const childProcess = require("node:child_process");
-const fs = require("node:fs");
-const http = require("node:http");
-const https = require("node:https");
-const net = require("node:net");
-const { resolve } = require("node:path");
 const { performance } = require("node:perf_hooks");
-const { Given, Then, When } = require("@cucumber/cucumber");
+const { After, Given, Then, When } = require("@cucumber/cucumber");
 const {
   Markdown,
   resetCapabilitiesCache,
@@ -17,10 +11,15 @@ const registerFormula = require("../../dist/extension.js").default;
 const {
   inspectPlacementBlocks,
   inspectStreamingRegression,
-  issue26Updates,
-  renderStreamingRegression,
+  issue26Source,
+  renderStreamingFrame,
+  tuiUpdates,
 } = require("../support/streaming-regression");
 const { fakePi, startWithKitty } = require("../../test/support/fake-pi");
+const { isolatedRenderer } = require("../support/isolated-renderer");
+const {
+  monitorExternalEffects,
+} = require("../support/external-effects-monitor");
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 
 function transform(world, markdown, options = {}) {
@@ -531,8 +530,6 @@ When("$$ を含む金額を変換する", function () {
 
 When("再走査される金額と後続の表示数式を含む本文を変換する", function () {
   const source = "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$";
-  transform(this, "$$x = 1$$");
-  this.expectedFormulaImages = imageIdentities(this.rendered);
   transform(this, source);
   this.actualFormulaImages = imageIdentities(this.rendered);
 });
@@ -540,8 +537,6 @@ When("再走査される金額と後続の表示数式を含む本文を変換�
 When(
   "コロン付きラベル「{word}」の再走査される金額と後続の表示数式を含む本文を変換する",
   function (label) {
-    transform(this, "$$x = 1$$");
-    this.expectedLabeledAmountFormulaImages = imageIdentities(this.rendered);
     this.labeledAmount = `${label} $$100`;
     transform(
       this,
@@ -552,8 +547,6 @@ When(
 );
 
 When("再走査される金額と表示数式と末尾のシェルの $$ を変換する", function () {
-  transform(this, "$$x = 1$$");
-  this.expectedFormulaBeforeShellImages = imageIdentities(this.rendered);
   transform(
     this,
     "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$\nrun echo $$",
@@ -564,8 +557,6 @@ When("再走査される金額と表示数式と末尾のシェルの $$ を変�
 When(
   "再走査される金額と独立した区切り行の表示数式を含む本文を変換する",
   function () {
-    transform(this, "$$\nx = 1\n$$");
-    this.expectedIndependentFormulaImages = imageIdentities(this.rendered);
     transform(
       this,
       "前置き $$ は数式ではありません。\n価格は $$100\n\n$$\nx = 1\n$$",
@@ -577,8 +568,6 @@ When(
 When(
   "数式でない $$ と後続の数値だけの表示数式を含む本文を変換する",
   function () {
-    transform(this, "$$100$$");
-    this.expectedNumericFormulaImages = imageIdentities(this.rendered);
     transform(this, "前置き $$ は数式ではありません。\n\n$$100$$");
     this.actualNumericFormulaImages = imageIdentities(this.rendered);
   },
@@ -587,16 +576,12 @@ When(
 When(
   "数式でない $$ と閉じ区切りを後続行に置いた数値表示数式を変換する",
   function () {
-    transform(this, "$$100\n$$");
-    this.expectedMultilineNumericFormulaImages = imageIdentities(this.rendered);
     transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$");
     this.actualMultilineNumericFormulaImages = imageIdentities(this.rendered);
   },
 );
 
 When("数式でない $$ と行内ラベル付きの数値表示数式を変換する", function () {
-  transform(this, "$$100\n$$");
-  this.expectedLabeledNumericFormulaImages = imageIdentities(this.rendered);
   transform(this, "前置き $$ は数式ではありません。\n式: $$100\n$$");
   this.actualLabeledNumericFormulaImages = imageIdentities(this.rendered);
 });
@@ -604,13 +589,9 @@ When("数式でない $$ と行内ラベル付きの数値表示数式を変換�
 When(
   "数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する",
   function () {
-    transform(this, "$$100\n$$");
-    const numericImages = imageIdentities(this.rendered);
-    transform(this, "$$y = 1$$");
-    const followingImages = imageIdentities(this.rendered);
     this.expectedSeparatedFormulaImages = [
-      ...numericImages,
-      ...followingImages,
+      ...this.referenceNumericImages,
+      ...this.referenceFollowingImages,
     ];
     transform(
       this,
@@ -623,8 +604,6 @@ When(
 When(
   "数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する",
   function () {
-    transform(this, "$$100\n$$");
-    this.expectedNumericBeforeUnclosedImages = imageIdentities(this.rendered);
     transform(this, "前置き $$ は数式ではありません。\n\n$$100\n$$\n\nx\n\n$$");
     this.actualNumericBeforeUnclosedImages = imageIdentities(this.rendered);
   },
@@ -667,56 +646,50 @@ When("不正な表示数式と正しい表示数式を含む本文を変換す�
   transform(this, "$$\\notacommand{$$\n次の本文\n$$x$$");
 });
 
-Then("インライン数式は残り、2 つの表示数式だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      inlineDollar: this.rendered.includes("$x$"),
-      inlineParentheses: this.rendered.includes("\\(z\\)"),
-      imageCount: imageCount(this.rendered),
-    },
-    { inlineDollar: true, inlineParentheses: true, imageCount: 2 },
-  );
+Then("ドル区切りのインライン数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes("$x$"), true);
+});
+
+Then("丸括弧区切りのインライン数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes("\\(z\\)"), true);
+});
+
+Then("4種類の区切りのうち表示数式2件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 2);
 });
 
 Then("コード内の本文は変更されない", function () {
   assert.equal(this.rendered, this.source);
 });
 
-Then(
-  "2 種類のコードフェンスが閉じて後続の表示数式だけが画像になる",
-  function () {
-    assert.deepEqual(
-      {
-        backtickFormulaRemains: this.rendered.includes("$$backtick$$"),
-        tildeFormulaRemains: this.rendered.includes("$$tilde$$"),
-        imageCount: imageCount(this.rendered),
-      },
-      {
-        backtickFormulaRemains: true,
-        tildeFormulaRemains: true,
-        imageCount: 1,
-      },
-    );
-  },
-);
+Then("長いバッククォートのフェンス内の表示数式は残る", function () {
+  assert.deepEqual(this.rendered.includes("$$backtick$$"), true);
+});
 
-Then("正規表現メタ文字を含む行の後もコード内の表示数式は残る", function () {
+Then("長いチルダのフェンス内の表示数式は残る", function () {
+  assert.deepEqual(this.rendered.includes("$$tilde$$"), true);
+});
+
+Then("長いフェンスの後の表示数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
+});
+
+Then("メタ文字を含むバッククォート行はフェンスを閉じない", function () {
   assert.deepEqual(
-    {
-      backtickFormulaRemains: this.rendered.includes(
-        "$$afterBacktickMetacharacters$$",
-      ),
-      tildeFormulaRemains: this.rendered.includes(
-        "$$afterTildeMetacharacters$$",
-      ),
-      imageCount: imageCount(this.rendered),
-    },
-    {
-      backtickFormulaRemains: true,
-      tildeFormulaRemains: true,
-      imageCount: 1,
-    },
+    this.rendered.includes("$$afterBacktickMetacharacters$$"),
+    true,
   );
+});
+
+Then("メタ文字を含むチルダ行はフェンスを閉じない", function () {
+  assert.deepEqual(
+    this.rendered.includes("$$afterTildeMetacharacters$$"),
+    true,
+  );
+});
+
+Then("メタ文字を含むフェンスの後の表示数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
 });
 
 Then("thinking の本文は変更されない", function () {
@@ -764,51 +737,41 @@ Then("画像経路で描かれる式は x = 1 だけになる", function () {
   assert.deepEqual(this.actualFormulaImages, this.expectedFormulaImages);
 });
 
-Then(
-  "コロン付きラベルの金額が一度だけ残り画像経路で描かれる式は x = 1 だけになる",
-  function () {
-    assert.deepEqual(
-      {
-        formulaImages: this.actualLabeledAmountFormulaImages,
-        amountOccurrences: this.rendered.split(this.labeledAmount).length - 1,
-      },
-      {
-        formulaImages: this.expectedLabeledAmountFormulaImages,
-        amountOccurrences: 1,
-      },
-    );
-  },
-);
-
-Then(
-  "金額とシェルは一度だけ残り画像経路で描かれる式は x = 1 だけになる",
-  function () {
-    assert.deepEqual(
-      {
-        formulaImages: this.actualFormulaBeforeShellImages,
-        amountOccurrences: this.rendered.split("価格は $$100").length - 1,
-        shellOccurrences: this.rendered.split("run echo $$").length - 1,
-      },
-      {
-        formulaImages: this.expectedFormulaBeforeShellImages,
-        amountOccurrences: 1,
-        shellOccurrences: 1,
-      },
-    );
-  },
-);
-
-Then("金額は一度だけ残り画像経路で描かれる式は x = 1 だけになる", function () {
+Then("コロン付き金額の後はx = 1だけが画像になる", function () {
   assert.deepEqual(
-    {
-      formulaImages: this.actualIndependentFormulaImages,
-      amountOccurrences: this.rendered.split("価格は $$100").length - 1,
-    },
-    {
-      formulaImages: this.expectedIndependentFormulaImages,
-      amountOccurrences: 1,
-    },
+    this.actualLabeledAmountFormulaImages,
+    this.expectedLabeledAmountFormulaImages,
   );
+});
+
+Then("コロン付きラベルの金額は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split(this.labeledAmount).length - 1, 1);
+});
+
+Then("金額とシェルを含む本文ではx = 1だけが画像になる", function () {
+  assert.deepEqual(
+    this.actualFormulaBeforeShellImages,
+    this.expectedFormulaBeforeShellImages,
+  );
+});
+
+Then("表示数式とシェルを含む本文の金額は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split("価格は $$100").length - 1, 1);
+});
+
+Then("表示数式と金額を含む本文のシェルの$$は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split("run echo $$").length - 1, 1);
+});
+
+Then("独立した区切り行ではx = 1だけが画像になる", function () {
+  assert.deepEqual(
+    this.actualIndependentFormulaImages,
+    this.expectedIndependentFormulaImages,
+  );
+});
+
+Then("独立した表示数式の前の金額は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split("価格は $$100").length - 1, 1);
 });
 
 Then("画像経路で描かれる式は 100 だけになる", function () {
@@ -832,32 +795,30 @@ Then("画像経路で描かれるラベル付きの式は 100 だけになる", 
   );
 });
 
-Then("100 と y = 1 だけが画像になり単一英字は一度だけ残る", function () {
+Then("数値数式と後続のy = 1だけが画像になる", function () {
   assert.deepEqual(
-    {
-      formulaImages: this.actualSeparatedFormulaImages,
-      textOccurrences: this.rendered.split("\nx\n").length - 1,
-    },
-    {
-      formulaImages: this.expectedSeparatedFormulaImages,
-      textOccurrences: 1,
-    },
+    this.actualSeparatedFormulaImages,
+    this.expectedSeparatedFormulaImages,
   );
 });
 
-Then("100 だけが画像になり単一英字と末尾区切りは残る", function () {
+Then("二つの表示数式の間の単一英字は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split("\nx\n").length - 1, 1);
+});
+
+Then("未完の区切りより前にある100だけが画像になる", function () {
   assert.deepEqual(
-    {
-      formulaImages: this.actualNumericBeforeUnclosedImages,
-      textOccurrences: this.rendered.split("\nx\n").length - 1,
-      delimiterRemains: this.rendered.endsWith("$$"),
-    },
-    {
-      formulaImages: this.expectedNumericBeforeUnclosedImages,
-      textOccurrences: 1,
-      delimiterRemains: true,
-    },
+    this.actualNumericBeforeUnclosedImages,
+    this.expectedNumericBeforeUnclosedImages,
   );
+});
+
+Then("未完の区切りと数値数式の間の単一英字は一度だけ残る", function () {
+  assert.deepEqual(this.rendered.split("\nx\n").length - 1, 1);
+});
+
+Then("数値数式の後の未完の区切りは残る", function () {
+  assert.deepEqual(this.rendered.endsWith("$$"), true);
 });
 
 Then("一つの表示数式が画像になる", function () {
@@ -873,14 +834,12 @@ Then("シェルの通常本文は入力どおり残る", function () {
   assert.equal(this.rendered.split(shellText).length - 1, 1);
 });
 
-Then("シェルに続く表示数式だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      imageCount: imageCount(this.rendered),
-      formulaRemains: this.rendered.includes("x = 1"),
-    },
-    { imageCount: 1, formulaRemains: false },
-  );
+Then("シェルに続く表示数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
+});
+
+Then("シェルに続くx = 1のLaTeXは変換結果に残らない", function () {
+  assert.deepEqual(this.rendered.includes("x = 1"), false);
 });
 
 Then("改行を含むシェルの通常本文は入力どおり残る", function () {
@@ -893,14 +852,12 @@ Then("行頭の $$ を含む通常本文は入力どおり残る", function () {
   assert.equal(this.rendered.split(text).length - 1, 1);
 });
 
-Then("後続の x = 1 だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      imageCount: imageCount(this.rendered),
-      formulaRemains: this.rendered.includes("x = 1"),
-    },
-    { imageCount: 1, formulaRemains: false },
-  );
+Then("非数式の$$に続く表示数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
+});
+
+Then("非数式の$$に続くx = 1のLaTeXは変換結果に残らない", function () {
+  assert.deepEqual(this.rendered.includes("x = 1"), false);
 });
 
 Then("ラベル付き表示数式の前の本文は入力どおり一度だけ残る", function () {
@@ -912,15 +869,16 @@ Then("走査は一秒以内に終わる", function () {
   assert.ok(this.scanDuration < 1_000, `${this.scanDuration}ms`);
 });
 
-Then("不正な数式は残り、正しい数式だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      invalidRemains: this.rendered.includes("$$\\notacommand{$$"),
-      followingTextRemains: this.rendered.includes("次の本文"),
-      imageCount: imageCount(this.rendered),
-    },
-    { invalidRemains: true, followingTextRemains: true, imageCount: 1 },
-  );
+Then("不正な表示数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes("$$\\notacommand{$$"), true);
+});
+
+Then("不正な表示数式に続く本文は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes("次の本文"), true);
+});
+
+Then("不正な表示数式の後の正しい数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
 });
 
 Given("pi-formula の画像処理設定を読む", function () {
@@ -931,31 +889,24 @@ When("固定上限を確認する", function () {
   this.limitValues = Object.values(this.safetyLimits ?? {});
 });
 
-Then(
-  "入力文字数、画像列数・行数、既成PNGのバイト数・ピクセル数、一時保存件数・バイト数が有限の正数である",
-  function () {
-    assert.deepEqual(
-      {
-        names: Object.keys(this.safetyLimits ?? {}).sort(),
-        allFinitePositiveIntegers: this.limitValues.every(
-          (value) => Number.isSafeInteger(value) && value > 0,
-        ),
-      },
-      {
-        names: [
-          "cacheBytes",
-          "cacheEntries",
-          "imageColumns",
-          "imageRows",
-          "latexCharacters",
-          "pngBytes",
-          "pngPixels",
-        ],
-        allFinitePositiveIntegers: true,
-      },
-    );
-  },
-);
+Then("画像処理の安全上限には定義された7項目が含まれる", function () {
+  assert.deepEqual(Object.keys(this.safetyLimits ?? {}).sort(), [
+    "cacheBytes",
+    "cacheEntries",
+    "imageColumns",
+    "imageRows",
+    "latexCharacters",
+    "pngBytes",
+    "pngPixels",
+  ]);
+});
+
+Then("画像処理のすべての安全上限は有限の正整数である", function () {
+  assert.deepEqual(
+    this.limitValues.every((value) => Number.isSafeInteger(value) && value > 0),
+    true,
+  );
+});
 
 When("上限を超えた表示数式と正しい表示数式を変換する", function () {
   const limits = require("../../dist/typesetter.js").FORMULA_SAFETY_LIMITS;
@@ -970,15 +921,16 @@ When("上限を超えた表示数式と正しい表示数式を変換する", fu
   );
 });
 
-Then("上限を超えた数式は残り、正しい数式だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      oversizedRemains: this.rendered.includes(this.oversizedLatex),
-      tooTallRemains: this.rendered.includes(this.tooTallLatex),
-      imageCount: imageCount(this.rendered),
-    },
-    { oversizedRemains: true, tooTallRemains: true, imageCount: 1 },
-  );
+Then("入力文字数上限を超えた数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes(this.oversizedLatex), true);
+});
+
+Then("画像行数上限を超えた数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes(this.tooTallLatex), true);
+});
+
+Then("上限を超えた数式の後の正しい数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
 });
 
 When("基準の半分より小さくなる表示数式と正しい表示数式を変換する", function () {
@@ -994,40 +946,26 @@ When("基準の半分より小さくなる表示数式と正しい表示数式�
   });
 });
 
-Then("小さくなりすぎる数式は残り、正しい数式だけが画像になる", function () {
-  assert.deepEqual(
-    {
-      smallRemains: this.rendered.includes(this.smallLatex),
-      imageCount: imageCount(this.rendered),
-    },
-    { smallRemains: true, imageCount: 1 },
-  );
+Then("読めない縮尺になる数式は変換結果に残る", function () {
+  assert.deepEqual(this.rendered.includes(this.smallLatex), true);
 });
 
-When("同じ表示数式のテーマ色だけと表示幅だけを変えて変換する", function () {
-  const formula = "$$x_{theme-width}$$";
-  const render = (availableWidth) =>
-    this.pi.transformer()(formula, {
-      messageType: "assistant",
-      isStreaming: false,
-      availableWidth,
-    });
-  const baseline = render(80);
-  this.started.setTextColor("\x1b[38;2;10;20;30m");
-  const colorOnly = render(80);
-  this.started.setTextColor("\x1b[38;2;212;212;212m");
-  const widthOnly = render(40);
-  this.imageIdentities = [baseline, colorOnly, widthOnly].map(
-    (rendered) => /\bi=(\d+)/u.exec(rendered)?.[1],
-  );
+Then("読めない縮尺の数式の後の正しい数式1件が画像になる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
+});
+
+When("テーマと幅の比較用数式を {int} 列で描く", function (width) {
+  const rendered = this.pi.transformer()("$$x_{theme-width}$$", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: width,
+  });
+  this.imageIdentities ??= [];
+  this.imageIdentities.push(/\bi=(\d+)/u.exec(rendered)?.[1]);
 });
 
 Then("テーマ色と表示幅の各変更が別の一時保存項目になる", function () {
-  assert.equal(
-    this.imageIdentities.every(Boolean) &&
-      new Set(this.imageIdentities).size === 3,
-    true,
-  );
+  assert.equal(new Set(this.imageIdentities).size, 3);
 });
 
 Given("正確な RGB を返さない画像経路の Pi がある", async function () {
@@ -1051,61 +989,48 @@ Given("件数上限が3件の画像一時保存がある", function () {
   const { RenderCache } = require("../../dist/render-cache.js");
   this.renderCache = new RenderCache(3, 10_000);
   this.cacheCreates = new Map();
+
+  this.cacheImageBytes = 20;
 });
 
-When("4件を保存して2件目を再利用する", function () {
-  const get = (key) =>
-    this.renderCache.getOrCreate(key, () => {
-      this.cacheCreates.set(key, (this.cacheCreates.get(key) ?? 0) + 1);
-      return cacheImage(20);
-    });
-  get("a");
-  get("b");
-  get("c");
-  get("b");
-  get("d");
-  get("a");
+When("一時保存から画像 {word} を取得する", function (key) {
+  this.renderCache.getOrCreate(key, () => {
+    this.cacheCreates.set(key, (this.cacheCreates.get(key) ?? 0) + 1);
+    return cacheImage(this.cacheImageBytes);
+  });
   this.cacheStats = this.renderCache.stats();
 });
 
-Then("最も長く使っていない項目が退避され件数上限内に残る", function () {
-  assert.deepEqual(
-    {
-      recreatedOldest: this.cacheCreates.get("a"),
-      reusedSecond: this.cacheCreates.get("b"),
-      entriesWithinLimit: this.cacheStats.entries <= 3,
-    },
-    { recreatedOldest: 2, reusedSecond: 1, entriesWithinLimit: true },
-  );
+Then("件数上限を超えた最も古い項目は再作成される", function () {
+  assert.deepEqual(this.cacheCreates.get("a"), 2);
+});
+
+Then("最近使った2件目の一時保存は再作成されない", function () {
+  assert.deepEqual(this.cacheCreates.get("b"), 1);
+});
+
+Then("画像の一時保存は3件以内に収まる", function () {
+  assert.deepEqual(this.cacheStats.entries <= 3, true);
 });
 
 Given("バイト上限が300バイトの画像一時保存がある", function () {
   const { RenderCache } = require("../../dist/render-cache.js");
   this.renderCache = new RenderCache(10, 300);
   this.cacheCreates = new Map();
+
+  this.cacheImageBytes = 80;
 });
 
-When("バイト上限を超える画像を順に保存する", function () {
-  const get = (key) =>
-    this.renderCache.getOrCreate(key, () => {
-      this.cacheCreates.set(key, (this.cacheCreates.get(key) ?? 0) + 1);
-      return cacheImage(80);
-    });
-  get("a");
-  get("b");
-  get("a");
-  this.cacheStats = this.renderCache.stats();
+Then("バイト上限を超えた最も古い項目は再作成される", function () {
+  assert.deepEqual(this.cacheCreates.get("a"), 2);
 });
 
-Then("最も長く使っていない項目が退避されバイト上限内に残る", function () {
-  assert.deepEqual(
-    {
-      recreatedOldest: this.cacheCreates.get("a"),
-      entries: this.cacheStats.entries,
-      bytesWithinLimit: this.cacheStats.bytes <= 300,
-    },
-    { recreatedOldest: 2, entries: 1, bytesWithinLimit: true },
-  );
+Then("バイト上限を超えた一時保存には最後の1件が残る", function () {
+  assert.deepEqual(this.cacheStats.entries, 1);
+});
+
+Then("画像の一時保存は300バイト以内に収まる", function () {
+  assert.deepEqual(this.cacheStats.bytes <= 300, true);
 });
 
 Given("画像結果を作る回数を数えられる一時保存がある", function () {
@@ -1114,54 +1039,37 @@ Given("画像結果を作る回数を数えられる一時保存がある", func
   this.failedCreates = 0;
 });
 
-When("同じ失敗項目を二回取得する", function () {
-  const fail = () => {
+When("一時保存から同じ失敗項目を取得する", function () {
+  this.renderCache.getOrCreate("failure", () => {
     this.failedCreates += 1;
     throw new Error("invalid LaTeX");
-  };
-  this.renderCache.getOrCreate("failure", fail);
-  this.renderCache.getOrCreate("failure", fail);
+  });
 });
 
 Then("同じ失敗項目の画像処理は一回だけになる", function () {
   assert.equal(this.failedCreates, 1);
 });
 
-When(
-  "通常本文とインライン数式と大きな行列を含む再現本文を逐次描画する",
-  function () {
-    this.streamingFormulaFrames = renderStreamingRegression(this.pi);
-  },
-);
+When("再現本文の {int} 番目までのフレームを描く", function (count) {
+  if (count < 1 || count > 4)
+    throw new Error(`unknown reproduction frame: ${count}`);
+  this.streamingFormulaFrames ??= [];
+  this.streamingFormulaFrames.push(renderStreamingFrame(this.pi, count));
+});
 
-Then(
-  "各画像の転送チャンク列は他の描画出力を含まず配置まで完結する",
-  function () {
-    const expected = [1, 2, 3, 4].map((imageCount) => ({
-      transformedTransferCount: imageCount,
-      transferLineCount: imageCount,
-      oneTransferPerLine: true,
-      completeChunks: true,
-      matchingPlacementIds: true,
-      matchingPlaceholderRows: true,
-      adjacentPlacements: true,
-    }));
-    assert.deepEqual(
-      inspectStreamingRegression(this.streamingFormulaFrames),
-      expected,
-    );
-  },
-);
+Then("変換結果の画像転送数は順に1・2・3・4件である", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.transformedTransferCount,
+    ),
+    [1, 2, 3, 4],
+  );
+});
 
-When(
-  "先行するツール描画後にIssue 26の異なる3式を逐次更新して確定する",
-  function () {
-    require("../../dist/api.js").registerFormula(this.pi.api, {
-      ket: [String.raw`\left|#1\right\rangle`, 1],
-    });
-    this.issue26Updates = issue26Updates(this.pi);
-  },
-);
+When("先行するqniツールの呼び出しと結果をTUIに描く", function () {
+  this.issue26Tui = tuiUpdates(["qni tool call", "qni tool result"]);
+  this.issue26Updates.tuiWrites.initial = this.issue26Tui.render("");
+});
 
 Then("先行するツール描画が残る", function () {
   assert.equal(
@@ -1184,23 +1092,19 @@ Then("各差分描画は新しい表示数式を1件ずつ転送する", functio
   );
 });
 
-Then("各更新の転送と配置が対応する", function () {
+Then("逐次更新の画像IDは各転送の画像IDと一致する", function () {
   const frames = [
     ...this.issue26Updates.streaming,
     this.issue26Updates.finalized,
   ];
-  const matching = frames
-    .map(inspectPlacementBlocks)
-    .every((blocks) =>
-      blocks.every(
-        (block) =>
-          block.id === block.transferId &&
-          block.rows === block.declaredRows &&
-          block.completeTransfer &&
-          block.adjacentTransfer,
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map(
+        (block) => block.id === block.transferId,
       ),
-    );
-  assert.equal(matching, true);
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
 });
 
 When("同じ複数行表示数式を一回の確定応答内に二回配置する", function () {
@@ -1209,191 +1113,103 @@ When("同じ複数行表示数式を一回の確定応答内に二回配置す�
   this.cachedPlacementBlocks = inspectPlacementBlocks(this.rendered);
 });
 
-Then("各配置で同じ画像IDの複数行転送とプレースホルダーが対応する", function () {
-  const [first, second] = this.cachedPlacementBlocks;
-  assert.equal(
-    this.cachedPlacementBlocks.length === 2 &&
-      first.id === second.id &&
-      this.cachedPlacementBlocks.every(
-        (block) =>
-          block.rows > 1 &&
-          block.id === block.transferId &&
-          block.rows === block.declaredRows &&
-          block.completeTransfer &&
-          block.adjacentTransfer,
-      ),
-    true,
-  );
+Then("同じ応答内の画像配置は2件である", function () {
+  assert.equal(this.cachedPlacementBlocks.length, 2);
 });
 
 When("外部作用を監視しながら表示数式を変換する", function () {
-  const calls = [];
-  const patches = [];
-  const block = (owner, name, kind) => {
-    const original = owner[name];
-    patches.push(() => {
-      owner[name] = original;
-    });
-    owner[name] = (..._args) => {
-      calls.push(kind);
-      throw new Error(`${kind} is unavailable while rendering`);
-    };
-  };
-  for (const name of [
-    "writeFileSync",
-    "writeFile",
-    "appendFileSync",
-    "appendFile",
-    "createWriteStream",
-  ]) {
-    block(fs, name, "disk");
-  }
-  for (const [owner, names] of [
-    [net, ["connect", "createConnection"]],
-    [http, ["request", "get"]],
-    [https, ["request", "get"]],
-  ]) {
-    for (const name of names) block(owner, name, "network");
-  }
-  for (const name of ["spawn", "spawnSync", "exec", "execSync", "fork"]) {
-    block(childProcess, name, "child process");
-  }
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => {
-    calls.push("browser/network");
-    throw new Error("browser/network is unavailable while rendering");
-  };
+  const monitor = monitorExternalEffects();
   try {
     transform(this, "$$x_{memory-only}+11$$");
   } finally {
-    globalThis.fetch = originalFetch;
-    for (const restore of patches.reverse()) restore();
+    monitor.restore();
   }
-  this.externalCalls = calls;
+  this.externalCalls = monitor.calls;
   this.browserModules = Object.keys(require.cache).filter((path) =>
     /playwright|puppeteer/iu.test(path),
   );
 });
 
 Then(
-  "SVGとPNGの保存、ネットワーク、ブラウザ、子プロセスを使わない",
+  "画像の変換中にファイル保存も外部サービスも子プロセスも呼ばない",
   function () {
-    assert.deepEqual(
-      {
-        externalCalls: this.externalCalls,
-        browserModules: this.browserModules,
-        renderedAsImage: imageCount(this.rendered),
-      },
-      { externalCalls: [], browserModules: [], renderedAsImage: 1 },
-    );
+    assert.deepEqual(this.externalCalls, []);
   },
 );
 
-Given("pi-formula を新しい Node.js プロセスで読み込む", function () {
-  this.projectRoot = resolve(__dirname, "../..");
+Then("画像の変換でブラウザ用moduleを読み込まない", function () {
+  assert.deepEqual(this.browserModules, []);
 });
 
-When("入力上限を超えた表示数式を変換する", function () {
-  const script = `
-    const crypto = require('node:crypto');
-    let keyCreations = 0;
-    crypto.createHash = () => { keyCreations += 1; throw new Error('unexpected key creation'); };
-    const loaded = () => Object.keys(require.cache).some((path) =>
-      path.includes('@mathjax/src') || path.includes('@resvg/resvg-js'));
-    const registerFormula = require('./dist/extension.js').default;
-    const { FORMULA_SAFETY_LIMITS } = require('./dist/typesetter.js');
-    const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
-    (async () => {
-      const pi = fakePi(); registerFormula(pi.api); await startWithKitty(pi);
-      const latex = 'x'.repeat(FORMULA_SAFETY_LIMITS.latexCharacters + 1);
-      const source = '$$' + latex + '$$';
-      const rendered = pi.transformer()(source, {
-        messageType: 'assistant', isStreaming: false, availableWidth: 80
-      });
-      process.stdout.write(JSON.stringify({ keyCreations, prepared: loaded(), unchanged: rendered === source }));
-    })().catch((error) => { console.error(error); process.exitCode = 1; });
-  `;
-  const result = childProcess.spawnSync(process.execPath, ["-e", script], {
-    cwd: this.projectRoot,
-    encoding: "utf8",
-  });
-  if (result.status !== 0) throw new Error(result.stderr);
-  this.oversizedPreparation = JSON.parse(result.stdout);
+Then("外部作用を禁止しても表示数式1件を画像へ変換できる", function () {
+  assert.deepEqual(imageCount(this.rendered), 1);
 });
 
-Then("鍵作成と画像処理へ進まない", function () {
-  assert.deepEqual(this.oversizedPreparation, {
-    keyCreations: 0,
-    prepared: false,
-    unchanged: true,
-  });
-});
-
-When("表示数式を初めて変換する", function () {
-  const script = `
-    const loaded = () => Object.keys(require.cache).some((path) =>
-      path.includes('@mathjax/src') || path.includes('@resvg/resvg-js'));
-    const registerFormula = require('./dist/extension.js').default;
-    const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
-    const before = loaded();
-    (async () => {
-      const pi = fakePi(); registerFormula(pi.api); await startWithKitty(pi);
-      const afterSessionStart = loaded();
-      pi.transformer()('$$x_{lazy}$$', {
-        messageType: 'assistant', isStreaming: false, availableWidth: 80
-      });
-      process.stdout.write(JSON.stringify({ before, afterSessionStart, afterFormula: loaded() }));
-    })().catch((error) => { console.error(error); process.exitCode = 1; });
-  `;
-  const result = childProcess.spawnSync(process.execPath, ["-e", script], {
-    cwd: this.projectRoot,
-    encoding: "utf8",
-  });
-  if (result.status !== 0) throw new Error(result.stderr);
-  this.lazyPreparation = JSON.parse(result.stdout);
-});
-
-Then("MathJaxとResvgは最初の表示数式で初めて準備される", function () {
-  assert.deepEqual(this.lazyPreparation, {
-    before: false,
-    afterSessionStart: false,
-    afterFormula: true,
-  });
-});
-
-When(
-  "初回準備後、異なる未キャッシュ数式と一時保存済み数式を複数回計測する",
-  function () {
-    const script = `
-    const { performance } = require('node:perf_hooks');
-    const registerFormula = require('./dist/extension.js').default;
-    const { fakePi, startWithKitty } = require('./test/support/fake-pi.js');
-    (async () => {
-      const pi = fakePi(); registerFormula(pi.api); await startWithKitty(pi);
-      const renderTimed = (latex) => {
-        const started = performance.now();
-        pi.transformer()('$$' + latex + '$$', {
-          messageType: 'assistant', isStreaming: false, availableWidth: 80
-        });
-        return performance.now() - started;
-      };
-      renderTimed('x_{warmup}');
-      const uncachedSamples = Array.from(
-        { length: 5 },
-        (_, index) => renderTimed('x_{cold' + (index + 1) + '}')
-      );
-      const cachedSamples = Array.from({ length: 10 }, () => renderTimed('x_{cold5}'));
-      process.stdout.write(JSON.stringify({ uncachedSamples, cachedSamples }));
-    })().catch((error) => { console.error(error); process.exitCode = 1; });
-  `;
-    const result = childProcess.spawnSync(process.execPath, ["-e", script], {
-      cwd: resolve(__dirname, "../.."),
-      encoding: "utf8",
+Given(
+  "新しいNode.jsプロセスで拡張を読み込んで登録したPiがある",
+  async function () {
+    this.isolatedRenderer = isolatedRenderer({
+      blockKeyCreation: this.blockKeyCreation ?? false,
     });
-    if (result.status !== 0) throw new Error(result.stderr);
-    this.durations = JSON.parse(result.stdout);
+    const loaded = await this.isolatedRenderer.request("load");
+    this.safetyLimits = loaded.limits;
+    this.lazyPreparation = { before: loaded.loaded };
+    await this.isolatedRenderer.request("register");
   },
 );
+
+When("入力上限を超えた表示数式を変換する", async function () {
+  const source = `$$${"x".repeat(this.safetyLimits.latexCharacters + 1)}$$`;
+  const result = await this.isolatedRenderer.request("render", {
+    markdown: source,
+  });
+  this.oversizedPreparation = {
+    keyCreations: result.keyCreations,
+    prepared: result.loaded,
+    unchanged: result.markdown === source,
+  };
+});
+
+Then("入力文字数上限を超えた数式の一時保存キーは作られない", function () {
+  assert.deepEqual(this.oversizedPreparation.keyCreations, 0);
+});
+
+Then("入力文字数上限を超えた数式は画像処理部品を準備しない", function () {
+  assert.deepEqual(this.oversizedPreparation.prepared, false);
+});
+
+Then("入力文字数上限を超えた数式は原文のまま残る", function () {
+  assert.deepEqual(this.oversizedPreparation.unchanged, true);
+});
+
+When("表示数式を初めて変換する", async function () {
+  const result = await this.isolatedRenderer.request("render", {
+    markdown: "$$x_{lazy}$$",
+  });
+  this.lazyPreparation.afterFormula = result.loaded;
+});
+
+Then("数式の描画前にはMathJaxもResvgも読み込まれていない", function () {
+  assert.deepEqual(this.lazyPreparation.before, false);
+});
+
+Then("セッション開始だけではMathJaxもResvgも読み込まれない", function () {
+  assert.deepEqual(this.lazyPreparation.afterSessionStart, false);
+});
+
+Then("最初の表示数式でMathJaxとResvgが読み込まれる", function () {
+  assert.deepEqual(this.lazyPreparation.afterFormula, true);
+});
+
+When("異なる未キャッシュ数式5件の変換時間を計測する", async function () {
+  this.durations = { uncachedSamples: [], cachedSamples: [] };
+  for (let index = 1; index <= 5; index++) {
+    const result = await this.isolatedRenderer.request("render", {
+      markdown: `$$x_{cold${index}}$$`,
+    });
+    this.durations.uncachedSamples.push(result.duration);
+  }
+});
 
 Then(
   "一時保存済みの中央値は未キャッシュ中央値の5パーセント未満である",
@@ -1406,10 +1222,7 @@ Then(
     const cachedMedian = median(this.durations.cachedSamples);
     const cachedRatio = cachedMedian / uncachedMedian;
     assert.ok(
-      this.durations.uncachedSamples.length === 5 &&
-        this.durations.cachedSamples.length === 10 &&
-        Number.isFinite(cachedRatio) &&
-        cachedRatio < 0.05,
+      cachedRatio < 0.05,
       JSON.stringify({
         ...this.durations,
         uncachedMedian,
@@ -1419,3 +1232,293 @@ Then(
     );
   },
 );
+
+When("比較用の表示数式1を先に描く", function () {
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用のx = 1を先に描く", function () {
+  transform(this, "$$x = 1$$");
+  this.expectedLabeledAmountFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式2を先に描く", function () {
+  transform(this, "$$x = 1$$");
+  this.expectedFormulaBeforeShellImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式3を先に描く", function () {
+  transform(this, "$$\nx = 1\n$$");
+  this.expectedIndependentFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式4を先に描く", function () {
+  transform(this, "$$100$$");
+  this.expectedNumericFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式5を先に描く", function () {
+  transform(this, "$$100\n$$");
+  this.expectedMultilineNumericFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式6を先に描く", function () {
+  transform(this, "$$100\n$$");
+  this.expectedLabeledNumericFormulaImages = imageIdentities(this.rendered);
+});
+
+When("比較用の表示数式7を先に描く", function () {
+  transform(this, "$$100\n$$");
+  this.expectedNumericBeforeUnclosedImages = imageIdentities(this.rendered);
+});
+
+When("比較用の数値100を先に描く", function () {
+  transform(this, "$$100\n$$");
+  this.referenceNumericImages = imageIdentities(this.rendered);
+});
+
+When("比較用のy = 1を次に描く", function () {
+  transform(this, "$$y = 1$$");
+  this.referenceFollowingImages = imageIdentities(this.rendered);
+});
+
+When("テーマの文字色をRGBの10・20・30へ変える", function () {
+  this.started.setTextColor("\x1b[38;2;10;20;30m");
+});
+
+When("テーマの文字色をRGBの212・212・212へ戻す", function () {
+  this.started.setTextColor("\x1b[38;2;212;212;212m");
+});
+
+Then("テーマと幅の比較では3個の画像IDが得られる", function () {
+  assert.deepEqual(this.imageIdentities.map(Boolean), [true, true, true]);
+});
+
+Then("端末描画の転送行数は順に1・2・3・4件である", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.transferLineCount,
+    ),
+    [1, 2, 3, 4],
+  );
+});
+
+Then("各転送行には一つの画像転送だけがある", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.oneTransferPerLine,
+    ),
+    [true, true, true, true],
+  );
+});
+
+Then("各フレームの転送チャンクが完結する", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.completeChunks,
+    ),
+    [true, true, true, true],
+  );
+});
+
+Then("各フレームの画像IDと配置IDが一致する", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.matchingPlacementIds,
+    ),
+    [true, true, true, true],
+  );
+});
+
+Then("各フレームのplaceholder行数が画像転送に対応する", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.matchingPlaceholderRows,
+    ),
+    [true, true, true, true],
+  );
+});
+
+Then("各フレームの配置は対応する転送に隣接する", function () {
+  assert.deepEqual(
+    inspectStreamingRegression(this.streamingFormulaFrames).map(
+      (frame) => frame.adjacentPlacements,
+    ),
+    [true, true, true, true],
+  );
+});
+
+Given("Issue 26のコーパスとket追加マクロがある", function () {
+  require("../../dist/api.js").registerFormula(this.pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  this.issue26Source = issue26Source();
+  this.issue26Updates = { streaming: [], tuiWrites: { streaming: [] } };
+});
+
+When("Issue 26の {int} 番目までの未完了本文を変換する", function (count) {
+  const source = this.issue26Source.partials[count - 1];
+  if (source === undefined) throw new Error(`unknown Issue 26 frame: ${count}`);
+  this.issue26Updates.streaming.push(
+    this.pi.transformer()(source, {
+      messageType: "assistant",
+      isStreaming: true,
+      availableWidth: 80,
+    }),
+  );
+});
+
+When("Issue 26の確定本文を変換する", function () {
+  this.issue26Updates.finalized = this.pi.transformer()(
+    this.issue26Source.corpus,
+    {
+      messageType: "assistant",
+      isStreaming: false,
+      availableWidth: 80,
+    },
+  );
+});
+
+When("Issue 26の {int} 番目の未完了本文をTUIへ更新する", function (count) {
+  this.issue26Updates.tuiWrites.streaming.push(
+    this.issue26Tui.render(this.issue26Updates.streaming[count - 1]),
+  );
+});
+
+When("Issue 26の確定本文をTUIへ更新する", function () {
+  this.issue26Updates.tuiWrites.finalized = this.issue26Tui.render(
+    this.issue26Updates.finalized,
+  );
+});
+
+Then("逐次更新のplaceholder行数は各転送の宣言行数と一致する", function () {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    this.issue26Updates.finalized,
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map(
+        (block) => block.rows === block.declaredRows,
+      ),
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
+
+Then("逐次更新の各配置の転送チャンクは完結する", function () {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    this.issue26Updates.finalized,
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map((block) => block.completeTransfer),
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
+
+Then("逐次更新の各配置は対応する転送に隣接する", function () {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    this.issue26Updates.finalized,
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map((block) => block.adjacentTransfer),
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
+
+Then("同じ応答内の各配置は同じ画像IDを使う", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map((block) => block.id),
+    [this.cachedPlacementBlocks[0]?.id, this.cachedPlacementBlocks[0]?.id],
+  );
+});
+
+Then("同じ応答内の各配置は複数行である", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map((block) => block.rows > 1),
+    [true, true],
+  );
+});
+
+Then("一時保存画像の画像IDは各転送の画像IDと一致する", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map((block) => block.id === block.transferId),
+    [true, true],
+  );
+});
+
+Then("一時保存画像のplaceholder行数は各転送の宣言行数と一致する", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map(
+      (block) => block.rows === block.declaredRows,
+    ),
+    [true, true],
+  );
+});
+
+Then("一時保存画像の各配置の転送チャンクは完結する", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map((block) => block.completeTransfer),
+    [true, true],
+  );
+});
+
+Then("一時保存画像の各配置は対応する転送に隣接する", function () {
+  assert.deepEqual(
+    this.cachedPlacementBlocks.map((block) => block.adjacentTransfer),
+    [true, true],
+  );
+});
+
+Given("一時保存キーを作ろうとすると失敗する環境である", function () {
+  this.blockKeyCreation = true;
+});
+
+When("分離プロセスで画像経路のセッションを開始する", async function () {
+  const result = await this.isolatedRenderer.request("start");
+  this.lazyPreparation.afterSessionStart = result.loaded;
+});
+
+When("初回準備用の数式を分離プロセスで描く", async function () {
+  await this.isolatedRenderer.request("render", { markdown: "$$x_{warmup}$$" });
+});
+
+When("一時保存済みの最後の数式を10回計測する", async function () {
+  for (let index = 0; index < 10; index++) {
+    const result = await this.isolatedRenderer.request("render", {
+      markdown: "$$x_{cold5}$$",
+    });
+    this.durations.cachedSamples.push(result.duration);
+  }
+});
+
+Then("未キャッシュ数式の計測は5件である", function () {
+  assert.equal(this.durations.uncachedSamples.length, 5);
+});
+
+Then("一時保存済み数式の計測は10件である", function () {
+  assert.equal(this.durations.cachedSamples.length, 10);
+});
+
+Then("一時保存済みの中央値比は有限である", function () {
+  const median = (samples) =>
+    [...samples].sort((a, b) => a - b)[Math.floor(samples.length / 2)];
+  assert.equal(
+    Number.isFinite(
+      median(this.durations.cachedSamples) /
+        median(this.durations.uncachedSamples),
+    ),
+    true,
+  );
+});
+
+After(function () {
+  if (this.issue26Tui) this.issue26Tui.stop();
+});

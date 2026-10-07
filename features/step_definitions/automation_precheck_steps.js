@@ -108,16 +108,29 @@ When(/^「(.+)」precheck を実行する$/, function (precheck) {
   };
 });
 
-Then(
-  /^precheck は正常終了し terminal close は「(.+)」だけ呼ばれる$/,
-  function (expected) {
-    assert.deepEqual(this.precheckObservation, {
-      error: null,
-      status: 0,
-      signal: null,
-      stdout: "",
-      stderr: "",
-      closedTerminals: expected === "なし" ? [] : [expected],
-    });
-  },
-);
+Then("precheckの子プロセス起動にエラーはない", function () {
+  assert.equal(this.precheckObservation.error, null);
+});
+
+Then("precheckは終了コード0を返す", function () {
+  assert.equal(this.precheckObservation.status, 0);
+});
+
+Then("precheckはシグナルで終了しない", function () {
+  assert.equal(this.precheckObservation.signal, null);
+});
+
+Then("precheckは標準出力へ何も書かない", function () {
+  assert.equal(this.precheckObservation.stdout, "");
+});
+
+Then("precheckは標準エラーへ何も書かない", function () {
+  assert.equal(this.precheckObservation.stderr, "");
+});
+
+Then("terminal closeは {string} だけ呼ばれる", function (expected) {
+  assert.deepEqual(
+    this.precheckObservation.closedTerminals,
+    expected === "なし" ? [] : [expected],
+  );
+});
