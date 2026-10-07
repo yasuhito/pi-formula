@@ -37,9 +37,18 @@ async function statusLines(pi, started) {
   return started.widgets.get("pi-formula-status");
 }
 
-Given("{word} が PNG 問い合わせへ応答する Pi がある", function (terminal) {
+Given("端末 `{word}` でPiを使っている", function (terminal) {
+  // Alacritty is modeled by no PNG-query response, without a multiplexer.
+  const responses = new Map([
+    ["Ghostty", "OK"],
+    ["Kitty", "OK"],
+    ["Alacritty", undefined],
+  ]);
+  if (!responses.has(terminal)) {
+    throw new Error(`Unknown terminal fixture: ${terminal}`);
+  }
   this.terminal = terminal;
-  this.startOptions = { response: "OK" };
+  this.startOptions = { response: responses.get(terminal) };
   this.pi = fakePi();
   registerFormula(this.pi.api);
 });
@@ -55,10 +64,19 @@ When("セッションを開始する", async function () {
   );
 });
 
-Then("画像経路が選ばれる", async function () {
+Then("`{word}`経路が選ばれる", async function (path) {
+  const paths = new Map([
+    ["画像", "image"],
+    ["テキスト", "text"],
+  ]);
+  if (!paths.has(path)) {
+    throw new Error(`Unknown path label: ${path}`);
+  }
   assert.equal(
-    (await statusLines(this.pi, this.started)).includes("path: image"),
-    true,
+    (await statusLines(this.pi, this.started)).find((line) =>
+      line.startsWith("path:"),
+    ),
+    `path: ${paths.get(path)}`,
   );
 });
 
