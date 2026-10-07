@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -112,9 +113,26 @@ test("run commandの異常終了時も子孫processを停止する", async () =>
 });
 
 test("direct childの終了後も同じprocess groupの子孫を停止する", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "display-process-"));
+  const pidFile = path.join(directory, "ready.pid");
+  const stateOf = (pid) => {
+    const result = spawnSync("ps", ["-p", String(pid), "-o", "stat="], {
+      encoding: "utf8",
+    });
+    if (result.error) throw result.error;
+    if (result.status === 1 && result.stdout.trim() === "") return "absent";
+    if (result.status !== 0) throw new Error(`ps failed: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+  const stopped = (state) => state === "absent" || state.startsWith("Z");
+  const descendant = `
+    process.on("SIGTERM", () => {});
+    setInterval(() => {}, 10000);
+    require("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+  `;
   const source = `
     const { spawn } = require("node:child_process");
-    const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 10000)"], { stdio: "inherit" });
+    const child = spawn(process.execPath, ["-e", ${JSON.stringify(descendant)}], { stdio: "inherit" });
     child.unref();
   `;
   const managed = adapter.spawn({
@@ -123,12 +141,29 @@ test("direct childの終了後も同じprocess groupの子孫を停止する", a
     args: ["-e", source],
     timeoutMs: 10_000,
   });
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  await managed.terminate();
-  assert.throws(
-    () => process.kill(-managed.pid, 0),
-    (error) => error.code === "ESRCH",
-  );
+  let descendantPid;
+  try {
+    const deadline = Date.now() + 5_000;
+    while (!fs.existsSync(pidFile) || !stopped(stateOf(managed.pid))) {
+      if (Date.now() >= deadline)
+        throw new Error("descendant did not become ready");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    descendantPid = Number(fs.readFileSync(pidFile, "utf8"));
+    if (stopped(stateOf(descendantPid))) {
+      throw new Error("descendant exited before termination was requested");
+    }
+    await managed.terminate();
+    // ps also distinguishes an exited, unreaped child from a running child on macOS.
+    assert.match(stateOf(descendantPid), /^(?:absent|Z\S*)$/);
+  } finally {
+    await managed.terminate("SIGKILL");
+    if (descendantPid && !stopped(stateOf(descendantPid))) {
+      process.kill(descendantPid, "SIGKILL");
+    }
+    await managed.completion;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("停止後にprocess groupへの探査がEPERMを返してもabortは完了する", async () => {
