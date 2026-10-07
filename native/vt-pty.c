@@ -302,7 +302,13 @@ int main(int argc, char **argv) {
     fprintf(stderr, "vt-pty: terminal allocation failed\n"); return 2;
   }
   uint64_t limit = 256u << 20;
+  // libghostty-vt has no window theme: supply defaults so OSC 10/11 queries
+  // behave like a real terminal, including Pi themes that inherit its colors.
+  GhosttyColorRgb foreground = { .r = 0xd8, .g = 0xd8, .b = 0xd8 };
+  GhosttyColorRgb background = { .r = 0x28, .g = 0x2c, .b = 0x34 };
   bool terminal_ready = ghostty_terminal_resize(term, (uint16_t)cols, (uint16_t)rows, (uint32_t)cell_w, (uint32_t)cell_h) == GHOSTTY_SUCCESS &&
+    ghostty_terminal_set(term, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &foreground) == GHOSTTY_SUCCESS &&
+    ghostty_terminal_set(term, GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, &background) == GHOSTTY_SUCCESS &&
     ghostty_terminal_set(term, GHOSTTY_TERMINAL_OPT_WRITE_PTY, (const void *)on_write_pty) == GHOSTTY_SUCCESS &&
     ghostty_terminal_set(term, GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT, &limit) == GHOSTTY_SUCCESS;
   if (!terminal_ready) {

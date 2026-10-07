@@ -92,6 +92,20 @@ pi-formula の worker として
 - Then libghostty-vt が解析したプロトコル状態が出力される
 
 `@native-vt`
+## Scenario: 端末の既定前景色を子プロセスへ返す
+
+- Given vt-pty の既定前景色を問い合わせる子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 子プロセスが既定前景色の応答を受け取る
+
+`@native-vt`
+## Scenario: 端末の既定背景色を子プロセスへ返す
+
+- Given vt-pty の既定背景色を問い合わせる子プロセスがある
+- When 子プロセスの出力が落ち着くまで待つ
+- Then 子プロセスが既定背景色の応答を受け取る
+
+`@native-vt`
 ## Scenario: 無出力時間があっても必要な仮想配置を待つ
 
 - Given vt-pty の収束時間より遅れて仮想配置を出力する子プロセスがある

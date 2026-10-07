@@ -119,6 +119,40 @@ Given("vt-pty で文字を出力する子プロセスを起動する", function 
   this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
 });
 
+function terminalColorQuery(osc) {
+  const program = `
+process.stdin.setRawMode(true);
+process.stdin.setEncoding("utf8");
+let response = "";
+const timeout = setTimeout(() => process.exit(1), 1000);
+process.stdin.on("data", (data) => {
+  response += data;
+  if (!response.includes("\\x1b\\\\")) return;
+  clearTimeout(timeout);
+  process.stdout.write("terminal-color=" + JSON.stringify(response));
+  process.stdin.pause();
+});
+process.stdout.write("\\x1b]${osc};?\\x1b\\\\");
+`;
+  return ["--settle-ms", "20", "--", process.execPath, "-e", program];
+}
+
+Given("vt-pty の既定前景色を問い合わせる子プロセスがある", function () {
+  this.nativeCommand = terminalColorQuery(10);
+});
+
+Given("vt-pty の既定背景色を問い合わせる子プロセスがある", function () {
+  this.nativeCommand = terminalColorQuery(11);
+});
+
+Then("子プロセスが既定前景色の応答を受け取る", function () {
+  assert.match(this.nativeResult.stdout, /10;rgb:d8d8\/d8d8\/d8d8/u);
+});
+
+Then("子プロセスが既定背景色の応答を受け取る", function () {
+  assert.match(this.nativeResult.stdout, /11;rgb:2828\/2c2c\/3434/u);
+});
+
 Given(
   "vt-pty の収束時間より遅れて仮想配置を出力する子プロセスがある",
   function () {
