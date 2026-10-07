@@ -82,17 +82,17 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@biomejs/biome": "2.5.12",
+    "@biomejs/biome": "2.5.15",
     "@cucumber/cucumber": "^13.2.1",
-    "@earendil-works/pi-coding-agent": "^0.99.1",
-    "@earendil-works/pi-tui": "^0.84.4",
+    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@earendil-works/pi-tui": "^1.0.0",
     "@types/node": "^26.4.1",
     "diff": "9.0.0",
     "estree-walker": "3.0.3",
-    "knip": "6.34.0",
-    "oxc-parser": "0.148.0",
-    "oxlint-plugin-complexity": "2.1.8",
-    "publint": "0.3.24",
+    "knip": "6.39.0",
+    "oxc-parser": "0.152.0",
+    "oxlint-plugin-complexity": "3.0.1",
+    "publint": "0.3.25",
     "typescript": "^7.0.2"
   }
 }

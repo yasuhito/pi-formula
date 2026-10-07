@@ -60,6 +60,33 @@ function isFenceClosingCandidate(
   return true;
 }
 
+function protectInlineCode(
+  markdown: string,
+  token: (value: string) => string,
+): string {
+  let protectedMarkdown = "";
+  for (let index = 0; index < markdown.length; ) {
+    if (markdown[index] !== "`") {
+      protectedMarkdown += markdown[index];
+      index += 1;
+      continue;
+    }
+    let length = 1;
+    while (markdown[index + length] === "`") length += 1;
+    const delimiter = "`".repeat(length);
+    const closing = markdown.indexOf(delimiter, index + length);
+    if (closing < 0) {
+      protectedMarkdown += delimiter;
+      index += length;
+      continue;
+    }
+    protectedMarkdown += token(markdown.slice(index, closing + length));
+    index = closing + length;
+  }
+
+  return protectedMarkdown;
+}
+
 function protectCode(markdown: string): ProtectedMarkdown {
   const parts: string[] = [];
   const token = (value: string): string =>
@@ -130,25 +157,7 @@ function protectCode(markdown: string): ProtectedMarkdown {
   }
   if (fence) withoutFences += token(fence.content);
 
-  let protectedMarkdown = "";
-  for (let index = 0; index < withoutFences.length; ) {
-    if (withoutFences[index] !== "`") {
-      protectedMarkdown += withoutFences[index];
-      index += 1;
-      continue;
-    }
-    let length = 1;
-    while (withoutFences[index + length] === "`") length += 1;
-    const delimiter = "`".repeat(length);
-    const closing = withoutFences.indexOf(delimiter, index + length);
-    if (closing < 0) {
-      protectedMarkdown += delimiter;
-      index += length;
-      continue;
-    }
-    protectedMarkdown += token(withoutFences.slice(index, closing + length));
-    index = closing + length;
-  }
+  const protectedMarkdown = protectInlineCode(withoutFences, token);
 
   return {
     markdown: protectedMarkdown,
