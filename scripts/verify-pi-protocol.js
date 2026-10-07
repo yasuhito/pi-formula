@@ -164,6 +164,7 @@ function run(tool, directory, markdown, expected) {
     env: {
       ...process.env,
       XDG_CONFIG_HOME: config,
+      PI_CODING_AGENT_DIR: path.join(directory, "agent"),
       PI_FORMULA_MACROS: "{}",
       PI_OFFLINE: "1",
     },
