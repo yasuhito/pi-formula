@@ -1,8 +1,8 @@
 # Feature: libghostty-vt で画像経路のプロトコル状態を検査する
 
-pi-formula の worker として
-不安定な native 依存を通常の検査から分離しながら
-画像経路のプロトコル状態を決定的に検査したい
+プロトコル検査は、エンコーダと Pi の画像経路が出力した storage・配置・逐次更新の状態を libghostty-vt で観察します。native 依存がない環境では、検査を省略したことを示して正常終了します。
+
+実際の vt-pty を使う検査は、専用タグで通常の検査から選び分けられます。
 
 ## Scenario: vt-ptyのないプロトコル検査は正常終了する
 
@@ -39,48 +39,6 @@ pi-formula の worker として
 - Given 環境変数で指定した vt-pty がある
 - When プロトコル検査の入口を実行する
 - Then 環境変数で指定したvt-ptyの出力が返る
-
-## Scenario: libghostty-vtのビルド計画は正常終了する
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は正常終了する
-
-## Scenario: libghostty-vtのビルド計画は固定したcommitを使う
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は固定したcommitを使う
-
-## Scenario: libghostty-vtのビルド計画は指定したprefixを使う
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は指定したprefixを使う
-
-## Scenario: ビルド計画のheaderは指定prefixのincludeにある
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のheaderは指定prefixのincludeにある
-
-## Scenario: ビルド計画のlibraryは指定prefixのlibにある
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のlibraryは指定prefixのlibにある
-
-## Scenario: ビルド計画のvt-ptyは指定prefixのbinにある
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のvt-ptyは指定prefixのbinにある
-
-## Scenario: Zigのビルド命令は指定prefixだけを使う
-
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then Zigのビルド命令は指定prefixだけを使う
 
 ## Scenario: vt-ptyのないエンコーダ検査は正常終了する
 
@@ -515,13 +473,6 @@ pi-formula の worker として
 - Given 下線色をセミコロン形式へ戻した pi-formula がある
 - When Pi を通したプロトコル検査を実行する
 - Then placeholder セルの汚れを検出して失敗する
-
-
-
-
-
-
-
 
 `@native-vt`
 ## Scenario: 端末の既定前景色を子プロセスへ返す

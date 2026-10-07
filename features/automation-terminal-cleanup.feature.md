@@ -1,8 +1,6 @@
-# Feature: automation precheck の terminal 後片付け
+# Feature: automation precheck で完了した端末だけを後片付けする
 
-Orca automation の利用者として
-完了扱いの run に対応する terminal で agent がまだ働いている場合に
-precheck がその terminal を閉じないようにしたい
+Orca automation の precheck は、完了扱いの run に対応する terminal でも、agent がまだ働いている場合は閉じません。最終出力から端末の状態を判断して後片付けします。
 
 ## Scenario Outline: precheckの子プロセス起動にエラーはない
 

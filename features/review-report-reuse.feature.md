@@ -1,8 +1,6 @@
 # Feature: 現 HEAD の独立レビュー判定を再利用する
 
-PR reviewer として
-完了済みの独立レビュー判定を失わずに再利用し
-同じ HEAD の review worker を重ねて起動したくない
+PR reviewer は、現 HEAD に対応する完了済みの独立レビュー判定を再利用できます。使えないレポートの理由を判別し、同じ HEAD の review worker を重ねて起動しないようにします。
 
 ## Scenario: 有効な独立レビューの解決は正常終了する
 
