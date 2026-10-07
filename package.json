@@ -84,7 +84,7 @@
     "@arethetypeswrong/cli": "0.18.5",
     "@biomejs/biome": "2.5.12",
     "@cucumber/cucumber": "^13.2.1",
-    "@earendil-works/pi-coding-agent": "^0.84.4",
+    "@earendil-works/pi-coding-agent": "^0.99.1",
     "@earendil-works/pi-tui": "^0.84.4",
     "@types/node": "^26.4.1",
     "diff": "9.0.0",
