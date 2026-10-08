@@ -2,18 +2,19 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     ".pi/extensions/**/*.ts",
-    "scripts/plan-display.js",
-    "scripts/streaming-protocol-fixture.js",
-    "scripts/verify-display-plan.js",
+    "scripts/plan-display.ts",
+    "scripts/streaming-protocol-fixture.ts",
+    "scripts/verify-display-plan.ts",
     "src/display-verification-cli.ts",
     "src/display-verification.ts",
-    "src/extension.ts"
+    "src/extension.ts",
+    "scripts/verify-extensions/**/*.ts"
   ],
   "project": [
     "src/**/*.ts",
     ".pi/extensions/**/*.ts",
-    "scripts/**/*.js",
-    "test/**/*.js",
+    "scripts/**/*.{js,ts}",
+    "test/**/*.{js,ts}",
     "features/**/*.js"
   ]
 }

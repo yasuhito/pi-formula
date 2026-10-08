@@ -1,0 +1,721 @@
+import assert from "node:assert/strict";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { Markdown } from "@earendil-works/pi-tui";
+import { registerFormula as registerApiFormula } from "../dist/api.js";
+import registerFormula from "../dist/extension.js";
+import {
+  fakePi,
+  resetFormulaState,
+  startSession,
+  startWithKitty,
+  startWithText,
+} from "./support/fake-pi";
+import { identityMarkdownTheme } from "./support/markdown-theme.js";
+
+test.beforeEach(() => resetFormulaState());
+
+function configureDefaultPath(
+  t: import("node:test").TestContext,
+  defaultPath: "text" | "image",
+) {
+  const xdg = mkdtempSync(join(tmpdir(), "pi-formula-default-path-"));
+  const directory = join(xdg, "pi-formula");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "config.json"),
+    JSON.stringify({ path: defaultPath }),
+  );
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  t.after(() => {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+    rmSync(xdg, { recursive: true, force: true });
+  });
+}
+
+async function selectedPathAndReason(
+  pi: ReturnType<typeof fakePi>,
+  started: Awaited<ReturnType<typeof startSession>>,
+) {
+  await pi.commands.get("formula").handler("status", started.ctx);
+  return started.widgets
+    .get("pi-formula-status")
+    .filter((line) => line.startsWith("path:") || line.startsWith("reason:"));
+}
+
+async function reportedColor(
+  pi: ReturnType<typeof fakePi>,
+  started: Awaited<ReturnType<typeof startSession>>,
+) {
+  await pi.commands.get("formula").handler("status", started.ctx);
+  return started.widgets
+    .get("pi-formula-status")
+    .find((line) => line.startsWith("color:"));
+}
+
+test("inline formulas stay in Pi Markdown without image transfer", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+  const markdown = "Use $x+1$ and \\(y-1\\).";
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("登録済みの追加マクロを両方のインライン数式区切りで展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    braket: [String.raw`\left\langle#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()(
+    String.raw`$\ket{s}$ and \(\braket{s|\psi}\)`,
+    {
+      messageType: "assistant",
+      isStreaming: false,
+      availableWidth: 80,
+    },
+  );
+
+  assert.equal(
+    rendered,
+    String.raw`$\left\vert{}s\right\rangle$ and \(\left\langle{}s\vert{}\psi\right\rangle\)`,
+  );
+});
+
+test("追加マクロの引数と制御綴の境界を TeX と同じく保つ", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+    sq: ["#1^2", 1],
+    groupedSq: ["{#1}^2", 1],
+    alpha: String.raw`\alpha`,
+    loop: String.raw`\loop`,
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`$\ket{x}y$`,
+    String.raw`$\sq{a+b}$`,
+    String.raw`$\groupedSq{a+b}$`,
+    String.raw`$\alpha x$`,
+    String.raw`$\\ket{x}$`,
+    String.raw`$\loop$`,
+  ].join(" / ");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(
+    rendered,
+    [
+      String.raw`$\left\vert{}x\right\rangle{}y$`,
+      "$a+b^2$",
+      "$" + "{a+b}^2$",
+      String.raw`$\alpha{}x$`,
+      String.raw`$\\ket{x}$`,
+      String.raw`$\loop$`,
+    ].join(" / "),
+  );
+});
+
+test("同じ追加マクロを引数内でも展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()(String.raw`$\ket{\ket{x}}$`, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(
+    rendered,
+    String.raw`$\left\vert{}\left\vert{}x\right\rangle\right\rangle$`,
+  );
+});
+
+test("空文字列へ展開する利用者マクロは原文を残す", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, { empty: "" });
+  await startWithKitty(pi);
+  const markdown = String.raw`$\empty$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("Markdown 表内でも追加マクロを一つの列で描く", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = ["| 状態 |", "| --- |", String.raw`| $\ket{s}$ |`].join(
+    "\n",
+  );
+  const passthroughTheme = identityMarkdownTheme;
+
+  const transformed = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+  const row = new Markdown(transformed, 0, 0, passthroughTheme)
+    .render(80)
+    .find((line) => line.includes("|s⟩"));
+
+  assert.equal((row?.match(/│/gu) ?? []).length, 2);
+});
+
+test("Markdown URL の構造内では追加マクロを展開しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [
+    String.raw`[ket]: /guide/$\ket{s}$`,
+    String.raw`[doc](/guide/(v1)/$\ket{s}$)`,
+    String.raw`https://example.com/\(\ket{s}\)`,
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("テキスト経路でも登録済みの追加マクロを展開する", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithText(pi);
+
+  const rendered = pi.transformer()(String.raw`$\ket{s}$`, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, String.raw`$\left\vert{}s\right\rangle$`);
+});
+
+test("展開後に Pi が描けないインライン数式は原文を残す", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = String.raw`$\ket{\notacommand{x}}$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("ストリーミング中に追加マクロを含む閉じた表示数式を描く", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = [String.raw`$$\ket{s}$$`, String.raw`\[\ket{s}\]`].join(
+    "\n",
+  );
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal((rendered.match(/\x1b_Ga=T,f=100/gu) ?? []).length, 2);
+});
+
+test("ストリーミング中もコード内の追加マクロを変更しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = "code: `$\\ket{s}$`";
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("ストリーミング中も URL 内の追加マクロを変更しない", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  registerApiFormula(pi.api, {
+    ket: [String.raw`\left|#1\right\rangle`, 1],
+  });
+  await startWithKitty(pi);
+  const markdown = String.raw`https://example.com/$\ket{s}$`;
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("display formulas use a Kitty PNG transfer and placeholder rows", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()("Before\n$$\\frac{1}{2}$$\nAfter", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.deepEqual(
+    {
+      hasPngTransfer: rendered.includes("\x1b_Ga=T,f=100"),
+      hasPlaceholder: rendered.includes(String.fromCodePoint(0x10eeee)),
+      hasLatex: rendered.includes("\\frac{1}{2}"),
+    },
+    {
+      hasPngTransfer: true,
+      hasPlaceholder: true,
+      hasLatex: false,
+    },
+  );
+});
+
+test("streaming display formulas use the image path when complete", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+  const markdown = "tool output\n\n$$x$$\n\n$$y$$\n\n$$z$$";
+
+  const streaming = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: true,
+    availableWidth: 80,
+  });
+
+  assert.equal((streaming.match(/\x1b_Ga=T,f=100/gu) ?? []).length, 3);
+});
+
+test("the same display formula transfers before every placement", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()("$$x$$\n間\n$$x$$", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.deepEqual(
+    {
+      transfers: (rendered.match(/\x1b_Ga=T,f=100/gu) ?? []).length,
+      placeholderRows: (rendered.match(/\x1b\[38;2;\d+;\d+;\d+m/gu) ?? [])
+        .length,
+      hasPlaceholder: rendered.includes(String.fromCodePoint(0x10eeee)),
+    },
+    {
+      transfers: 2,
+      placeholderRows: 2,
+      hasPlaceholder: true,
+    },
+  );
+});
+
+test("a display formula keeps each Kitty transfer line free of other drawing output", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const transformed = pi.transformer()("Before\n$$x$$\nAfter", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+  const passthroughTheme = identityMarkdownTheme;
+  const renderedLines = new Markdown(
+    transformed,
+    0,
+    0,
+    passthroughTheme,
+  ).render(80);
+  const transferLine = renderedLines.find((line) => line.includes("\x1b_G"));
+
+  const withoutGraphics = transferLine?.replace(
+    /\x1b_G[^;]*;[^\x1b]*\x1b\\/gu,
+    "",
+  );
+  assert.deepEqual(
+    {
+      containsOtherLine: transferLine?.includes("\n"),
+      hasCompleteTransfer: transferLine?.includes("\x1b\\"),
+      visibleRemainder: withoutGraphics?.replace(/\x1b\[[0-9;]*m/gu, ""),
+    },
+    {
+      containsOtherLine: false,
+      hasCompleteTransfer: true,
+      visibleRemainder: "",
+    },
+  );
+});
+
+test("an unreadably scaled formula uses text without retaining image bytes", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi);
+  await pi.commands.get("formula").handler("clear", started.ctx);
+  const markdown = "$$\\frac{12345678901234567890}{12345678901234567890}$$";
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 10,
+  });
+  await pi.commands.get("formula").handler("status", started.ctx);
+  const status = started.widgets.get("pi-formula-status");
+  const cacheBytes = Number(
+    /cache: 1 entries, (\d+) bytes/u.exec(status.join("\n"))?.[1],
+  );
+
+  assert.deepEqual(
+    {
+      rendered,
+      lightweightCache: cacheBytes > 0 && cacheBytes < 1000,
+      lastFailure: status.find((line) => line.startsWith("last failure:")),
+    },
+    {
+      rendered: markdown,
+      lightweightCache: true,
+      lastFailure: "last failure: image would be too small",
+    },
+  );
+});
+
+test("bracketed display formulas are placed at the content left edge", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+
+  const rendered = pi.transformer()("\\[x^2\\]", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+  const placeholderLine = rendered
+    .split("\n")
+    .find((line) => line.includes(String.fromCodePoint(0x10eeee)));
+
+  assert.equal(placeholderLine?.startsWith("\x1b["), true);
+});
+
+test("code blocks and escaped display delimiters stay unchanged", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi);
+  const markdown = [
+    "    $$indented$$",
+    "> ```text",
+    "> $$quoted$$",
+    "> ```",
+    "\\\\[literal\\\\]",
+  ].join("\n");
+
+  const rendered = pi.transformer()(markdown, {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered, markdown);
+});
+
+test("the display-only hook leaves persistence and model-context hooks untouched", () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+
+  assert.deepEqual(
+    [...pi.handlers.keys()],
+    ["session_shutdown", "session_start"],
+  );
+});
+
+test("registering the package twice does not duplicate formula rendering", () => {
+  const pi = fakePi();
+
+  registerFormula(pi.api);
+  registerFormula(pi.api);
+
+  assert.deepEqual(pi.registrationCounts(), {
+    transformerRegistrations: 1,
+    commandRegistrations: 1,
+  });
+});
+
+test("a saved global default applies without a session path preference", async (t) => {
+  configureDefaultPath(t, "text");
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startSession(pi, { response: "OK" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: text",
+    "reason: default setting",
+  ]);
+});
+
+test("a restored auto session preference bypasses the saved global default", async (t) => {
+  configureDefaultPath(t, "text");
+  const pi = fakePi({
+    sessionEntries: [
+      {
+        type: "custom",
+        customType: "pi-formula-path",
+        data: { path: "auto" },
+      },
+    ],
+  });
+  registerFormula(pi.api);
+  const started = await startSession(pi, { response: "OK" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: image",
+    "reason: PNG query returned OK",
+  ]);
+});
+
+test("image path prohibition overrides a restored auto session preference", async () => {
+  const pi = fakePi({
+    sessionEntries: [
+      {
+        type: "custom",
+        customType: "pi-formula-path",
+        data: { path: "auto" },
+      },
+    ],
+  });
+  registerFormula(pi.api);
+  const started = await startSession(pi, { mode: "rpc" });
+
+  assert.deepEqual(await selectedPathAndReason(pi, started), [
+    "path: text",
+    "reason: rpc mode has no terminal screen",
+  ]);
+});
+
+test("a saved session path overrides a rejected automatic probe", async () => {
+  const pi = fakePi({
+    sessionEntries: [
+      {
+        type: "custom",
+        customType: "pi-formula-path",
+        data: { path: "image" },
+      },
+    ],
+  });
+  registerFormula(pi.api);
+  const { ctx, widgets } = await startSession(pi, { response: "EINVAL" });
+
+  await pi.commands.get("formula").handler("status", ctx);
+
+  assert.equal(widgets.get("pi-formula-status").includes("path: image"), true);
+});
+
+test("a default rename failure leaves the session path unchanged and reports the error", async () => {
+  const xdg = mkdtempSync(join(tmpdir(), "pi-formula-write-failure-"));
+  mkdirSync(join(xdg, "pi-formula", "config.json"), { recursive: true });
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  try {
+    const pi = fakePi();
+    registerFormula(pi.api);
+    const started = await startSession(pi, { response: "OK" });
+
+    await pi.commands.get("formula").handler("text --default", started.ctx);
+    await pi.commands.get("formula").handler("status", started.ctx);
+
+    assert.deepEqual(
+      {
+        savedEntries: pi.entries.length,
+        path: started.widgets
+          .get("pi-formula-status")
+          .find((line) => line.startsWith("path:")),
+        notification: started.notifications.at(-1),
+      },
+      {
+        savedEntries: 0,
+        path: "path: image",
+        notification: {
+          message:
+            "Could not save the pi-formula default; the session path was not changed.",
+          level: "error",
+        },
+      },
+    );
+  } finally {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+  }
+});
+
+test("invalid config is preserved when changing or clearing the default path", async () => {
+  const xdg = mkdtempSync(join(tmpdir(), "pi-formula-invalid-config-"));
+  const configPath = join(xdg, "pi-formula", "config.json");
+  mkdirSync(join(xdg, "pi-formula"), { recursive: true });
+  const original = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = xdg;
+  try {
+    const results = [];
+    for (const raw of ["{ broken JSON", "[]"]) {
+      for (const action of ["auto --default", "text --default"]) {
+        writeFileSync(configPath, raw);
+        resetFormulaState();
+        const pi = fakePi();
+        registerFormula(pi.api);
+        const started = await startSession(pi, { response: "OK" });
+
+        await pi.commands.get("formula").handler(action, started.ctx);
+        await pi.commands.get("formula").handler("status", started.ctx);
+        results.push({
+          contents: readFileSync(configPath, "utf8"),
+          savedEntries: pi.entries.length,
+          path: started.widgets
+            .get("pi-formula-status")
+            .find((line) => line.startsWith("path:")),
+          notification: started.notifications.at(-1),
+        });
+      }
+    }
+
+    assert.equal(
+      results.every(
+        (result, index) =>
+          result.contents === (index < 2 ? "{ broken JSON" : "[]") &&
+          result.savedEntries === 0 &&
+          result.path === "path: image" &&
+          result.notification?.level === "error",
+      ),
+      true,
+    );
+  } finally {
+    if (original === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = original;
+  }
+});
+
+test("terminal foreground overrides a mismatched Pi theme color", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi, {
+    textColor: "\x1b[38;2;0;0;0m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
+});
+
+test("terminal foreground is used when the Pi theme color is unavailable", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startWithKitty(pi, {
+    textColor: "\x1b[39m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
+});
+
+test("terminal foreground is available when the default forces the image path", async (t) => {
+  configureDefaultPath(t, "image");
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const started = await startSession(pi, {
+    response: "EINVAL",
+    textColor: "\x1b[38;2;0;0;0m",
+    foregroundResponse: "rgb:d4d4/d4d4/d4d4",
+    backgroundResponse: "rgb:0000/0000/0000",
+  });
+
+  assert.equal(
+    await reportedColor(pi, started),
+    "color: #d4d4d4 (terminal foreground)",
+  );
+});
+
+test("/formula status reports the package version and image path in English", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  const { ctx, widgets } = await startWithKitty(pi);
+
+  await pi.commands.get("formula").handler("status", ctx);
+
+  assert.deepEqual(widgets.get("pi-formula-status").slice(0, 2), [
+    "pi-formula 0.1.1",
+    "path: image",
+  ]);
+});

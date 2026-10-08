@@ -10,3 +10,10 @@ IDENTITY.md
 SOUL.md
 USER.md
 memory/
+
+# Tool/test JavaScript is compiled from TypeScript beside the source.
+# Three bootstrap JS files remain tracked for product-only checkouts.
+scripts/**/*.js
+scripts/**/*.js.map
+test/**/*.js
+test/**/*.js.map
