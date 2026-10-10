@@ -13,5 +13,5 @@
     "types": ["node"],
     "sourceMap": true
   },
-  "include": ["scripts/**/*.ts", "test/**/*.ts"]
+  "include": ["scripts/**/*.ts", "test/**/*.ts", "features/support/**/*.ts"]
 }

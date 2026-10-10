@@ -8,13 +8,16 @@
     "src/display-verification-cli.ts",
     "src/display-verification.ts",
     "src/extension.ts",
-    "scripts/verify-extensions/**/*.ts"
+    "scripts/verify-extensions/**/*.ts",
+    "features/step_definitions/**/*.ts",
+    "features/support/isolated-renderer-worker.ts"
   ],
   "project": [
     "src/**/*.ts",
     ".pi/extensions/**/*.ts",
     "scripts/**/*.{js,ts}",
     "test/**/*.{js,ts}",
-    "features/**/*.js"
+    "features/step_definitions/**/*.ts",
+    "features/support/**/*.ts"
   ]
 }

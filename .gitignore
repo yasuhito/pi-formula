@@ -17,3 +17,5 @@ scripts/**/*.js
 scripts/**/*.js.map
 test/**/*.js
 test/**/*.js.map
+features/support/**/*.js
+features/support/**/*.js.map

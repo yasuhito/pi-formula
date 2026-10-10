@@ -1,6 +1,21 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const { Markdown, TuiMainScreen } = require("@earendil-works/pi-tui");
+const fs: typeof import("node:fs") = require("node:fs");
+const path: typeof import("node:path") = require("node:path");
+const {
+  Markdown,
+  TuiMainScreen,
+}: typeof import("@earendil-works/pi-tui") = require("@earendil-works/pi-tui");
+
+interface GraphicsCommand {
+  controls: string;
+  payload: string;
+}
+interface StreamingFrame {
+  source: string;
+  transformed: string;
+  terminalLines: string[];
+}
+type FakePi = ReturnType<typeof import("../../test/support/fake-pi.js").fakePi>;
+type MarkdownTheme = ConstructorParameters<typeof Markdown>[3];
 
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 const SGR = /\x1b\[[0-9;:]*m/gu;
@@ -38,7 +53,7 @@ F_8 = \frac{1}{\sqrt{8}}
 $$`,
 ];
 
-function graphicsCommands(line) {
+function graphicsCommands(line: string): GraphicsCommand[] {
   return [...line.matchAll(/\x1b_G([^;]*);([^\x1b]*)\x1b\\/gu)].map(
     (match) => ({
       controls: match[1],
@@ -47,13 +62,16 @@ function graphicsCommands(line) {
   );
 }
 
-function controls(command) {
+function controls(command: GraphicsCommand) {
   return new Map(
-    command.controls.split(",").map((control) => control.split("=", 2)),
+    command.controls.split(",").map((control) => {
+      const [name, value] = control.split("=", 2);
+      return [name, value] as const;
+    }),
   );
 }
 
-function placeholderId(line) {
+function placeholderId(line: string) {
   const match = /\x1b\[38;2;(\d+);(\d+);(\d+)m\x1b\[58:2::\1:\2:\3m/u.exec(
     line,
   );
@@ -61,7 +79,7 @@ function placeholderId(line) {
   return (Number(match[1]) << 16) | (Number(match[2]) << 8) | Number(match[3]);
 }
 
-function chunksAreComplete(line, commands) {
+function chunksAreComplete(line: string, commands: GraphicsCommand[]) {
   const remainder = line
     .replace(/\x1b_G[^;]*;[^\x1b]*\x1b\\/gu, "")
     .replace(SGR, "")
@@ -78,11 +96,11 @@ function chunksAreComplete(line, commands) {
   return (
     chunkControls[0].get("m") === "1" &&
     chunkControls.slice(1, -1).every((values) => values.get("m") === "1") &&
-    chunkControls.at(-1).get("m") === "0"
+    chunkControls.at(-1)?.get("m") === "0"
   );
 }
 
-function inspectFrame(frame) {
+function inspectFrame(frame: StreamingFrame) {
   const transferLines = frame.terminalLines
     .map((line, index) => ({ line, index, commands: graphicsCommands(line) }))
     .filter(({ commands }) =>
@@ -122,7 +140,7 @@ function inspectFrame(frame) {
           placeholders.filter((placeholder) => placeholder.id === id).length ===
           Number(header.get("r"))
         );
-      }) && placeholders.every(({ id }) => transferIds.includes(id)),
+      }) && placeholders.every(({ id }) => transferIds.includes(id ?? -1)),
     adjacentPlacements: transferLines.every(({ index, commands }) => {
       const id = Number(controls(commands[0]).get("i"));
       const placement = placeholders.find(
@@ -139,8 +157,10 @@ function inspectFrame(frame) {
   };
 }
 
-function renderStreamingFrame(pi, count) {
-  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+function renderStreamingFrame(pi: FakePi, count: number): StreamingFrame {
+  const passthroughTheme = new Proxy({} as MarkdownTheme, {
+    get: () => (value: string) => value,
+  });
   const source = REPRODUCTION_PARTS.slice(0, count).join("\n\n");
   const transformed = pi.transformer()(source, {
     messageType: "assistant",
@@ -154,16 +174,18 @@ function renderStreamingFrame(pi, count) {
   };
 }
 
-function inspectStreamingRegression(frames) {
+function inspectStreamingRegression(frames: StreamingFrame[]) {
   return frames.map(inspectFrame);
 }
 
-function renderMarkdown(markdown) {
-  const passthroughTheme = new Proxy({}, { get: () => (value) => value });
+function renderMarkdown(markdown: string) {
+  const passthroughTheme = new Proxy({} as MarkdownTheme, {
+    get: () => (value: string) => value,
+  });
   return new Markdown(markdown, 0, 0, passthroughTheme).render(80);
 }
 
-function inspectPlacementBlocks(markdown) {
+function inspectPlacementBlocks(markdown: string) {
   const lines = renderMarkdown(markdown);
   const blocks = [];
   for (let index = 0; index < lines.length; index += 1) {
@@ -199,8 +221,8 @@ function inspectPlacementBlocks(markdown) {
   return blocks;
 }
 
-function tuiUpdates(precedingToolLines) {
-  const writes = [];
+function tuiUpdates(precedingToolLines: string[]) {
+  const writes: string[] = [];
   const terminal = {
     columns: 80,
     rows: 600,
@@ -208,7 +230,7 @@ function tuiUpdates(precedingToolLines) {
     start() {},
     stop() {},
     async drainInput() {},
-    write(value) {
+    write(value: string) {
       writes.push(value);
     },
     moveBy() {},
@@ -225,7 +247,7 @@ function tuiUpdates(precedingToolLines) {
   const tui = new TuiMainScreen(terminal, false);
   tui.addChild(content);
   tui.start();
-  const render = (markdown) => {
+  const render = (markdown: string) => {
     const start = writes.length;
     lines = [...precedingToolLines, ...renderMarkdown(markdown)];
     tui.renderNow();
@@ -246,9 +268,9 @@ function issue26Source() {
   return { corpus, partials };
 }
 
-function issue26Updates(pi) {
+function issue26Updates(pi: FakePi) {
   const { corpus, partials } = issue26Source();
-  const transform = (source, isStreaming) =>
+  const transform = (source: string, isStreaming: boolean) =>
     pi.transformer()(source, {
       messageType: "assistant",
       isStreaming,
@@ -281,4 +303,12 @@ module.exports = {
   issue26Updates,
   renderStreamingFrame,
   tuiUpdates,
+};
+export type StreamingRegressionModule = {
+  inspectPlacementBlocks: typeof inspectPlacementBlocks;
+  inspectStreamingRegression: typeof inspectStreamingRegression;
+  issue26Source: typeof issue26Source;
+  issue26Updates: typeof issue26Updates;
+  renderStreamingFrame: typeof renderStreamingFrame;
+  tuiUpdates: typeof tuiUpdates;
 };

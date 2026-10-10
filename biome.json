@@ -35,7 +35,7 @@
   },
   "overrides": [
     {
-      "includes": ["features/**/*.js", "test/**/*.{js,ts}"],
+      "includes": ["features/**/*.{js,ts}", "test/**/*.{js,ts}"],
       "linter": {
         "rules": {
           "suspicious": {

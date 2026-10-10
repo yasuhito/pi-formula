@@ -1,4 +1,8 @@
-const { readdirSync, rmSync }: typeof import("node:fs") = require("node:fs");
+const {
+  existsSync,
+  readdirSync,
+  rmSync,
+}: typeof import("node:fs") = require("node:fs");
 const { join, resolve }: typeof import("node:path") = require("node:path");
 const root = resolve(__dirname, "..");
 const retainBootstrap = !process.argv.includes("--analyze-sources");
@@ -28,5 +32,7 @@ function cleanDirectory(directory: string): void {
   }
 }
 // Knip analyzes original TS rather than generated JS; source maps also identify orphan outputs.
-for (const directory of ["scripts", "test"])
-  cleanDirectory(join(root, directory));
+for (const directory of ["scripts", "test", "features/support"]) {
+  const path = join(root, directory);
+  if (existsSync(path)) cleanDirectory(path);
+}
