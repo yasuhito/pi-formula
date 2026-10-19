@@ -92,9 +92,9 @@
     "@types/node": "^26.4.1",
     "diff": "9.0.0",
     "estree-walker": "3.0.3",
-    "knip": "6.39.0",
-    "oxc-parser": "0.152.0",
-    "oxlint-plugin-complexity": "3.0.1",
+    "knip": "6.41.0",
+    "oxc-parser": "0.154.0",
+    "oxlint-plugin-complexity": "4.0.0",
     "publint": "0.3.25",
     "typescript": "^7.0.2"
   }
