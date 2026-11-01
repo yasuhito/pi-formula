@@ -224,6 +224,32 @@ Given(
   },
 );
 
+Given("仮想配置の後に異常終了する子プロセスがある", function (this: StepWorld) {
+  const program = `
+const png = Buffer.alloc(24);
+png.set([137, 80, 78, 71]);
+png.writeUInt32BE(1, 16);
+png.writeUInt32BE(1, 20);
+const output =
+  "\\x1b[?2026h\\x1b_Ga=T,f=100,q=2,U=1,i=1,p=1,c=1,r=1;" +
+  png.toString("base64") +
+  "\\x1b\\\\\\x1b[?2026l";
+process.stdout.write(output, () => process.exit(1));
+`;
+  this.nativeCommand = [
+    "--settle-ms",
+    "20",
+    "--wait-for-placements",
+    "1",
+    "--wait-for-render-boundary",
+    "--wait-for-child-exit",
+    "--",
+    process.execPath,
+    "-e",
+    program,
+  ];
+});
+
 Given(
   "仮想配置の後に placeholder と本文を分けて出力し続ける子プロセスがある",
   function (this: StepWorld) {

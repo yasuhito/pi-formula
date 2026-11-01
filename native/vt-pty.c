@@ -385,7 +385,7 @@ int main(int argc, char **argv) {
     if (pty_write_failed) {
       fprintf(stderr, "vt-pty: terminal response write failed\n"); result = 2; break;
     }
-    if (wait_for_placements > 0) {
+    if (!wait_for_child_exit && wait_for_placements > 0) {
       if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
       if (wait_for_render_boundary && observed_placements >= wait_for_placements &&
           render_boundary_after_kitty(&output_boundary)) {
