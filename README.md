@@ -24,10 +24,10 @@ The Ghostty capture below shows Unicode inline formulas in the prose and MathJax
 
 - **Inline formulas** (`$...$` and `\(...\)`) expand registered user and additional macros, then use Pi's Unicode text renderer. They remain selectable, searchable, and aligned with surrounding text. If Pi cannot render the expanded formula, the original LaTeX remains.
 - **Display formulas** (`$$...$$` and `\[...\]`) use transparent MathJax PNG images on the image path.
-- If images are unavailable, display formulas use Pi's Unicode text path too.
+- If images are unavailable, display formulas also use Pi's Unicode text path.
 - Only displayed Markdown changes. Saved messages and model context retain the original LaTeX.
 
-Formula for Pi leaves code fences, inline code, thinking, escaped dollar signs, ordinary money, URLs, shell variables, ambiguous dollar signs, and incomplete formulas unchanged. A closed display formula can appear while a response is streaming and keeps its list or quote nesting.
+Formula for Pi leaves code fences, inline code, thinking, escaped dollar signs, ordinary money, URLs, shell variables, ambiguous dollar signs, and incomplete formulas unchanged. A display formula can render once it is closed, even while a response is streaming, and keeps its list or quote nesting.
 
 If one display formula is invalid, exceeds a safety limit, lacks an exact theme RGB color, or would shrink below half size, only that formula stays as LaTeX. Later formulas continue rendering.
 
@@ -56,7 +56,7 @@ The configuration file is `$XDG_CONFIG_HOME/pi-formula/config.json`, or `~/.conf
 }
 ```
 
-`path` can be `image`, `text`, or omitted for automatic selection. `/formula` writes only explicit defaults; `auto` is represented by an omitted `path`.
+The file can also contain a `path` key set to `image` or `text`; omit the key for automatic selection. `/formula` writes only explicit defaults; `auto` is represented by an omitted `path`.
 
 `PI_FORMULA_MACROS` accepts the `macros` object itself as JSON and overrides valid names from the file:
 
@@ -78,7 +78,7 @@ An invalid JSON source is ignored. An invalid individual macro is ignored withou
 
 The supported image path is a direct Ghostty or Kitty session on Linux or macOS. A rejected or unanswered PNG query safely selects the text path. Windows and other terminal image protocols are not supported or verified in 0.1.0.
 
-## Not supported and extension coexistence
+## Limitations and coexistence with other extensions
 
 Formula for Pi intentionally does not:
 
@@ -98,7 +98,7 @@ The fixed limits are 16,384 LaTeX characters, 255 image columns, 255 image rows,
 
 ## Extension API
 
-The CommonJS package root exports synchronous `registerFormula`, `createFormulaPng`, `getFormulaPath`, and `renderPng` operations. Internal subpaths are not public. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
+The CommonJS package root exports four synchronous functions: `registerFormula`, `createFormulaPng`, `getFormulaPath`, and `renderPng`. Internal subpaths are not public. Another Pi extension can register protected additional macros and create a display-formula PNG through the same rendering path:
 
 ```js
 const {
@@ -123,7 +123,7 @@ return asciiCircuit;
 
 Additional macro names contain ASCII letters, with an optional leading backslash. Invalid additional macros make `registerFormula` throw `TypeError`. Additional macros override user macros and stay protected when standalone and bundled copies register in either order. Reloading or switching sessions rebinds the extension and reads user macros again.
 
-`image` is `undefined` on the text path. On the image path it contains PNG `data`, pixel content size, and terminal column and row counts. It does not contain a Pi UI component. Each call returns an independent PNG buffer.
+`createFormulaPng` returns `undefined` on the text path. On the image path, the result contains PNG `data`, pixel content size, and terminal column and row counts. It does not contain a Pi UI component. Each call returns an independent PNG buffer.
 
 `getFormulaPath()` returns the current image or text path. `renderPng()` accepts a PNG `Buffer` or file path plus the maximum available columns. On the image path it calculates terminal columns and rows from the terminal dimensions, then returns the Kitty image transfer and placement in `output`. Return this string as the extension's displayed result. On the text path it returns `{ rendered: false, reason: "image-unavailable" }`, so the caller can select a fallback. A PNG whose signature, chunks, CRCs, or compressed data cannot be validated returns `invalid-png`. A PNG exceeding 32 MiB, 4,194,304 expanded pixels, or the fixed column or row limit returns `safety-limit`. File paths accept regular files only. These outcomes do not throw exceptions.
 
