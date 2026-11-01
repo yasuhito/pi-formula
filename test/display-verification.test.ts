@@ -231,18 +231,17 @@ test("cleanupだけが失敗した場合はcleanup failureを返す", async () =
   assert.equal(stage, "cleanup");
 });
 
-test("cleanupが例外を返しても実表示検証は完了する", async () => {
+test("cleanupが例外を返しても完了待ちせず実表示検証は完了する", async () => {
   const subject = fixture({}, { terminationError: "cannot stop" });
   try {
-    const outcome = await Promise.race([
-      subject
-        .run()
-        .then((result) =>
-          result.kind === "failed" ? result.stage : result.kind,
-        ),
-      new Promise((resolve) => setTimeout(() => resolve("timeout"), 100)),
-    ]);
-    assert.equal(outcome, "cleanup");
+    const result = await subject.run();
+    assert.deepEqual(
+      {
+        stage: result.kind === "failed" ? result.stage : result.kind,
+        completionObservations: subject.processAdapter.completionObservations,
+      },
+      { stage: "cleanup", completionObservations: 1 },
+    );
   } finally {
     subject.cleanup();
   }

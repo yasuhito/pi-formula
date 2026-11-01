@@ -31,6 +31,7 @@ class DisplayProcessAdapter {
   options: AdapterOptions;
   requests: ProcessRequest[];
   terminated: boolean;
+  completionObservations = 0;
   captureCount = 0;
   constructor(options: AdapterOptions = {}) {
     this.options = options;
@@ -130,9 +131,13 @@ class DisplayProcessAdapter {
     const completion = new Promise<ProcessOutcome>((resolve) => {
       complete = resolve;
     });
+    const thisAdapter = this;
     return {
       pid: 12345,
-      completion,
+      get completion() {
+        thisAdapter.completionObservations += 1;
+        return completion;
+      },
       terminate: async () => {
         this.terminated = true;
         if (this.options.terminationError) {
