@@ -298,7 +298,7 @@ Then(
   "診断には次の項目だけがこの順に含まれる",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const fieldNames = new Map([
-      ["版", "pi-formula 0.1.1"],
+      ["版", "pi-formula 0.1.2"],
       ["経路", "path"],
       ["理由", "reason"],
       ["端末", "terminal"],

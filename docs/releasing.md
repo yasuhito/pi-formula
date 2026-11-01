@@ -10,7 +10,7 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
 - npm のアクセストークンとワンタイムパスワードのフィールドを `op://` 形式で参照できる。
 - `op account get` と `npm whoami` に必要な認証が済んでいる。
 
-1. `package.json` と `CHANGELOG.md` の版を確定し、公開対象のコミットへ `vX.Y.Z` タグを付ける。
+1. 下記の「リリース情報の準備」を行い、公開対象のコミットへ `vX.Y.Z` タグを付ける。
 2. タグと同じコミットで全チェックと tarball の内容確認を実行する。
 
    ```sh
@@ -64,9 +64,15 @@ pi-formula は初回だけ 1Password を使って手元から公開する。2回
 
 GitHub の repository environment `npm` を作り、required reviewer に保守者を設定する。`npm` environment に npm トークンは登録しない。`.github/workflows/release.yml` は `id-token: write` で OpenID Connect の短期資格情報を取得し、`npm publish --provenance` で由来証明を付ける。
 
+## リリース情報の準備
+
+`release-metadata.json` がレビュー対象の原本。新しい版を先頭に追加し、版、日付、箇条書きの順序を確定する。`npm version patch --no-git-tag-version` などで package と lock の版を合わせ、`npm run changelog:generate` で `CHANGELOG.md` を生成する。生成物は直接編集しない。`npm run check` は生成物が最新かも検査する。
+
+その後 `npm run release:prepare -- vX.Y.Z .release` を実行する。この手順が全チェックと tarball 作成を行い、生成済み CHANGELOG から同じ順序の `release-notes.md` を抽出する。
+
 ## 継続公開
 
-1. `package.json` の版と `CHANGELOG.md` の同じ版の箇条書きを確定する。
+1. 上記の「リリース情報の準備」を行う。
 2. `npm run release:prepare -- vX.Y.Z .release` を手元で実行し、全チェック、tarball、`release-notes.md` を確認する。
 3. 公開対象のコミットへ `vX.Y.Z` タグを付け、タグだけを push する。
 4. GitHub Actions の `prepare` が全チェック、タグと版の一致、tarball 内容を再確認する。

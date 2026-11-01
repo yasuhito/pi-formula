@@ -1,5 +1,13 @@
 # Changelog
 
+> Generated from release-metadata.json. DO NOT EDIT. Run `npm run changelog:generate`.
+
+## 0.1.2 - 2026-11-01
+
+- Use Pi 1.4's resolved theme colors so display formula images remain visible with terminal-default ANSI themes.
+- Make display verification report failures reliably and clean up child processes when interrupted, including on macOS.
+- Restore native terminal protocol verification for display formula images.
+
 ## 0.1.1 - 2026-09-11
 
 - Keep display formulas visible when the Pi theme color has insufficient contrast with the terminal background.

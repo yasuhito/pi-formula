@@ -731,7 +731,7 @@ test("/formula status reports the package version and image path in English", as
   await pi.commands.get("formula").handler("status", ctx);
 
   assert.deepEqual(widgets.get("pi-formula-status").slice(0, 2), [
-    "pi-formula 0.1.1",
+    "pi-formula 0.1.2",
     "path: image",
   ]);
 });

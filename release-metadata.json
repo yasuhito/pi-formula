@@ -1,0 +1,38 @@
+[
+  {
+    "version": "0.1.2",
+    "date": "2026-11-01",
+    "notes": [
+      "Use Pi 1.4's resolved theme colors so display formula images remain visible with terminal-default ANSI themes.",
+      "Make display verification report failures reliably and clean up child processes when interrupted, including on macOS.",
+      "Restore native terminal protocol verification for display formula images."
+    ]
+  },
+  {
+    "version": "0.1.1",
+    "date": "2026-09-11",
+    "notes": [
+      "Keep display formulas visible when the Pi theme color has insufficient contrast with the terminal background.",
+      "Use the terminal foreground when the Pi theme does not provide an exact RGB color, including when the image path is selected after a rejected terminal probe.",
+      "Render display formulas that use `\\\\boldsymbol`."
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-09-09",
+    "notes": [
+      "Add the CommonJS TypeScript foundation for rendering display formulas as transparent MathJax PNG images.",
+      "Add a Pi 0.84 extension that keeps inline formulas in Unicode text and renders display formulas as images in Ghostty and Kitty.",
+      "Preserve ordinary Markdown, code, money, URLs, shell variables, streaming input, lists, and quotes while detecting formulas.",
+      "Add `/formula status` and local-tarball discovery coverage against the real Pi runtime.",
+      "Add XDG and environment user macros plus a protected additional-macro and synchronous PNG API for other Pi extensions.",
+      "Add public display-path detection and bounded, validated Kitty rendering for PNG buffers and regular files created by other extensions.",
+      "Bound formula input, image cells, and the in-memory result cache; cache failures and fall back to text per formula.",
+      "Delay MathJax and Resvg until the first display formula and follow the current exact theme RGB and display width.",
+      "Add English and Japanese installation guides, a Ghostty preview, support and coexistence notes, dependency audit details, and an intentionally limited npm tarball.",
+      "Let an explicit session `auto` preference bypass the saved global default and return display-path selection to the terminal probe.",
+      "Select an installed CJK serif for Japanese `\\\\text{}` in display formulas and report the choice in `/formula status`.",
+      "Detect Kitty graphics support with a strictly decodable probe PNG so Kitty selects the image path instead of falling back to text."
+    ]
+  }
+]

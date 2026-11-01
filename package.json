@@ -1,6 +1,6 @@
 {
   "name": "pi-formula",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Readable LaTeX in Pi: terminal-native inline math and MathJax display images.",
   "license": "MIT",
   "author": "Yasuhito Takamiya <yasuhito@hey.com> (https://github.com/yasuhito)",
@@ -63,7 +63,9 @@
     "test:cucumber": "npm run build:tools && cucumber-js --require \"features/step_definitions/**/*.ts\" --format progress \"features/**/*.feature.md\"",
     "test:native-vt": "npm run build:tools && cucumber-js --require \"features/step_definitions/**/*.ts\" --format progress --tags \"@native-vt\" \"features/native-protocol.feature.md\"",
     "test": "npm run coverage && npm run test:cucumber",
-    "check": "npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
+    "changelog:generate": "node scripts/generate-changelog.ts",
+    "changelog:check": "node scripts/generate-changelog.ts --check",
+    "check": "npm run changelog:check && npm run lint && npm run typecheck && npm run knip && npm run complexity && npm run check:test-assertions && npm run check:package && npm test",
     "verify:vt": "node scripts/run-vt-pty.js",
     "verify:display": "npm run build:tools --silent >/dev/null && node scripts/verify-display.js",
     "verify:encoder-protocol": "npm run build && node scripts/verify-encoder-protocol.js",
