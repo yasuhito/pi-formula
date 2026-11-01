@@ -1,0 +1,9 @@
+{
+  "isolates": {
+    "worktree": {
+      "setup": [
+        "npm ci --prefer-offline --no-audit --no-fund"
+      ]
+    }
+  }
+}
