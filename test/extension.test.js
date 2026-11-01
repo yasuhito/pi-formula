@@ -329,6 +329,24 @@ test("display formulas use a Kitty PNG transfer and placeholder rows", async () 
   );
 });
 
+test("terminal-default theme text color still renders display formulas as images", async () => {
+  const pi = fakePi();
+  registerFormula(pi.api);
+  await startWithKitty(pi, {
+    foregroundAnsi: "\x1b[39m",
+    foregroundResponse: "invalid",
+    themeColor: { kind: "rgb", r: 212, g: 212, b: 212 },
+  });
+
+  const rendered = pi.transformer()("$$x$$", {
+    messageType: "assistant",
+    isStreaming: false,
+    availableWidth: 80,
+  });
+
+  assert.equal(rendered.includes("\x1b_Ga=T,f=100"), true);
+});
+
 test("streaming display formulas use the image path when complete", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
@@ -654,7 +672,7 @@ test("terminal foreground overrides a mismatched Pi theme color", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   const started = await startWithKitty(pi, {
-    textColor: "\x1b[38;2;0;0;0m",
+    themeColor: { kind: "rgb", r: 0, g: 0, b: 0 },
     foregroundResponse: "rgb:d4d4/d4d4/d4d4",
     backgroundResponse: "rgb:0000/0000/0000",
   });
@@ -665,19 +683,17 @@ test("terminal foreground overrides a mismatched Pi theme color", async () => {
   );
 });
 
-test("terminal foreground is used when the Pi theme color is unavailable", async () => {
+test("resolved Pi theme color is used when its ANSI sequence selects the terminal default", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   const started = await startWithKitty(pi, {
     textColor: "\x1b[39m",
+    themeColor: { kind: "rgb", r: 212, g: 212, b: 212 },
     foregroundResponse: "rgb:d4d4/d4d4/d4d4",
     backgroundResponse: "rgb:0000/0000/0000",
   });
 
-  assert.equal(
-    await reportedColor(pi, started),
-    "color: #d4d4d4 (terminal foreground)",
-  );
+  assert.equal(await reportedColor(pi, started), "color: #d4d4d4 (Pi theme)");
 });
 
 test("terminal foreground is available when the default forces the image path", async (t) => {
@@ -686,7 +702,7 @@ test("terminal foreground is available when the default forces the image path", 
   registerFormula(pi.api);
   const started = await startSession(pi, {
     response: "EINVAL",
-    textColor: "\x1b[38;2;0;0;0m",
+    themeColor: { kind: "rgb", r: 0, g: 0, b: 0 },
     foregroundResponse: "rgb:d4d4/d4d4/d4d4",
     backgroundResponse: "rgb:0000/0000/0000",
   });

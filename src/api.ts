@@ -5,17 +5,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent" with {
   "resolution-mode": "import",
 };
 
+const { colorToHex } = require("@earendil-works/pi-tui") as {
+  colorToHex(color: unknown): string;
+};
+
 import {
   type FormulaPathMode,
   formulaConfigPath,
   loadFormulaConfig,
   saveDefaultPath,
 } from "./config";
-import {
-  resolveFormulaColor,
-  rgbFromAnsi,
-  type TerminalColors,
-} from "./formula-color";
+import { resolveFormulaColor, type TerminalColors } from "./formula-color";
 import {
   FormulaImageRenderer,
   type FormulaPng,
@@ -232,7 +232,13 @@ export function registerFormula(
 
   pi.on("session_start", async (_event, ctx) => {
     state.terminalColors = {};
-    state.themeTextColor = () => rgbFromAnsi(ctx.ui.theme.getFgAnsi("text"));
+    state.themeTextColor = () => {
+      try {
+        return colorToHex(ctx.ui.theme.colors.text);
+      } catch {
+        return undefined;
+      }
+    };
     const config = loadFormulaConfig(process.env);
     state.configPath = config.filePath;
     state.defaultPath = config.defaultPath;

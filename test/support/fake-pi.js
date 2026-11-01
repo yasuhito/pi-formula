@@ -46,10 +46,20 @@ function fakePi(options = {}) {
   };
 }
 
+function rgbThemeColor(ansi) {
+  const match = /38;2;(\d+);(\d+);(\d+)/u.exec(ansi);
+  if (!match) return { kind: "invalid" };
+  const [r, g, b] = match.slice(1).map(Number);
+  return { kind: "rgb", r, g, b };
+}
+
 async function startSession(pi, options = {}) {
   let inputListener;
   let terminalWrites = 0;
   let textColor = options.textColor ?? "\x1b[38;2;212;212;212m";
+  let themeColor = Object.hasOwn(options, "themeColor")
+    ? options.themeColor
+    : rgbThemeColor(textColor);
   const tui = {
     addInputListener(listener) {
       inputListener = listener;
@@ -88,7 +98,14 @@ async function startSession(pi, options = {}) {
       notify(message, level) {
         notifications.push({ message, level });
       },
-      theme: { getFgAnsi: () => textColor },
+      theme: {
+        colors: {
+          get text() {
+            return themeColor;
+          },
+        },
+        getFgAnsi: () => textColor,
+      },
       setWidget(name, value) {
         widgets.set(name, value);
         if (typeof value === "function") value(tui);
@@ -103,6 +120,7 @@ async function startSession(pi, options = {}) {
     widgets,
     setTextColor(value) {
       textColor = value;
+      themeColor = rgbThemeColor(value);
     },
   };
 }

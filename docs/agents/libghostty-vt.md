@@ -43,6 +43,8 @@ scripts/run-vt-pty.js -- <command> [args...]
 
 配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。`--wait-for-render-boundary` も指定した場合は、必要な仮想配置の後に `ESC[?2026l` の同期出力終了境界を受け取るまで PTY を読む。これにより、配置 APC と別の read に分かれた placeholder や本文も libghostty-vt へ渡しつつ、境界後の出力が続いても全体の静止を待たない。
 
+`--wait-for-child-exit` を指定すると出力の静止ではなく子プロセスの正常終了を待つ。端末応答を受け取ったこと自体を検査する短命な fixture のように、応答後の出力有無を静止時間から推測できない場合に使う。
+
 `--frames` を指定すると、pty から読むたびに同期出力の完了を示す `frame.complete`、Kitty APC の継続中を示す `frame.kitty_open`、Kitty storage と仮想配置、placeholder セル、本文セルの APC 断片を出力する。最後に従来の最終状態も出力する。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
 
 native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。

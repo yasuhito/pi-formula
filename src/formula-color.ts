@@ -8,18 +8,6 @@ export interface ResolvedFormulaColor {
   source: "terminal foreground" | "Pi theme";
 }
 
-export function rgbFromAnsi(ansi: string): string | undefined {
-  const match = ansi.match(
-    /(?:^|[;[])38;2;(\d{1,3});(\d{1,3});(\d{1,3})(?=m|;)/u,
-  );
-  if (!match) return undefined;
-  const channels = match.slice(1).map(Number);
-  if (channels.some((channel) => !Number.isInteger(channel) || channel > 255)) {
-    return undefined;
-  }
-  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
-}
-
 function relativeLuminance(color: string): number {
   const channels = color
     .slice(1)

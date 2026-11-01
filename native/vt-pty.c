@@ -3,7 +3,8 @@
 //
 // 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
 //                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
-//                [--wait-for-render-boundary] [--frames] [--raw <file>] -- <command> [args...]
+//                [--wait-for-render-boundary] [--wait-for-child-exit]
+//                [--frames] [--raw <file>] -- <command> [args...]
 #define _GNU_SOURCE
 #include <ghostty/vt.h>
 #include <errno.h>
@@ -270,7 +271,8 @@ static bool render_boundary_after_kitty(const OutputBoundary *state) {
 int main(int argc, char **argv) {
   int cols = 120, rows = 40, cell_w = 9, cell_h = 18;
   int settle_ms = 2000, timeout_ms = 60000, wait_for_placements = 0;
-  bool wait_for_render_boundary = false, record_frames = false;
+  bool wait_for_render_boundary = false, wait_for_child_exit = false;
+  bool record_frames = false;
   const char *raw_path = NULL;
   int i = 1;
   for (; i < argc; i++) {
@@ -283,6 +285,7 @@ int main(int argc, char **argv) {
     else if (strcmp(argv[i], "--timeout-ms") == 0 && i + 1 < argc) timeout_ms = atoi(argv[++i]);
     else if (strcmp(argv[i], "--wait-for-placements") == 0 && i + 1 < argc) wait_for_placements = atoi(argv[++i]);
     else if (strcmp(argv[i], "--wait-for-render-boundary") == 0) wait_for_render_boundary = true;
+    else if (strcmp(argv[i], "--wait-for-child-exit") == 0) wait_for_child_exit = true;
     else if (strcmp(argv[i], "--frames") == 0) record_frames = true;
     else if (strcmp(argv[i], "--raw") == 0 && i + 1 < argc) raw_path = argv[++i];
     else { fprintf(stderr, "unknown option: %s\n", argv[i]); return 2; }
@@ -353,7 +356,7 @@ int main(int argc, char **argv) {
       } else fprintf(stderr, "vt-pty: timeout %dms\n", timeout_ms);
       result = 2; break;
     }
-    if (saw_data && now - last_data > settle_ms) {
+    if (!wait_for_child_exit && saw_data && now - last_data > settle_ms) {
       if (wait_for_placements <= 0) { settled = true; break; }
       if (!kitty_placement_count(term, &observed_placements)) { result = 2; break; }
       if (observed_placements >= wait_for_placements &&

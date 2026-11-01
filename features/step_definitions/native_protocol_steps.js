@@ -877,7 +877,15 @@ process.stdin.on("data", (data) => {
 });
 process.stdout.write("\\x1b]${osc};?\\x1b\\\\");
 `;
-  return ["--settle-ms", "20", "--", process.execPath, "-e", program];
+  return [
+    "--settle-ms",
+    "20",
+    "--wait-for-child-exit",
+    "--",
+    process.execPath,
+    "-e",
+    program,
+  ];
 }
 
 Given("vt-pty の既定前景色を問い合わせる子プロセスがある", function () {
