@@ -3,5 +3,8 @@
     "worktree": {
       "setup": ["npm ci --prefer-offline --no-audit --no-fund"]
     }
+  },
+  "lander": {
+    "checks": ["npm run check"]
   }
 }
