@@ -1,4 +1,24 @@
-const { rmSync } = require("node:fs");
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const { chmodSync, existsSync, rmSync, } = require("node:fs");
 const { resolve } = require("node:path");
-
-rmSync(resolve(__dirname, "../dist"), { recursive: true, force: true });
+const { execFileSync, } = require("node:child_process");
+const root = resolve(__dirname, "..");
+if (process.argv.includes("--tools")) {
+    // Product-only checkouts and published packages do not contain development tools.
+    const config = resolve(root, "tsconfig.tools.json");
+    if (existsSync(config)) {
+        execFileSync(process.execPath, [resolve(root, "scripts/clean-tools.ts")], {
+            cwd: root,
+            stdio: "inherit",
+        });
+        execFileSync("tsc", ["-p", config], { cwd: root, stdio: "inherit" });
+        const nativeLauncher = resolve(root, "scripts/run-vt-pty.js");
+        if (existsSync(nativeLauncher))
+            chmodSync(nativeLauncher, 0o755);
+    }
+}
+else {
+    rmSync(resolve(root, "dist"), { recursive: true, force: true });
+}
+//# sourceMappingURL=clean-dist.js.map

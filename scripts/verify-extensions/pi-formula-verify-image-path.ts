@@ -1,8 +1,10 @@
 import { writeFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createFormulaPng } from "../../src/api";
+import { createFormulaPng } from "../../dist/api.js";
 
-const { hasPngSignature } = require("../../scripts/png-signature");
+const {
+  hasPngSignature,
+}: typeof import("../png-signature") = require("../png-signature");
 
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", () => {

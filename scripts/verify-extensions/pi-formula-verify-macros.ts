@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerFormula } from "../../src/api";
+import { registerFormula } from "../../dist/api.js";
 
 const {
   VERIFY_DISPLAY_MACROS,
-} = require("../../scripts/verify-display-macros");
+}: typeof import("../verify-display-macros") = require("../verify-display-macros");
 
 export default function (pi: ExtensionAPI) {
   registerFormula(pi, VERIFY_DISPLAY_MACROS);
