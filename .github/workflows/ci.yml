@@ -25,7 +25,7 @@ jobs:
           - macos-latest
         node-version:
           - "22"
-          - node
+          - "26"
     permissions:
       contents: read
     steps:
