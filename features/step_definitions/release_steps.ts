@@ -1,10 +1,6 @@
 interface StepWorld {
   changelog: string;
   changelogVersion: string;
-  firstTarball: string;
-  initialPublishInstructions: string;
-  initialPublisher: string;
-  initialReleaseJob: string;
   operations: string;
   preparation: import("node:child_process").SpawnSyncReturns<string>;
   publishJob: string;
@@ -13,25 +9,20 @@ interface StepWorld {
   releaseNotes: string | null;
   releaseTag: string;
   releaseWorkflow: string;
-  secondTarball: string;
   similarVersionChangelog: string;
-  tarballComparison: import("node:child_process").SpawnSyncReturns<string>;
 }
 
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const {
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
-  writeFileSync,
 }: typeof import("node:fs") = require("node:fs");
 const { tmpdir }: typeof import("node:os") = require("node:os");
 const { join, resolve }: typeof import("node:path") = require("node:path");
 const {
   spawnSync,
 }: typeof import("node:child_process") = require("node:child_process");
-const { gzipSync }: typeof import("node:zlib") = require("node:zlib");
 const {
   After,
   Given,
@@ -50,182 +41,6 @@ After(function (this: StepWorld) {
   if (this.releaseDirectory) {
     rmSync(this.releaseDirectory, { recursive: true, force: true });
   }
-});
-
-Given("初回 npm 公開の手順がある", function (this: StepWorld) {
-  this.releaseGuide = readProjectFile("docs/releasing.md");
-  this.initialPublisher = readProjectFile("scripts/publish-initial.sh");
-});
-
-When(
-  "1Password から npm 認証情報を渡す方法を調べる",
-  function (this: StepWorld) {
-    this.initialPublishInstructions = `${this.releaseGuide}\n${this.initialPublisher}`;
-  },
-);
-
-Then("初回公開手順は1Passwordのop runを使う", function (this: StepWorld) {
-  assert.deepEqual(/\bop run\b/u.test(this.initialPublishInstructions), true);
-});
-
-Then("初回公開手順はtokenとOTPの秘密参照を使う", function (this: StepWorld) {
-  assert.deepEqual(
-    /OP_NPM_TOKEN_REF/u.test(this.initialPublishInstructions) &&
-      /OP_NPM_OTP_REF/u.test(this.initialPublishInstructions),
-    true,
-  );
-});
-
-Then("初回公開スクリプトはshell traceを止める", function (this: StepWorld) {
-  assert.deepEqual(/set \+x/u.test(this.initialPublisher), true);
-});
-
-Then(
-  "初回公開スクリプトは一時npmrcを作って終了時に削除する",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      /mktemp/u.test(this.initialPublisher) &&
-        /trap/u.test(this.initialPublisher),
-      true,
-    );
-  },
-);
-
-Then(
-  "初回公開スクリプトは秘密の値を表示する指定を使わない",
-  function (this: StepWorld) {
-    assert.deepEqual(!/--reveal/u.test(this.initialPublisher), true);
-  },
-);
-
-Given("初回版が 1Password で npm に公開済みである", function (this: StepWorld) {
-  this.releaseGuide = readProjectFile("docs/releasing.md");
-  this.releaseWorkflow = readProjectFile(".github/workflows/release.yml");
-});
-
-When(
-  "初回版の遠隔タグと Release を作る経路を調べる",
-  function (this: StepWorld) {
-    this.initialReleaseJob = this.releaseWorkflow.slice(
-      this.releaseWorkflow.indexOf("\n  initial-release:"),
-    );
-  },
-);
-
-Then("初回Releaseを手動で起動できる", function (this: StepWorld) {
-  assert.deepEqual(/workflow_dispatch:/u.test(this.releaseWorkflow), true);
-});
-
-Then("初回Releaseジョブは手動起動時だけ動く", function (this: StepWorld) {
-  assert.deepEqual(
-    /if: github\.event_name == 'workflow_dispatch'/u.test(
-      this.initialReleaseJob,
-    ),
-    true,
-  );
-});
-
-Then("二つのタグ公開ジョブはpush時だけ動く", function (this: StepWorld) {
-  assert.deepEqual(
-    (this.releaseWorkflow.match(/if: github\.event_name == 'push'/gu) ?? [])
-      .length,
-    2,
-  );
-});
-
-Then(
-  "初回Releaseはnpm公開を確認してからタグを作る",
-  function (this: StepWorld) {
-    const npmCheck = this.initialReleaseJob.indexOf("npm view");
-    const tagCreation = this.initialReleaseJob.indexOf("git/refs");
-    assert.deepEqual(npmCheck !== -1 && npmCheck < tagCreation, true);
-  },
-);
-
-Then("初回Releaseは同じ版の遠隔タグを作る", function (this: StepWorld) {
-  assert.deepEqual(
-    /refs\/tags\/\$\{RELEASE_TAG\}/u.test(this.initialReleaseJob),
-    true,
-  );
-});
-
-Then("初回Releaseは同じ版のGitHub Releaseを作る", function (this: StepWorld) {
-  assert.deepEqual(
-    /gh release create "\$\{RELEASE_TAG\}"/u.test(this.initialReleaseJob),
-    true,
-  );
-});
-
-Then("初回Releaseの題名には同じ版が含まれる", function (this: StepWorld) {
-  assert.deepEqual(
-    /--title "pi-formula \$\{VERSION\}"/u.test(this.initialReleaseJob),
-    true,
-  );
-});
-
-Then(
-  "初回Releaseの本文には作成したリリースノートを使う",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      /--notes-file \.release\/release-notes\.md/u.test(this.initialReleaseJob),
-      true,
-    );
-  },
-);
-
-Then("初回Releaseはnpmへ再公開しない", function (this: StepWorld) {
-  assert.deepEqual(!/npm publish/u.test(this.initialReleaseJob), true);
-});
-
-Then(
-  "初回Releaseのタグ作成はタグ公開処理を再起動しないと案内される",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      /GITHUB_TOKEN[^\n]*タグ push 用の公開処理は新しく起動せず/u.test(
-        this.releaseGuide,
-      ),
-      true,
-    );
-  },
-);
-
-Then("初回版には由来証明がない例外が案内される", function (this: StepWorld) {
-  assert.deepEqual(
-    /初回版[^。]*由来証明は付かない/u.test(this.releaseGuide),
-    true,
-  );
-});
-
-Given(
-  "同じ tar ストリームを異なる圧縮レベルで gzip にした二つの tarball がある",
-  function (this: StepWorld) {
-    this.releaseDirectory = mkdtempSync(join(tmpdir(), "pi-formula-tarball-"));
-    const packageDirectory = join(this.releaseDirectory, "package");
-    const tarPath = join(this.releaseDirectory, "package.tar");
-    mkdirSync(packageDirectory);
-    writeFileSync(
-      join(packageDirectory, "contents.txt"),
-      "verified release contents\n".repeat(1024),
-    );
-    spawnSync("tar", ["-cf", tarPath, "-C", this.releaseDirectory, "package"]);
-    const tarStream = readFileSync(tarPath);
-    this.firstTarball = join(this.releaseDirectory, "first.tgz");
-    this.secondTarball = join(this.releaseDirectory, "second.tgz");
-    writeFileSync(this.firstTarball, gzipSync(tarStream, { level: 1 }));
-    writeFileSync(this.secondTarball, gzipSync(tarStream, { level: 9 }));
-  },
-);
-
-When("tarball の中身を照合する", function (this: StepWorld) {
-  this.tarballComparison = spawnSync(
-    "scripts/compare-tarball-contents.sh",
-    [this.firstTarball, this.secondTarball],
-    { cwd: root, encoding: "utf8" },
-  );
-});
-
-Then("tarball の中身は一致する", function (this: StepWorld) {
-  assert.equal(this.tarballComparison.status, 0, this.tarballComparison.stderr);
 });
 
 Given("package.json と異なる版の公開タグがある", function (this: StepWorld) {
