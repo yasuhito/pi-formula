@@ -30,8 +30,6 @@ function displayFormulasIn(markdown: string) {
   return rendered;
 }
 
-// pi-formula が画像にした式のうち、Pi は本文として残したものを返す。
-// 画像化した件数が合っていても中身がずれる退行（#68）を捕まえる。
 function formulasPiKeptAsText(markdown: string) {
   const consumed: Array<{ latex: string; original: string }> = [];
   transformDisplayMath(markdown, (latex, original) => {
@@ -48,8 +46,6 @@ function formulasPiKeptAsText(markdown: string) {
     .map(({ latex }) => latex);
 }
 
-// Pi が数式と見なさない入力。pi-formula が画像にすると、利用者には
-// 金額や URL が数式へ化けて見える。#56 と #68 がこの退行だった。
 const PLAIN_FOR_PI = [
   ["単独の金額", "$5 and $10"],
   [
@@ -77,9 +73,6 @@ const PI_FORMULA_ONLY = [
   ["引用の中", "> 式: \\[\n> x^2\n> \\]", "\nx^2\n"],
 ];
 
-// Pi と pi-formula がどちらも数式と見る入力。pi-formula が画像にした式は
-// Pi も数式として消費していなければならない。件数だけ合って中身がずれる
-// 退行を、消費した原文が Pi の描画に残るかどうかで見分ける。
 const AGREES_WITH_PI = [
   ["単独の表示数式", "$$x = 1$$"],
   ["数値だけの表示数式", "$$100$$"],

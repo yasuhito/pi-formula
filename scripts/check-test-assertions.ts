@@ -83,7 +83,6 @@ function walk(node: unknown, visitor: WalkVisitor, parent?: Node): void {
   visitor.leave?.(node, parent);
 }
 
-// These nodes change only types or grouping; their runtime expression is unchanged.
 function runtimeExpression(node: Node | undefined): Node | undefined {
   while (node) {
     switch (node.type) {
@@ -142,7 +141,6 @@ const ASSERT_CALLBACK_METHODS = new Set([
 ]);
 
 function callbackArguments(call: CallExpression) {
-  // Non-assert calls keep the existing conservative callback scan.
   if (!isAssertion(call)) return call.arguments;
   const callee = runtimeExpression(call.callee);
   // assert(value) tests a value; it does not call a function-valued operand.
@@ -154,7 +152,6 @@ function callbackArguments(call: CallExpression) {
       : property?.type === "Literal" && typeof property.value === "string"
         ? property.value
         : undefined;
-  // A dynamic method cannot be classified statically; keep the prior scan.
   if (method === undefined) return call.arguments;
   // The fixed Node runtimes execute fn/asyncFn at 0 and error predicates at 1.
   // Comparison/truthiness operands and message arguments are values.
@@ -203,8 +200,6 @@ function assertionsIn(
           line: lineFor(node.start),
           repeated: repeated || loopDepth > 0,
         });
-        // Count the outer call and inspect only the API's callback positions.
-        // The walker still visits actual calls inside all value expressions.
       }
 
       const callee = runtimeExpression(node.callee);

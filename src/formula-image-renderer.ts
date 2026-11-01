@@ -64,7 +64,6 @@ const defaultDependencies: FormulaImageRendererDependencies = {
   encodePlaceholderRows,
 };
 
-/** Own the complete image path from typesetting through terminal placement. */
 export class FormulaImageRenderer {
   private readonly cache = new RenderCache(
     FORMULA_SAFETY_LIMITS.cacheEntries,
