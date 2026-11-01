@@ -344,7 +344,7 @@ test("terminal-default theme text color still renders display formulas as images
   registerFormula(pi.api);
   await startWithKitty(pi, {
     foregroundAnsi: "\x1b[39m",
-    foregroundResponse: "invalid",
+    foregroundResponse: "rgb:invalid",
     themeColor: { kind: "rgb", r: 212, g: 212, b: 212 },
   });
 

@@ -49,6 +49,8 @@ async function commandsFromRealPi(
   options: {
     command?: string;
     args?: string[];
+    startupMarker?: string;
+    startupTimeoutMs?: number;
     responseTimeoutMs?: number;
     terminateTimeoutMs?: number;
     killTimeoutMs?: number;
@@ -65,6 +67,7 @@ async function commandsFromRealPi(
     "--no-prompt-templates",
     "--no-themes",
   ];
+  const startupTimeoutMs = options.startupTimeoutMs ?? 10_000;
   const responseTimeoutMs = options.responseTimeoutMs ?? 10_000;
   const terminateTimeoutMs = options.terminateTimeoutMs ?? 500;
   const killTimeoutMs = options.killTimeoutMs ?? 500;
@@ -108,6 +111,14 @@ async function commandsFromRealPi(
 
   let responseTimedOut = false;
   try {
+    const startupMarker = options.startupMarker;
+    if (startupMarker !== undefined) {
+      await waitUntil(
+        () => stdout.includes(startupMarker),
+        () => state.closed || spawnError !== undefined,
+        startupTimeoutMs,
+      );
+    }
     agent.stdin.end('{"type":"get_commands"}\n');
     const received = await waitUntil(
       () => stdout.includes('"command":"get_commands"'),

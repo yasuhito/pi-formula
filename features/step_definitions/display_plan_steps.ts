@@ -102,11 +102,12 @@ Given("100 列では読めない縮尺になる表示数式がある", function 
   createPlanCorpus(this, "scaled.md", `$$${latex}$$`);
 });
 
-Given("60 個の短い表示数式を含むコーパスがある", function (this: StepWorld) {
+Given("11 個の高い表示数式を含むコーパスがある", function (this: StepWorld) {
+  const tallFormula = String.raw`$$\begin{matrix}x\\x\\x\\x\\x\\x\\x\\x\\x\\x\end{matrix}$$`;
   createPlanCorpus(
     this,
     "many-formulas.md",
-    Array.from({ length: 60 }, () => "$$x$$").join("\n"),
+    Array.from({ length: 11 }, () => tallFormula).join("\n"),
   );
 });
 
