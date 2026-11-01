@@ -1,4 +1,3 @@
-/** A partial test double fails immediately if production uses an unimplemented member. */
 export function strictStub<T extends object>(
   members: Partial<T>,
   name: string,

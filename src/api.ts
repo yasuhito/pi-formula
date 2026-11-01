@@ -168,12 +168,10 @@ function addProtectedMacros(state: FormulaState, macros: FormulaMacros): void {
   if (changed) state.imageRenderer.clear();
 }
 
-/** Return the registered extension's current display path. */
 export function getFormulaPath(): FormulaPath {
   return sharedStore().current?.path ?? "text";
 }
 
-/** Render an existing PNG for the current image path. */
 export function renderPng(
   source: PngSource,
   availableWidth: number,
@@ -186,7 +184,6 @@ export function renderPng(
   return state.imageRenderer.renderPng(source, availableWidth);
 }
 
-/** Create one display-formula PNG using the registered extension's current path and theme. */
 export function createFormulaPng(
   latex: string,
   availableWidth: number,
@@ -208,7 +205,6 @@ export function createFormulaPng(
   });
 }
 
-/** Register Formula for Pi and merge protected additional macros from another extension. */
 export function registerFormula(
   pi: ExtensionAPI,
   additionalMacros: FormulaMacros = {},

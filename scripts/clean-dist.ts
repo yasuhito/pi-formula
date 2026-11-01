@@ -9,7 +9,6 @@ const {
 }: typeof import("node:child_process") = require("node:child_process");
 const root = resolve(__dirname, "..");
 if (process.argv.includes("--tools")) {
-  // Product-only checkouts and published packages do not contain development tools.
   const config = resolve(root, "tsconfig.tools.json");
   if (existsSync(config)) {
     execFileSync(process.execPath, [resolve(root, "scripts/clean-tools.ts")], {

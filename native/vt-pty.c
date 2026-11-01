@@ -1,10 +1,3 @@
-// vt-pty: pty で子プロセスを起動し、その出力を libghostty-vt へ流してプロトコル状態を dump する。
-// エンコーダ層（Tier A）と Pi を通した出力（Tier B）のプロトコル状態を検査する。
-//
-// 使い方: vt-pty [--cols N] [--rows N] [--cell-w N] [--cell-h N]
-//                [--settle-ms N] [--timeout-ms N] [--wait-for-placements N]
-//                [--wait-for-render-boundary] [--wait-for-child-exit]
-//                [--frames] [--raw <file>] -- <command> [args...]
 #define _GNU_SOURCE
 #include <ghostty/vt.h>
 #include <errno.h>
@@ -49,7 +42,6 @@ static void on_write_pty(GhosttyTerminal t, void *ud, const uint8_t *d, size_t n
 
 static uint32_t be32(const uint8_t *p) { return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3]; }
 
-// PNG の IHDR だけ読み、寸法どおりのゼロ埋め RGBA を返す。プロトコル状態の検査には画素は要らない。
 static bool decode_png_stub(void *ud, const GhosttyAllocator *a, const uint8_t *data, size_t len, GhosttySysImage *out) {
   (void)ud;
   if (len < 24 || memcmp(data, "\x89PNG", 4) != 0) return false;
@@ -142,7 +134,6 @@ static bool dump_kitty(GhosttyTerminal term) {
   return true;
 }
 
-// UTF-8 で 1 コードポイントを出す。CJK も本文として読めるようにする。
 static size_t utf8_put(char *dst, uint32_t cp) {
   if (cp < 0x80) { dst[0] = (char)cp; return 1; }
   if (cp < 0x800) { dst[0] = (char)(0xc0 | (cp >> 6)); dst[1] = (char)(0x80 | (cp & 0x3f)); return 2; }
