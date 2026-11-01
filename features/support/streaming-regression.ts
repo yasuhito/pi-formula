@@ -241,6 +241,7 @@ function tuiUpdates(precedingToolLines: string[]) {
     clearScreen() {},
     setTitle() {},
     setProgress() {},
+    setProgramStatus() {},
   };
   let lines = precedingToolLines;
   const content = { render: () => lines, invalidate() {} };

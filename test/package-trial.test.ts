@@ -70,8 +70,10 @@ test("Pi RPC escalates to SIGKILL when the child ignores SIGTERM", {
     command: process.execPath,
     args: [
       "--eval",
-      "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)",
+      "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000)",
     ],
+    startupMarker: "ready\n",
+    startupTimeoutMs: 1000,
     responseTimeoutMs: 100,
     terminateTimeoutMs: 50,
     killTimeoutMs: 500,
