@@ -2,15 +2,15 @@
 
 ## Domain docs
 
-このリポジトリは single-context として扱い、ルートの `CONTEXT.md` と `docs/adr/` を使う。詳細は `docs/agents/domain.md` を参照する。
+Treat this repository as a single context, using the root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md` for details.
 
-## テスト
+## Tests
 
-- 1 テストケースのアサーションは 1 つまでにする。Node Test Runner の各 `test(...)` と Cucumber の各 Scenario を、それぞれ 1 テストケースとして数える。
-- 2 つ以上のアサーションが必要な場合はテストケースを分割し、共通の準備だけをヘルパーや hook へ抽出する。アサーションをヘルパーへ隠した場合も 1 つとして数える。
-- 件数を満たすためだけに、無関係な期待値を 1 つの集約アサーションへまとめない。Given と When は準備に限定し、結果のアサーションは Then に置く。
-- 検証の道具のテストは、道具を実行して結果を観察する。終了コード、出力、生成物を確かめる。実装・CI 設定・文書を `readFileSync` で読み、文字列の出現や順序を検査するテストは新しく書かない。字面はふるまいではないので、変数名を変える・コマンドを整形する・文書を書き直すだけでテストが落ちる。確かめたいことが設定や文書にしか無い場合は、道具へ「解決した設定を出力する」経路を足し、その出力を見る。
-- ピクセルの合否はコードで判定しない。`npm run verify:display -- <corpus>` は「撮るまでを自動化し、合否は目で見る」道具なので、画像の正しさを判定するロジックへ投資しない。プロトコル状態のように仕様で定まる事実は、コードで検査してよい。
+- Limit each test case to one assertion. Count each Node Test Runner `test(...)` and each Cucumber Scenario as one test case.
+- When two or more assertions are needed, split them into separate test cases and extract only shared setup into helpers or hooks. Assertions hidden in helpers still count toward this limit.
+- Do not combine unrelated expectations into one aggregate assertion solely to satisfy the assertion limit. Restrict Given and When to setup, and put result assertions in Then.
+- Tests of verification tools must run the tool and observe its results. Check the exit code, output, and generated artifacts. Do not add tests that use `readFileSync` to read implementation, CI configuration, or documentation and inspect the presence or order of strings. Literal text is not behavior, so such tests fail merely because a variable is renamed, a command is reformatted, or documentation is rewritten. If something to verify exists only in configuration or documentation, add a way for the tool to print its resolved configuration and inspect that output.
+- Do not determine pixel-level pass or failure in code. `npm run verify:display -- <corpus>` automates the process through capturing the images, while a person judges the result visually, so do not invest in logic that determines whether an image is correct. Facts defined by the specification, such as protocol state, may be checked in code.
 
 ## Maintaining this file
 
