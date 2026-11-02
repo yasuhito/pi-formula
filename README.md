@@ -16,9 +16,9 @@ Pi loads the extension automatically. Ask the model to use `$...$` or `\(...\)` 
 
 ## Preview
 
-The Ghostty capture below shows Unicode inline formulas in the prose and MathJax images for display formulas at the same time.
+The light and dark Ghostty captures below show a complete Pi session, including the prompt and footer, with Unicode inline formulas in the prose and MathJax images for display formulas.
 
-![Ghostty showing Unicode inline formulas and MathJax display-formula images](assets/ghostty-formulas.png)
+![Light and dark Ghostty sessions showing Unicode inline formulas and MathJax display-formula images](assets/ghostty-formulas.png)
 
 ## What it does
 

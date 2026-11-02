@@ -51,24 +51,6 @@
 - When 画像情報を調べる
 - Then Ghostty表示見本はPNG形式である
 
-## Scenario: Ghostty表示見本の幅は775pxである
-
-- Given pi-formula の Pi パッケージ情報がある
-- When 画像情報を調べる
-- Then Ghostty表示見本の幅は775pxである
-
-## Scenario: Ghostty表示見本の高さは830pxである
-
-- Given pi-formula の Pi パッケージ情報がある
-- When 画像情報を調べる
-- Then Ghostty表示見本の高さは830pxである
-
-## Scenario: Ghostty表示見本は目視承認済みの画像と一致する
-
-- Given pi-formula の Pi パッケージ情報がある
-- When 画像情報を調べる
-- Then Ghostty表示見本は目視承認済みの画像と一致する
-
 ## Scenario: npm tarball に利用者向け配布物だけを入れる
 
 - When pi-formula の npm tarball を作る

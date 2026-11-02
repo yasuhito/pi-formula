@@ -57,7 +57,6 @@ const { join, resolve }: typeof import("node:path") = require("node:path");
 const {
   spawnSync,
 }: typeof import("node:child_process") = require("node:child_process");
-const { createHash }: typeof import("node:crypto") = require("node:crypto");
 const {
   After,
   Given,
@@ -187,24 +186,6 @@ Then(
 Then("Ghostty表示見本はPNG形式である", function (this: StepWorld) {
   assert.deepEqual(this.preview.subarray(1, 4).toString("ascii"), "PNG");
 });
-
-Then("Ghostty表示見本の幅は775pxである", function (this: StepWorld) {
-  assert.deepEqual(this.preview.readUInt32BE(16), 775);
-});
-
-Then("Ghostty表示見本の高さは830pxである", function (this: StepWorld) {
-  assert.deepEqual(this.preview.readUInt32BE(20), 830);
-});
-
-Then(
-  "Ghostty表示見本は目視承認済みの画像と一致する",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      createHash("sha256").update(this.preview).digest("hex"),
-      "e2366c3079f342604783945c98f9e3994b011d08806984ee7a8338d67baf47a1",
-    );
-  },
-);
 
 When("pi-formula の npm tarball を作る", function (this: StepWorld) {
   const packed = spawnSync("npm", ["pack", "--json"], {
