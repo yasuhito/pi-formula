@@ -28,4 +28,3 @@ orca-ide automations runs --id <id> --json
 
 - `main` に `npm run check` と `.github/workflows/ci.yml` が入っていること。worker worktree は `origin/main` から作られ、PR reviewer は CI checks が 1 件以上成功していないとマージしない。
 - 自動実装に渡す issue には `ready-for-agent` と `agent:implement` の両方を付け、本文に `## What to build` と `## Acceptance criteria` を書く（`## Out of scope` は任意）。依存関係は GitHub Relationships の `blockedBy` に入れる。
-- `.pi/extensions/pi-formula-orca-role-name.ts` が pi の session 名を役割ごとに付ける。

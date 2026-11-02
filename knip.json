@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    ".pi/extensions/**/*.ts",
     "scripts/plan-display.ts",
     "scripts/streaming-protocol-fixture.ts",
     "scripts/verify-display-plan.ts",
@@ -14,7 +13,6 @@
   ],
   "project": [
     "src/**/*.ts",
-    ".pi/extensions/**/*.ts",
     "scripts/**/*.{js,ts}",
     "test/**/*.{js,ts}",
     "features/step_definitions/**/*.ts",

@@ -260,14 +260,7 @@ function buildCheckout(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), "pi-formula-tool-build-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = resolve(__dirname, "..");
-  for (const directory of [
-    "src",
-    "scripts",
-    "test",
-    "features",
-    "native",
-    ".pi",
-  ])
+  for (const directory of ["src", "scripts", "test", "features", "native"])
     cpSync(join(source, directory), join(root, directory), { recursive: true });
   for (const file of [
     "package.json",
