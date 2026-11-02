@@ -28,10 +28,7 @@ interface StepWorld {
   placeholderRendition: ReturnType<typeof finalSgrRendition>;
   publicNames: string[];
   reloadedImage: ReturnType<StepWorld["formula"]["createFormulaPng"]>;
-  // Observe unexpected runtime fields rather than assuming the API union is exhaustive.
-  renderedPng: ReturnType<StepWorld["formula"]["renderPng"]> & {
-    reason?: unknown;
-  };
+  renderedPng: ReturnType<StepWorld["formula"]["renderPng"]>;
   result: ReturnType<ReturnType<typeof fakePi>["registrationCounts"]> & {
     additionalMacro: boolean;
     distinctApis: boolean;
@@ -108,6 +105,10 @@ function finalSgrRendition(output: string) {
     }
   }
   return state;
+}
+
+function unexpectedReason(result: StepWorld["renderedPng"]): unknown {
+  return "reason" in result ? result.reason : undefined;
 }
 
 function freshApi(): typeof import("../../dist/api.js") {
@@ -486,7 +487,7 @@ Then("既成PNGの描画は成功する", function (this: StepWorld) {
 });
 
 Then("既成PNGの描画成功時に拒否理由はない", function (this: StepWorld) {
-  assert.deepEqual(this.renderedPng.reason, undefined);
+  assert.deepEqual(unexpectedReason(this.renderedPng), undefined);
 });
 
 Then("既成PNGの描画結果には画像転送が含まれる", function (this: StepWorld) {
@@ -562,7 +563,7 @@ Then("画像を使えない端末では既成PNGを描画しない", function (t
 Then(
   "既成PNGを描画しない理由は画像経路を使えないことである",
   function (this: StepWorld) {
-    assert.deepEqual(this.renderedPng.reason, "image-unavailable");
+    assert.deepEqual(unexpectedReason(this.renderedPng), "image-unavailable");
   },
 );
 
@@ -575,7 +576,7 @@ Then("安全上限を超えた既成PNGは描画しない", function (this: Step
 });
 
 Then("既成PNGの拒否理由は安全上限である", function (this: StepWorld) {
-  assert.deepEqual(this.renderedPng.reason, "safety-limit");
+  assert.deepEqual(unexpectedReason(this.renderedPng), "safety-limit");
 });
 
 When("途中で切れた既成 PNG を公開 API で描く", function (this: StepWorld) {
@@ -588,7 +589,7 @@ Then("不正な既成PNGは描画しない", function (this: StepWorld) {
 });
 
 Then("既成PNGの拒否理由はPNG形式の不正である", function (this: StepWorld) {
-  assert.deepEqual(this.renderedPng.reason, "invalid-png");
+  assert.deepEqual(unexpectedReason(this.renderedPng), "invalid-png");
 });
 
 When("展開上限を超える既成 PNG を公開 API で描く", function (this: StepWorld) {

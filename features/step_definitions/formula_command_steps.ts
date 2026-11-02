@@ -57,17 +57,18 @@ async function statusLines(pi: StepWorld["pi"], started: StepWorld["started"]) {
 Given(
   "端末 `{word}` でPiを使っている",
   function (this: StepWorld, terminal: string) {
-    // Alacritty is modeled by no PNG-query response, without a multiplexer.
-    const responses = new Map([
-      ["Ghostty", "OK"],
-      ["Kitty", "OK"],
-      ["Alacritty", undefined],
+    const terminals = new Map([
+      ["Ghostty", { pngQuery: "OK", multiplexer: undefined }],
+      ["Kitty", { pngQuery: "OK", multiplexer: undefined }],
+      ["Alacritty", { pngQuery: undefined, multiplexer: undefined }],
     ]);
-    if (!responses.has(terminal)) {
+    const fixture = terminals.get(terminal);
+    if (!fixture) {
       throw new Error(`Unknown terminal fixture: ${terminal}`);
     }
     this.terminal = terminal;
-    this.startOptions = { response: responses.get(terminal) };
+    this.startOptions = { response: fixture.pngQuery };
+    this.tmux = fixture.multiplexer;
     this.pi = fakePi();
     registerFormula(this.pi.api);
   },
