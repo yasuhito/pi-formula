@@ -1,15 +1,58 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, test } from "node:test";
 import { encodePlaceholderRows } from "../dist/kitty.js";
 
 // Source: https://github.com/kovidgoyal/kitty/blob/master/gen/rowcolumn-diacritics.txt
-const header = readFileSync("native/diacritics.h", "utf8");
-const initializer = /DIACRITICS\[\]\s*=\s*\{([^}]+)\}/u.exec(header)?.[1] ?? "";
-const nativeCodePoints = initializer
-  .split(",")
-  .map((hex) => Number.parseInt(hex.trim(), 16));
-const nativeLength = Number(/DIACRITICS_LEN\s*=\s*(\d+)/u.exec(header)?.[1]);
+let probeDirectory = "";
+let nativeLength = Number.NaN;
+let nativeCodePoints: number[] = [];
+
+function successfulOutput(
+  operation: string,
+  result: ReturnType<typeof spawnSync>,
+): string {
+  if (result.error) throw result.error;
+  if (result.status !== 0)
+    throw new Error(`${operation} failed:\n${String(result.stderr)}`);
+  return String(result.stdout);
+}
+
+before(() => {
+  probeDirectory = mkdtempSync(join(tmpdir(), "pi-formula-diacritics-"));
+  const executable = join(probeDirectory, "diacritics-probe");
+  successfulOutput(
+    "native diacritics probe compilation",
+    spawnSync(
+      process.env.CC ?? "cc",
+      [
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-o",
+        executable,
+        "native/diacritics-probe.c",
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  const observed = successfulOutput(
+    "native diacritics probe",
+    spawnSync(executable, { encoding: "utf8" }),
+  )
+    .trim()
+    .split("\n")
+    .map(Number);
+  [nativeLength, ...nativeCodePoints] = observed;
+});
+
+after(() => {
+  rmSync(probeDirectory, { force: true, recursive: true });
+});
 
 function placeholderCodePoints(rows: string[], coordinate: number): number[] {
   return rows.flatMap((row) =>
