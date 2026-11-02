@@ -16,9 +16,9 @@ Pi は拡張を自動で読み込みます。インライン数式には `$...$`
 
 ## 表示見本
 
-次の Ghostty 画像では、本文中のインライン数式を Unicode 文字で、表示数式を MathJax 画像で同時に表示しています。
+次のライト・ダーク両テーマの Ghostty 画像では、プロンプト入力欄とフッターを含む Pi セッション全体で、本文中のインライン数式を Unicode 文字、表示数式を MathJax 画像として表示しています。
 
-![Unicode のインライン数式と MathJax 画像の表示数式を表示する Ghostty](assets/ghostty-formulas.png)
+![Unicode のインライン数式と MathJax 画像の表示数式を表示するライト・ダーク両テーマの Ghostty](assets/ghostty-formulas.png)
 
 ## 動作
 
