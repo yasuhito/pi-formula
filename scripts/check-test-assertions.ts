@@ -24,7 +24,6 @@ interface WalkVisitor {
   enter?(this: { skip(): void }, node: Node, parent: Node | undefined): void;
   leave?(node: Node, parent: Node | undefined): void;
 }
-// Children come only from Oxc's parsed AST, never unvalidated input objects.
 function isNode(value: unknown): value is Node {
   return (
     typeof value === "object" &&
@@ -59,8 +58,11 @@ const LOOP_TYPES = new Set([
   "WhileStatement",
 ]);
 
-function walk(node: unknown, visitor: WalkVisitor, parent?: Node): void {
-  if (!isNode(node)) return;
+function walk(program: Program, visitor: WalkVisitor): void {
+  visitNode(program, visitor);
+}
+
+function visitNode(node: Node, visitor: WalkVisitor, parent?: Node): void {
   let skipped = false;
   visitor.enter?.call(
     {
@@ -74,9 +76,11 @@ function walk(node: unknown, visitor: WalkVisitor, parent?: Node): void {
   if (!skipped) {
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) {
-        for (const child of value) walk(child, visitor, node);
-      } else {
-        walk(value, visitor, node);
+        for (const child of value) {
+          if (isNode(child)) visitNode(child, visitor, node);
+        }
+      } else if (isNode(value)) {
+        visitNode(value, visitor, node);
       }
     }
   }
@@ -133,17 +137,16 @@ function isAssertion(call: CallExpression) {
   return object?.type === "Identifier" && object.name === "assert";
 }
 
-const ASSERT_CALLBACK_METHODS = new Set([
-  "throws",
-  "rejects",
-  "doesNotThrow",
-  "doesNotReject",
+const ASSERT_CALLBACK_POSITIONS = new Map<string, readonly number[]>([
+  ["throws", [0, 1]],
+  ["rejects", [0, 1]],
+  ["doesNotThrow", [0, 1]],
+  ["doesNotReject", [0, 1]],
 ]);
 
 function callbackArguments(call: CallExpression) {
   if (!isAssertion(call)) return call.arguments;
   const callee = runtimeExpression(call.callee);
-  // assert(value) tests a value; it does not call a function-valued operand.
   if (callee?.type !== "MemberExpression") return [];
   const property = runtimeExpression(callee.property);
   const method =
@@ -153,9 +156,9 @@ function callbackArguments(call: CallExpression) {
         ? property.value
         : undefined;
   if (method === undefined) return call.arguments;
-  // The fixed Node runtimes execute fn/asyncFn at 0 and error predicates at 1.
-  // Comparison/truthiness operands and message arguments are values.
-  return ASSERT_CALLBACK_METHODS.has(method) ? call.arguments.slice(0, 2) : [];
+  return (ASSERT_CALLBACK_POSITIONS.get(method) ?? [])
+    .map((position) => call.arguments[position])
+    .filter((argument) => argument !== undefined);
 }
 
 function localFunctions(program: Program) {
@@ -183,11 +186,11 @@ function assertionsIn(
 ): Array<{ line: number; repeated: boolean }> {
   const assertions: Array<{ line: number; repeated: boolean }> = [];
   let loopDepth = 0;
+  if (!callback.body) return assertions;
 
-  walk(callback.body, {
+  visitNode(callback.body, {
     enter(node) {
       if (isCallback(node) || node.type === "FunctionDeclaration") {
-        // Function bodies are inspected at their call site, after unwrapping types.
         this.skip();
         return;
       }
