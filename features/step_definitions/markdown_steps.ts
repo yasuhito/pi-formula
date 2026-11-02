@@ -69,15 +69,15 @@ interface StepWorld {
   unicode: string;
 }
 
-// These callbacks run after the scenario's preparation fills the frame fields.
-type FormulaFramesWorld = StepWorld & {
-  issue26Updates: StepWorld["issue26Updates"] & { finalized: string };
-};
-type TuiFramesWorld = FormulaFramesWorld & {
-  issue26Updates: {
-    tuiWrites: { initial: string; streaming: string[]; finalized: string };
-  };
-};
+function requireIssue26Frames(
+  frames: { initial?: string; finalized?: string },
+  frame: "initial" | "finalized" = "finalized",
+): string {
+  const rendered = frames[frame];
+  if (rendered === undefined)
+    throw new Error(`Issue 26 ${frame} frame has not been prepared`);
+  return rendered;
+}
 
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const {
@@ -1386,9 +1386,11 @@ When(
   },
 );
 
-Then("先行するツール描画が残る", function (this: TuiFramesWorld) {
+Then("先行するツール描画が残る", function (this: StepWorld) {
   assert.equal(
-    this.issue26Updates.tuiWrites.initial.includes("qni tool result"),
+    requireIssue26Frames(this.issue26Updates.tuiWrites, "initial").includes(
+      "qni tool result",
+    ),
     true,
   );
 });
@@ -1397,36 +1399,30 @@ Then("画像経路で描く表示数式が1件ずつ増える", function (this: 
   assert.deepEqual(this.issue26Updates.streaming.map(imageCount), [1, 2, 3]);
 });
 
-Then(
-  "各差分描画は新しい表示数式を1件ずつ転送する",
-  function (this: TuiFramesWorld) {
-    assert.deepEqual(
-      [
-        ...this.issue26Updates.tuiWrites.streaming.map(imageCount),
-        imageCount(this.issue26Updates.tuiWrites.finalized),
-      ],
-      [1, 1, 1, 0],
-    );
-  },
-);
+Then("各差分描画は新しい表示数式を1件ずつ転送する", function (this: StepWorld) {
+  assert.deepEqual(
+    [
+      ...this.issue26Updates.tuiWrites.streaming.map(imageCount),
+      imageCount(requireIssue26Frames(this.issue26Updates.tuiWrites)),
+    ],
+    [1, 1, 1, 0],
+  );
+});
 
-Then(
-  "逐次更新の画像IDは各転送の画像IDと一致する",
-  function (this: FormulaFramesWorld) {
-    const frames = [
-      ...this.issue26Updates.streaming,
-      this.issue26Updates.finalized,
-    ];
-    assert.deepEqual(
-      frames.map((frame) =>
-        inspectPlacementBlocks(frame).map(
-          (block) => block.id === block.transferId,
-        ),
+Then("逐次更新の画像IDは各転送の画像IDと一致する", function (this: StepWorld) {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    requireIssue26Frames(this.issue26Updates),
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map(
+        (block) => block.id === block.transferId,
       ),
-      [[true], [true, true], [true, true, true], [true, true, true]],
-    );
-  },
-);
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
 
 When(
   "同じ複数行表示数式を一回の確定応答内に二回配置する",
@@ -1741,18 +1737,18 @@ When(
   },
 );
 
-When("Issue 26の確定本文をTUIへ更新する", function (this: FormulaFramesWorld) {
+When("Issue 26の確定本文をTUIへ更新する", function (this: StepWorld) {
   this.issue26Updates.tuiWrites.finalized = this.issue26Tui.render(
-    this.issue26Updates.finalized,
+    requireIssue26Frames(this.issue26Updates),
   );
 });
 
 Then(
   "逐次更新のplaceholder行数は各転送の宣言行数と一致する",
-  function (this: FormulaFramesWorld) {
+  function (this: StepWorld) {
     const frames = [
       ...this.issue26Updates.streaming,
-      this.issue26Updates.finalized,
+      requireIssue26Frames(this.issue26Updates),
     ];
     assert.deepEqual(
       frames.map((frame) =>
@@ -1765,37 +1761,31 @@ Then(
   },
 );
 
-Then(
-  "逐次更新の各配置の転送チャンクは完結する",
-  function (this: FormulaFramesWorld) {
-    const frames = [
-      ...this.issue26Updates.streaming,
-      this.issue26Updates.finalized,
-    ];
-    assert.deepEqual(
-      frames.map((frame) =>
-        inspectPlacementBlocks(frame).map((block) => block.completeTransfer),
-      ),
-      [[true], [true, true], [true, true, true], [true, true, true]],
-    );
-  },
-);
+Then("逐次更新の各配置の転送チャンクは完結する", function (this: StepWorld) {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    requireIssue26Frames(this.issue26Updates),
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map((block) => block.completeTransfer),
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
 
-Then(
-  "逐次更新の各配置は対応する転送に隣接する",
-  function (this: FormulaFramesWorld) {
-    const frames = [
-      ...this.issue26Updates.streaming,
-      this.issue26Updates.finalized,
-    ];
-    assert.deepEqual(
-      frames.map((frame) =>
-        inspectPlacementBlocks(frame).map((block) => block.adjacentTransfer),
-      ),
-      [[true], [true, true], [true, true, true], [true, true, true]],
-    );
-  },
-);
+Then("逐次更新の各配置は対応する転送に隣接する", function (this: StepWorld) {
+  const frames = [
+    ...this.issue26Updates.streaming,
+    requireIssue26Frames(this.issue26Updates),
+  ];
+  assert.deepEqual(
+    frames.map((frame) =>
+      inspectPlacementBlocks(frame).map((block) => block.adjacentTransfer),
+    ),
+    [[true], [true, true], [true, true, true], [true, true, true]],
+  );
+});
 
 Then("同じ応答内の各配置は同じ画像IDを使う", function (this: StepWorld) {
   assert.deepEqual(

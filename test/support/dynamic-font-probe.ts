@@ -1,4 +1,9 @@
-import { moduleLoader } from "./module-loader.js";
+import Module from "node:module";
+import type { ModuleLoader } from "./module-loader.js";
+
+const moduleLoader = Module as ModuleLoader;
+if (typeof moduleLoader._load !== "function")
+  throw new Error("Node Module._load hook is unavailable");
 
 const originalLoad = moduleLoader._load;
 moduleLoader._load = function load(request, parent, isMain) {
