@@ -1,7 +1,12 @@
 import fs from "node:fs";
+import Module from "node:module";
 import type { ResvgRenderOptions } from "@resvg/resvg-js";
-import { moduleLoader } from "./module-loader.js";
+import type { ModuleLoader } from "./module-loader.js";
 import { createPng } from "./png-fixture";
+
+const moduleLoader = Module as ModuleLoader;
+if (typeof moduleLoader._load !== "function")
+  throw new Error("Node Module._load hook is unavailable");
 
 const inventory = process.argv[2];
 const text = process.argv[3];

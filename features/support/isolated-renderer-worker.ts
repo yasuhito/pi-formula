@@ -6,7 +6,7 @@ import type {
   RendererResult,
 } from "./isolated-renderer.js";
 
-const Module: typeof import("../../test/support/module-loader.js").moduleLoader = require("node:module");
+const Module: import("../../test/support/module-loader.js").ModuleLoader = require("node:module");
 const crypto: typeof import("node:crypto") = require("node:crypto");
 const {
   performance,

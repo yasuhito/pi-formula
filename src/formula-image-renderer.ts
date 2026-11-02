@@ -64,6 +64,15 @@ const defaultDependencies: FormulaImageRendererDependencies = {
   encodePlaceholderRows,
 };
 
+function transferWithMarkdownSafeTrailer(transfer: string): string {
+  const nonBackslashTrailer = "\x1b[0m";
+  return `${transfer}${nonBackslashTrailer}`;
+}
+
+function joinWithBlankLine(first: string, second: string): string {
+  return `${first}\n\n${second}`;
+}
+
 export class FormulaImageRenderer {
   private readonly cache = new RenderCache(
     FORMULA_SAFETY_LIMITS.cacheEntries,
@@ -193,9 +202,10 @@ export class FormulaImageRenderer {
     const placeholder =
       existingPlaceholder ??
       this.dependencies.encodePlaceholderRows(id, columns, rows).join("\n");
-    // Keep the final Kitty terminator away from Markdown's line-ending
-    // backslash handling, and isolate the transfer as its own rendered line.
-    return `${transfer}\x1b[0m\n\n${placeholder}`;
+    return joinWithBlankLine(
+      transferWithMarkdownSafeTrailer(transfer),
+      placeholder,
+    );
   }
 
   private cachedImage(

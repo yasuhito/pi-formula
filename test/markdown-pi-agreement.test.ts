@@ -1,16 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Markdown } from "@earendil-works/pi-tui";
+import { Markdown, renderLatex } from "@earendil-works/pi-tui";
 import { identityMarkdownTheme } from "./support/markdown-theme.js";
 
 const {
   transformDisplayMath,
 }: typeof import("../dist/markdown.js") = require("../dist/markdown.js");
 
-// Pi の数式 tokenizer は公開されていないため、公開 Markdown component を
-// renderLatex の on/off で描き分け、出力が変わるかどうかで Pi の判定を読む。
-// Pi が描画できない LaTeX は両モードとも原文へ落ちるので、この読み方では
-// 「数式でない」と区別が付かない。fixture は描画できる式だけで作る。
 const THEME = identityMarkdownTheme;
 
 function piSeesMath(markdown: string) {
@@ -18,7 +14,14 @@ function piSeesMath(markdown: string) {
     new Markdown(markdown, 0, 0, THEME, undefined, { renderLatex })
       .render(80)
       .join("\n");
-  return render(true) !== render(false);
+  if (render(true) !== render(false)) return true;
+  if (
+    displayFormulasIn(markdown).some(
+      (latex) => renderLatex(latex, { display: true }) === undefined,
+    )
+  )
+    return undefined;
+  return false;
 }
 
 function displayFormulasIn(markdown: string) {
@@ -65,9 +68,6 @@ const PLAIN_FOR_PI = [
   ["ドル記号の直後が空白", "$ x $"],
 ];
 
-// pi-formula が意図して Pi より広く画像にする入力。Pi の block tokenizer は
-// `^ {0,3}$$` なので、箇条書きや引用でインデントされた内容には一致しない。
-// features/markdown.feature.md に対応するシナリオがある。
 const PI_FORMULA_ONLY = [
   ["箇条書きの中", "- 外側\n  - 式: $$\n    x^2\n    $$", "\nx^2\n"],
   ["引用の中", "> 式: \\[\n> x^2\n> \\]", "\nx^2\n"],
@@ -105,16 +105,15 @@ test("oracle が金額を数式として読まない", () => {
   assert.equal(piSeesMath("$$100"), false);
 });
 
-test("fixture の入力を Pi はいずれも数式と見なさない", () => {
-  assert.deepEqual(
-    PLAIN_FOR_PI.filter(([, markdown]) => piSeesMath(markdown)).map(
-      ([name]) => name,
-    ),
-    [],
-  );
+test("oracle は描画できない表示数式を判定不能として返す", () => {
+  assert.equal(piSeesMath(String.raw`$$\notacommand{x}$$`), undefined);
 });
 
 for (const [name, markdown] of PLAIN_FOR_PI) {
+  test(`Pi は${name}を数式と見なさないと判定できる`, () => {
+    assert.equal(piSeesMath(markdown), false);
+  });
+
   test(`Pi が数式と見なさない${name}を表示数式にしない`, () => {
     assert.deepEqual(displayFormulasIn(markdown), []);
   });
@@ -127,6 +126,10 @@ for (const [name, markdown] of AGREES_WITH_PI) {
 }
 
 for (const [name, markdown, expected] of PI_FORMULA_ONLY) {
+  test(`Pi は${name}の表示数式を数式と見なさない`, () => {
+    assert.equal(piSeesMath(markdown), false);
+  });
+
   test(`Pi が数式と見なさない${name}の表示数式を意図して画像にする`, () => {
     assert.deepEqual(displayFormulasIn(markdown), [expected]);
   });

@@ -12,10 +12,7 @@ import { NodeDisplayProcessAdapter } from "../dist/display-verification-process.
 
 const root = path.resolve(__dirname, "..");
 
-// npm run verify:display は dist/ を消して再ビルドするため、並列に走る
-// 他のテストファイルが dist/ を require できなくなる。ビルド済みの
-// スクリプトを直接起動する。
-function run(...args: string[]) {
+function runBuiltScriptDirectly(...args: string[]) {
   return spawnSync(
     process.execPath,
     [path.join(root, "scripts", "verify-display.js"), ...args],
@@ -28,11 +25,11 @@ function run(...args: string[]) {
 }
 
 test("CLIは入力拒否を終了コード1で返す", () => {
-  assert.equal(run().status, 1);
+  assert.equal(runBuiltScriptDirectly().status, 1);
 });
 
 test("CLIはmachine-readableな入力拒否を一件返す", () => {
-  assert.equal(JSON.parse(run().stdout).kind, "rejected");
+  assert.equal(JSON.parse(runBuiltScriptDirectly().stdout).kind, "rejected");
 });
 
 async function runSignal(signalName: NodeJS.Signals) {
