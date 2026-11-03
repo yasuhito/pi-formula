@@ -5,6 +5,7 @@
     }
   },
   "lander": {
-    "checks": ["npm run check"]
+    "checks": ["npm run check"],
+    "push": "origin"
   }
 }
