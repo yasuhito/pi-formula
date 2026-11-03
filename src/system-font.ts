@@ -51,20 +51,24 @@ function dataFontDirectories(): string[] {
   ];
 }
 
+function readableDirectoryEntries(directory: string) {
+  try {
+    return readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
 function fontFilesUnder(root: string): string[] {
   const files: string[] = [];
   const pending = [root];
   while (pending.length > 0) {
     const directory = pending.pop();
     if (!directory) continue;
-    try {
-      for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        const path = join(directory, entry.name);
-        if (entry.isDirectory()) pending.push(path);
-        else if (entry.isFile()) files.push(path);
-      }
-    } catch {
-      // Missing and unreadable system font directories are normal.
+    for (const entry of readableDirectoryEntries(directory)) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) pending.push(path);
+      else if (entry.isFile()) files.push(path);
     }
   }
   return files;

@@ -4,7 +4,7 @@ const ESC = "\x1b";
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 const CHUNK_SIZE = 3072;
 
-// Kitty protocol table: github.com/kovidgoyal/kitty/blob/master/gen/rowcolumn-diacritics.txt
+// See docs/adr/0001-use-public-pi-api-for-hybrid-math-display.md
 const DIACRITICS = `
 0305 030D 030E 0310 0312 033D 033E 033F 0346 034A 034B 034C 0350 0351 0352 0357 035B 0363 0364 0365 0366 0367
 0368 0369 036A 036B 036C 036D 036E 036F 0483 0484 0485 0486 0487 0592 0593 0594 0595 0597 0598 0599 059C 059D

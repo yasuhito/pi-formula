@@ -156,7 +156,6 @@ test("direct childの終了後も同じprocess groupの子孫を停止する", a
       throw new Error("descendant exited before termination was requested");
     }
     await managed.terminate();
-    // ps also distinguishes an exited, unreaped child from a running child on macOS.
     assert.match(stateOf(descendantPid), /^(?:absent|Z\S*)$/);
   } finally {
     await managed.terminate("SIGKILL");

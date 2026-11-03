@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { encodePlaceholderRows } from "../dist/kitty.js";
 
-// Source: https://github.com/kovidgoyal/kitty/blob/master/gen/rowcolumn-diacritics.txt
 let probeDirectory = "";
 let nativeLength = Number.NaN;
 let nativeCodePoints: number[] = [];

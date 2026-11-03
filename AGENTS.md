@@ -4,6 +4,10 @@
 
 Treat this repository as a single context, using the root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md` for details.
 
+## Code comments
+
+Use names and structure instead of explanatory comments. Put protocol provenance and non-obvious platform constraints in `docs/adr/`. `npm run lint` checks handwritten JavaScript/TypeScript under `src/`, `scripts/`, `test/`, and `features/`; only exact `// See docs/adr/<existing-file>.md` references and reasoned `biome-ignore` directives are allowed. Generated JavaScript siblings of TypeScript are excluded. Native C and the legacy shell/Python automation documents are not parser-linted; preserve necessary machine directives and upstream notices rather than removing them to satisfy this policy.
+
 ## Tests
 
 - Limit each test case to one assertion. Count each Node Test Runner `test(...)` and each Cucumber Scenario as one test case.

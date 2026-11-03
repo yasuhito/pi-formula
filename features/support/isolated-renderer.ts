@@ -102,11 +102,10 @@ function isolatedRenderer(configuration: RendererConfiguration = {}) {
               new Error(`isolated renderer timed out: ${operation}\n${stderr}`),
             );
           }, 10_000);
-          // The worker checks its results against the shared protocol. IPC erases
-          // the association between this request's operation and its reply.
+          const resolveWorkerValidatedReply = (result: RendererResult) =>
+            resolveRequest(result as RendererResults[Operation]);
           pending.set(id, {
-            resolve: (result) =>
-              resolveRequest(result as RendererResults[Operation]),
+            resolve: resolveWorkerValidatedReply,
             reject,
             timer,
           });

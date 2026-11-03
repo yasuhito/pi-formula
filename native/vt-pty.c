@@ -23,8 +23,7 @@ static int master_fd = -1;
 static FILE *raw_sink = NULL;
 static bool pty_write_failed = false;
 
-// 端末からの応答（Kitty の a=q への OK、DA、DSR など）を pty へ書き戻す。
-// これを返さないと Pi の probe が待ち続ける。
+// See docs/adr/0001-use-public-pi-api-for-hybrid-math-display.md
 static void on_write_pty(GhosttyTerminal t, void *ud, const uint8_t *d, size_t n) {
   (void)t; (void)ud;
   if (master_fd < 0) return;

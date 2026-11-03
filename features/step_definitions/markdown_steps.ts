@@ -152,10 +152,12 @@ function renderUnicode(markdown: string) {
     {} as ConstructorParameters<typeof Markdown>[3],
     { get: () => (value: string) => value },
   );
-  // 端末 capability の自動検出は実行中の端末の環境変数に従う。Ghostty の中で
-  // 回すと URL が OSC 8 で包まれ、期待値が環境によって変わる。この検査は
-  // 装飾の有無ではなく Unicode の文字列を見るので、capability を固定する。
-  setCapabilityOverrides({ images: null, trueColor: true, hyperlinks: false });
+  const deterministicTextCapabilities = {
+    images: null,
+    trueColor: true,
+    hyperlinks: false,
+  };
+  setCapabilityOverrides(deterministicTextCapabilities);
   try {
     return new Markdown(markdown, 0, 0, passthroughTheme)
       .render(80)
