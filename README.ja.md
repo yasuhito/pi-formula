@@ -12,7 +12,7 @@ Pi の LaTeX を読みやすく表示します。インライン数式は選択�
 
 ## 導入
 
-Pi 0.84 以降と Node.js 22.19 以降が必要です。
+Pi 0.99 以降と Node.js 22.19 以降が必要です。
 
 ```sh
 pi install npm:pi-formula

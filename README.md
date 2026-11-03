@@ -12,7 +12,7 @@ The light and dark Ghostty captures below show a complete Pi session, including 
 
 ## Install
 
-Requires Pi 0.84 or later and Node.js 22.19 or later.
+Requires Pi 0.99 or later and Node.js 22.19 or later.
 
 ```sh
 pi install npm:pi-formula

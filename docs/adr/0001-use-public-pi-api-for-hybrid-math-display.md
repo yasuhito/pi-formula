@@ -8,7 +8,7 @@ Some earlier image extensions rewrite Pi's internal Markdown rendering. This giv
 
 ## Decision
 
-Use only public APIs in Pi 0.84 and later. Change only the on-screen display, without changing saved conversations or the LaTeX passed to the model.
+Use only public APIs in Pi 0.99 and later. Pi 0.99.0 is the first release with the theme color APIs the image path uses for its text color (`colorToHex` and `Theme.colors`). Change only the on-screen display, without changing saved conversations or the LaTeX passed to the model.
 
 - Always leave inline math on Pi's standard Unicode text path.
 - Convert display math into images with MathJax and Resvg on image-capable terminals.
