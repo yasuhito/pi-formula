@@ -1,25 +1,25 @@
 # Domain docs
 
-このリポジトリは単一コンテキストとして扱う。
+Treat this repository as a single context.
 
-## 作業前に読む文書
+## Read before working
 
-- ルートの `CONTEXT.md`
-- 作業対象に関係する `docs/adr/`
+- Root `CONTEXT.md`
+- The `docs/adr/` documents relevant to the work
 
-ファイルが存在しない場合は何も報告せず作業を続ける。用語や戻しにくい決定が固まった時点で、domain-modeling の規則に従って作成する。
+If a file does not exist, continue without reporting it. Create it according to the domain-modeling rules once terminology or hard-to-reverse decisions have settled.
 
-## 用語
+## Terminology
 
-Issue、仕様、試験、コードでドメイン概念を呼ぶときは、`CONTEXT.md` の標準語を使う。避ける語が指定されている場合は使わない。
+Use the canonical terms in `CONTEXT.md` when naming domain concepts in issues, specifications, tests, and code. Do not use terms marked as ones to avoid.
 
-必要な概念が用語集にない場合は、別名を勝手に作らず、用語の不足か設計のずれかを確認する。
+If a needed concept is missing from the glossary, do not invent an alias. Check whether the terminology is incomplete or the design has drifted.
 
-## ADR
+## ADRs
 
-既存ADRと矛盾する変更は、黙って上書きしない。矛盾と見直す理由を明示する。
+Do not silently overwrite decisions when a change contradicts an existing ADR. State the conflict and the reason for reconsideration explicitly.
 
-## 構成
+## Structure
 
 ```text
 /

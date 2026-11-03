@@ -1,28 +1,28 @@
-# ADR 0002: pi-formulaを数式描画の唯一の正本にする
+# ADR 0002: Make pi-formula the single source of truth for math rendering
 
-## 状況
+## Context
 
-数式描画はqni-cliの一部として生まれたが、描画の大部分は量子回路CLIに依存しない。qni-cliの中に置き続けると、量子計算を使わないPi利用者が単独で導入できず、数式描画とqni専用ツールの責務も混在する。独立版とqni-cli版へコードを複製すると、修正、試験、仕様が分岐する。
+Math rendering originated as part of qni-cli, but most rendering does not depend on the quantum circuit CLI. Keeping it inside qni-cli prevents Pi users who do not use quantum computing from installing it independently, and mixes math rendering with qni-specific tool responsibilities. Duplicating code between a standalone version and qni-cli would cause fixes, tests, and specifications to diverge.
 
-## 決定
+## Decision
 
-数式描画コードの正本はpi-formulaリポジトリだけに置く。
+Keep the canonical math rendering code only in the pi-formula repository.
 
-- pi-formulaは分野固有のマクロを標準では持たない。
-- 別のPi拡張が追加マクロを渡し、表示数式のPNGを作れる小さな公開インターフェースを提供する。
-- qni-cliはこの公開インターフェースを使い、追加マクロとして量子系マクロを渡す。
-- qni-cliは確認済みのpi-formulaの版を同梱し、一回の導入で従来の体験を提供する。
-- pi-formula単体とqni-cliを両方導入しても、数式描画と`/formula`は一つだけ登録する。
-- pi-formula 0.1.0をqni-cli 0.1.0より先に公開する。
+- pi-formula includes no field-specific macros by default.
+- Provide a small public interface through which another Pi extension can pass additional macros and generate display math PNGs.
+- qni-cli uses this public interface to pass quantum macros as additional macros.
+- qni-cli bundles a verified version of pi-formula, preserving the existing single-install experience.
+- Even when both standalone pi-formula and qni-cli are installed, register math rendering and `/formula` only once.
+- Publish pi-formula 0.1.0 before qni-cli 0.1.0.
 
-## 結果
+## Consequences
 
-量子計算を使わないPi利用者も数式描画だけを導入できる。qni-cliは数式描画を複製せず、量子回路と計算結果の責務へ集中できる。
+Pi users who do not use quantum computing can install math rendering alone. qni-cli can focus on quantum circuits and computation results without duplicating math rendering.
 
-独立した版管理、LinuxとmacOSの検証、二重導入の調整が必要になる。pi-formulaをqni-cliへ取り込むときは依存版を固定し、qni-cli側でも実端末確認を行う。
+Independent versioning, Linux and macOS verification, and coordination of dual installations are required. When integrating pi-formula into qni-cli, pin the dependency version and verify it in real terminals on the qni-cli side as well.
 
-## 検討した選択肢
+## Alternatives considered
 
-- qni-cliの中だけに残す: 汎用機能を量子計算へ閉じ込め、責務の混在を残すため採らない。
-- 両方のリポジトリへコードを複製する: 修正、試験、仕様が分岐するため採らない。
-- qni-cli利用者にもpi-formulaを別途導入してもらう: Qni CoResearcherの一回の導入体験を壊すため採らない。
+- Keep it only inside qni-cli: rejected because it confines a general-purpose feature to quantum computing and leaves responsibilities mixed.
+- Duplicate the code in both repositories: rejected because fixes, tests, and specifications would diverge.
+- Require qni-cli users to install pi-formula separately: rejected because it breaks Qni CoResearcher's single-install experience.

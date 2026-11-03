@@ -3,41 +3,41 @@
 ## pi-formula
 
 **pi-formula**:
-Pi の会話に現れる一般的な LaTeX 数式を読みやすく描く、独立した汎用拡張。量子計算など特定分野の知識やマクロを前提にしない。
-_Avoid_: qni-math, 量子計算専用の数式拡張
+An independent, general-purpose extension that renders common LaTeX formulas in Pi conversations for readability. It does not assume knowledge or macros from a specific field such as quantum computing.
+_Avoid_: qni-math, quantum-computing-only math extension
 
-**インライン数式**:
-文章の途中に置く `$...$` または `\(...\)` の数式。常に本文と同じ Unicode テキストとして描く。
-_Avoid_: インライン数式画像
+**Inline math**:
+Math placed within prose using `$...$` or `\(...\)`. Always rendered as Unicode text, just like the surrounding prose.
+_Avoid_: inline math images
 
-**表示数式**:
-文章と分けた行に置く `$$...$$` または `\[...\]` の数式。画像対応端末では MathJax 画像として描き、画像を使えない端末では Unicode テキストとして描く。
-_Avoid_: ブロック数式
+**Display math**:
+Math placed on lines separate from prose using `$$...$$` or `\[...\]`. Rendered as MathJax images on image-capable terminals and as Unicode text on terminals that cannot use images.
+_Avoid_: block math
 
-**画像経路**:
-表示数式を組版して画像にし、端末の画像プロトコルで描く経路。最初に画像表示を保証する端末は Ghostty と Kitty とする。
-_Avoid_: 画像モード, Kitty モード
+**Image path**:
+The path that typesets display math into images and renders them using the terminal's image protocol. Ghostty and Kitty are the first terminals with guaranteed image support.
+_Avoid_: image mode, Kitty mode
 
-**テキスト経路**:
-数式を Pi 標準の Unicode テキストで描く経路。インライン数式では常に使い、画像を使えない場合は表示数式にも使う。
-_Avoid_: Unicode モード, 劣化表示
+**Text path**:
+The path that renders math using Pi's standard Unicode text. Always used for inline math, and also for display math when images are unavailable.
+_Avoid_: Unicode mode, degraded display
 
-**利用者マクロ**:
-利用者が設定で追加する LaTeX 命令。pi-formula は一般的な利用者マクロの仕組みを提供するが、特定分野の命令を標準では持たない。
-_Avoid_: pi-formula 標準の量子系マクロ
+**User macros**:
+LaTeX commands added through user settings. pi-formula provides a general user macro mechanism but does not include field-specific commands by default.
+_Avoid_: pi-formula standard quantum macros
 
-**追加マクロ**:
-別の Pi 拡張が pi-formula へ渡す分野固有の LaTeX 命令。qni-cli は追加マクロとして量子系マクロを渡す。
-_Avoid_: pi-formula の組み込み量子マクロ
+**Additional macros**:
+Field-specific LaTeX commands passed to pi-formula by another Pi extension. qni-cli passes quantum macros as additional macros.
+_Avoid_: pi-formula built-in quantum macros
 
-**実表示検証**:
-画像経路で描かれた表示数式を実際の端末画面から撮影し、表示の異常と検証作業の失敗を区別して調べる検証。
-_Avoid_: 表示検証, スクリーンショットテスト
+**Real-display verification**:
+Verification that captures display math rendered through the image path from an actual terminal screen and distinguishes display defects from failures in the verification procedure.
+_Avoid_: display verification, screenshot tests
 
-**表示計画**:
-実表示検証の前に、コーパス、表示経路、撮影する端末幅から必要な出力高を求め、履歴全体がキャプチャへ収まるかを決めた結果。
-_Avoid_: 高さ見積もり, 画面サイズ計算
+**Display plan**:
+The result of calculating the required output height from the corpus, rendering path, and terminal widths to capture before real-display verification, and deciding whether the entire history fits in the capture.
+_Avoid_: height estimate, screen size calculation
 
-**コーパスモード**:
-保存済みの Markdown コーパスをモデルに一字一句そのまま応答させ、応答一致と実表示を回帰検証する実表示検証のモード。
-_Avoid_: echo モード, 回帰モード
+**Corpus mode**:
+A real-display verification mode that has the model respond with a saved Markdown corpus verbatim, checking response equality and the actual display for regressions.
+_Avoid_: echo mode, regression mode

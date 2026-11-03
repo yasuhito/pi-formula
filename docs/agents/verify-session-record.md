@@ -1,35 +1,35 @@
-# セッション記録のツール失敗検査
+# Checking session records for tool failures
 
-`scripts/verify-session-tools.js` は、Pi のセッション記録から、表示だけでは分からないツールの失敗、機能不足、途中停止、代替手段への切り替えを抽出する決定的な検査である。
+`scripts/verify-session-tools.js` deterministically extracts tool failures, unsupported functionality, interrupted batches, and switches to alternatives from Pi session records that may not be apparent from the display alone.
 
-## 実行
+## Run
 
-検証ハーネスが起動したセッションの JSONL を指定する。
+Specify the JSONL file for a session started by the verification harness.
 
 ```sh
 npm run verify:session-record -- ~/.pi/agent/sessions/<project>/<session>.jsonl
 ```
 
-ヒットがなければ0、ヒットがあれば1、引数、JSONL、無視リストの読み取りまたは解析に失敗すると2で終了する。ヒットには種類、ツール、コマンド、JSONLの行番号、前後1行の文脈を表示する。長い文脈行は300文字で打ち切る。
+The exit code is 0 for no hits, 1 for hits, and 2 for failures reading or parsing arguments, JSONL, or the ignore list. Each hit shows its kind, tool, command, JSONL line number, and one line of context on either side. Long context lines are truncated at 300 characters.
 
-次を検出する。
+The following are detected:
 
-- `exited with status N`、`exited with code N`、`Command exited with code N` の非0終了
-- 「未対応」「対応していない」「unsupported」「not supported」を含むツール出力
-- `Stopped at command N of M` による一括実行の途中停止
-- 「代わりに」「代替手段」「切り替え」「fallback」を含む、失敗したツール実行直後の assistant 本文
+- Nonzero exits reported as `exited with status N`, `exited with code N`, or `Command exited with code N`
+- Tool output containing `未対応`, `対応していない`, `unsupported`, or `not supported`
+- Interrupted batches reported as `Stopped at command N of M`
+- Assistant text containing `代わりに`, `代替手段`, `切り替え`, or `fallback` immediately after a failed tool execution
 
-複数コマンドを一括実行した記録では、ツール出力の直前にある `$ ...`、または `Stopped at command N of M` の N 番目から該当コマンドを決める。`commands` から復元するコマンド名には、その tool call の名前を使う。代替手段は、失敗、機能不足、途中停止のいずれかを含むか `isError` が真であるツール結果だけを候補にする。その次の assistant メッセージだけを検査して候補を消費するため、成功結果の後や後続ターンの無関係な表現は関連付けない。
+For batched command records, the relevant command is determined from `$ ...` immediately before the tool output, or the Nth command in `Stopped at command N of M`. Command names reconstructed from `commands` use the name of that tool call. Only tool results containing a failure, unsupported functionality, or an interrupted batch, or with `isError` set to true, are candidates for fallback detection. Each candidate is consumed by inspecting only the next assistant message, so unrelated expressions after successful results or in later turns are not associated with it.
 
-## 無視リスト
+## Ignore list
 
-既知で許容するヒットは JSON の無視リストで除外する。
+Exclude known, accepted hits with a JSON ignore list.
 
 ```json
 {
   "ignore": [
     {
-      "kind": "機能不足",
+      "kind": "unsupported",
       "tool": "qni",
       "command": "qni run --symbolic",
       "pattern": "unsupported symbolic gate column"
@@ -44,16 +44,18 @@ npm run verify:session-record -- \
   ~/.pi/agent/sessions/<project>/<session>.jsonl
 ```
 
-各項目には `kind`、`tool`、`command`、`pattern` の一つ以上を空文字以外で指定する。指定した条件をすべて満たすヒットだけを除外する。`pattern` は大文字と小文字を区別しない正規表現として、ヒットした行へ適用する。空文字の条件は設定ミスとして終了コード2で拒否する。
+Each entry must specify one or more of `kind`, `tool`, `command`, and `pattern` as nonempty strings. Only hits matching all specified conditions are excluded. `pattern` is applied to the matched line as a case-insensitive regular expression. Empty conditions are rejected as configuration errors with exit code 2.
 
-## 表示検査との関係
+Kind values are `nonzero-exit`, `unsupported`, `stopped`, and `fallback suggested`. Migrate existing ignore lists from `非 0 終了` to `nonzero-exit`, `機能不足` to `unsupported`, `途中停止` to `stopped`, and `代替手段` to `fallback suggested`. There is no compatibility shim for the old kind values. Japanese input detection terms remain supported as listed above.
 
-実表示検証は目視確認用の画面を撮影し、セッション記録検査は道具が期待どおり働いたかを記録から検査する。検査面は異なる。
+## Relationship to display checks
 
-実表示検証のコーパスモードは `--no-tools` で Pi を起動し、session JSONL を実行ごとの artifact directory に残す。`captured` または `failed` の結果にある directory から、その記録を次のように検査する。
+Real-display verification captures screens for visual review, while session record checks examine records to determine whether tools worked as expected. They inspect different surfaces.
+
+Corpus mode in real-display verification starts Pi with `--no-tools` and retains session JSONL in the per-run artifact directory. Inspect the record from the directory in a `captured` or `failed` result as follows:
 
 ```sh
 npm run verify:session-record -- path/to/persisted-session.jsonl
 ```
 
-セッション記録検査はウィンドウを作らず、別の headless ハーネスによる表示検査や後片付けを妨げない。
+Session record checks create no windows and do not interfere with display checks or cleanup performed by a separate headless harness.

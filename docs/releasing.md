@@ -1,10 +1,10 @@
-# npm 公開手順
+# Publishing to npm
 
-pi-formula は `vX.Y.Z` タグから GitHub Actions を起動し、人間の承認後に npm の信頼された公開を使う。
+pi-formula starts GitHub Actions from a `vX.Y.Z` tag and uses npm trusted publishing after human approval.
 
-## 公開の事前設定
+## Publishing setup
 
-npm のパッケージ設定で GitHub Actions を信頼された公開元として登録する。
+Register GitHub Actions as a trusted publisher in the npm package settings.
 
 - Organization or user: `yasuhito`
 - Repository: `pi-formula`
@@ -12,26 +12,26 @@ npm のパッケージ設定で GitHub Actions を信頼された公開元とし
 - Environment: `npm`
 - Allowed actions: `npm publish`
 
-GitHub の repository environment `npm` を作り、required reviewer に保守者を設定する。`npm` environment に npm トークンは登録しない。`.github/workflows/release.yml` は `id-token: write` で OpenID Connect の短期資格情報を取得し、`npm publish --provenance` で由来証明を付ける。
+Create the GitHub repository environment `npm` and set a maintainer as its required reviewer. Do not register an npm token in the `npm` environment. `.github/workflows/release.yml` obtains short-lived OpenID Connect credentials with `id-token: write` and attaches provenance with `npm publish --provenance`.
 
-## リリース情報の準備
+## Prepare release information
 
-`release-metadata.json` がレビュー対象の原本。新しい版を先頭に追加し、版、日付、箇条書きの順序を確定する。`npm version patch --no-git-tag-version` などで package と lock の版を合わせ、`npm run changelog:generate` で `CHANGELOG.md` を生成する。生成物は直接編集しない。`npm run check` は生成物が最新かも検査する。
+`release-metadata.json` is the canonical source for review. Add the new version at the top and finalize the version, date, and bullet order. Align the package and lockfile versions with a command such as `npm version patch --no-git-tag-version`, then generate `CHANGELOG.md` with `npm run changelog:generate`. Do not edit generated files directly. `npm run check` also verifies that generated files are up to date.
 
-その後 `npm run release:prepare -- vX.Y.Z .release` を実行する。この手順が全チェックと tarball 作成を行い、生成済み CHANGELOG から同じ順序の `release-notes.md` を抽出する。
+Then run `npm run release:prepare -- vX.Y.Z .release`. This runs all checks, creates the tarball, and extracts `release-notes.md` from the generated CHANGELOG in the same order.
 
-## 公開
+## Publish
 
-1. 上記の「リリース情報の準備」を行う。
-2. `npm run release:prepare -- vX.Y.Z .release` を手元で実行し、全チェック、tarball、`release-notes.md` を確認する。
-3. 公開対象のコミットへ `vX.Y.Z` タグを付け、タグだけを push する。
-4. GitHub Actions の `prepare` が全チェック、タグと版の一致、tarball 内容を再確認する。
-5. `publish` が `npm` environment の承認待ちになったら、版と成果物を確認して人間が承認する。
-6. 承認後、信頼された公開で npm へ公開し、`pi-formula X.Y.Z` という題名の GitHub Release を作る。Release 本文には同じ版の CHANGELOG の箇条書きを同じ順で使う。
+1. Complete "Prepare release information" above.
+2. Run `npm run release:prepare -- vX.Y.Z .release` locally and inspect all checks, the tarball, and `release-notes.md`.
+3. Tag the commit to publish with `vX.Y.Z` and push only the tag.
+4. GitHub Actions `prepare` rechecks all checks, tag/version agreement, and tarball contents.
+5. When `publish` awaits approval for the `npm` environment, a human reviews the version and artifacts and approves.
+6. After approval, trusted publishing publishes to npm and creates a GitHub Release titled `pi-formula X.Y.Z`. The Release body uses the CHANGELOG bullets for that version in the same order.
 
-## 公開後の確認
+## Post-publication checks
 
-`X.Y.Z` を公開版へ置き換えて実行する。
+Replace `X.Y.Z` with the published version and run:
 
 ```sh
 npm view pi-formula@X.Y.Z version dist-tags dist.integrity
@@ -42,10 +42,10 @@ workdir=$(mktemp -d)
 rm -rf "$workdir"
 ```
 
-さらに新しい一時環境で `pi install npm:pi-formula@X.Y.Z` を実行し、Pi が拡張を読み込めることを確認する。npm の Provenance 表示から `yasuhito/pi-formula` の `release.yml` と対象タグに由来することも確認する。
+Also run `pi install npm:pi-formula@X.Y.Z` in a fresh temporary environment and confirm that Pi can load the extension. Check npm's Provenance display to confirm it originates from `yasuhito/pi-formula`'s `release.yml` and the target tag.
 
-## 認証または外部サービスで止まった場合
+## If authentication or an external service blocks publication
 
-npm、GitHub Actions、GitHub environment、OpenID Connect の認証や権限で止まった場合は再試行しない。失敗した段階、エラーメッセージ、不足条件を報告し、人間が解消するまで公開を止める。
+Do not retry when blocked by authentication or permissions for npm, GitHub Actions, GitHub environments, or OpenID Connect. Report the failed stage, error message, and missing prerequisites, and stop publication until a human resolves them.
 
-npm 公開後に GitHub Release 作成だけが止まった場合も workflow 全体を再実行しない。npm に同じ版を再公開せず、公開済みの npm 版とタグを保ったまま不足条件を報告する。
+If only GitHub Release creation fails after npm publication, do not rerun the entire workflow. Do not republish the same npm version; preserve the published npm version and tag and report the missing prerequisites.

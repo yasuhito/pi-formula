@@ -11,11 +11,11 @@ AUTOMATION_IDS = (
 )
 
 
-# Orca は dispatch の数秒後に run を completed にするが、agent はその後も動き続ける。
-# status だけで tab を閉じると、働いている agent を殺してしまう
-# （2026-09-04 に PR #98 のレビューで、判定を書いた直後の terminal が次の tick に閉じられた）。
-# 動作中の Pi はスピナーを描き続けるため lastOutputAt が更新される。
-# 静かになってからこの窓を過ぎた tab だけを閉じる。
+# Orca marks a run completed a few seconds after dispatch, but the agent keeps working.
+# Closing a tab based on status alone kills an active agent
+# (on 2026-09-04, the terminal reviewing PR #98 was closed on the next tick just after writing its verdict).
+# Active Pi keeps drawing its spinner, updating lastOutputAt.
+# Close only tabs that have been quiet for longer than this window.
 QUIET_WINDOW_MS = 120_000
 
 
@@ -101,7 +101,7 @@ def has_worker_worktree(branch):
 issues = gh_json("issue", "list", "-R", repo, "--state", "open", "--limit", "200", "--json", "number,title,body,labels,updatedAt")
 
 skip_labels = {"agent:in-progress", "agent:blocked", "agent:waiting-dependency", "needs-info", "ready-for-human", "wontfix"}
-# 同時実行は 1 件だけ。worker が動いている（agent:in-progress がある）間は新しい候補で run を起こさない。
+# Run only one worker at a time. Do not start a run for a new candidate while a worker is active (agent:in-progress exists).
 worker_running = any(
     "agent:in-progress" in {label["name"] for label in issue.get("labels", [])} for issue in issues
 )

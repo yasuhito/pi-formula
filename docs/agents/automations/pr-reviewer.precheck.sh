@@ -10,11 +10,11 @@ AUTOMATION_IDS = (
 )
 
 
-# Orca は dispatch の数秒後に run を completed にするが、agent はその後も動き続ける。
-# status だけで tab を閉じると、働いている agent を殺してしまう
-# （2026-09-04 に PR #98 のレビューで、判定を書いた直後の terminal が次の tick に閉じられた）。
-# 動作中の Pi はスピナーを描き続けるため lastOutputAt が更新される。
-# 静かになってからこの窓を過ぎた tab だけを閉じる。
+# Orca marks a run completed a few seconds after dispatch, but the agent keeps working.
+# Closing a tab based on status alone kills an active agent
+# (on 2026-09-04, the terminal reviewing PR #98 was closed on the next tick just after writing its verdict).
+# Active Pi keeps drawing its spinner, updating lastOutputAt.
+# Close only tabs that have been quiet for longer than this window.
 QUIET_WINDOW_MS = 120_000
 
 
@@ -78,9 +78,9 @@ prs = gh_json(
 )
 
 def clear_stale_reviewing(prs):
-    """run が異常終了して agent:reviewing が残ると全 run が skip されるため、
-    付与から 45 分以上経過した agent:reviewing を自己修復として外す
-    （2026-08-31 に PR #20 でデッドロックが起きた）。"""
+    """A crashed run can leave agent:reviewing behind, causing every run to skip.
+    Self-repair by removing agent:reviewing when it was applied at least 45 minutes ago
+    (PR #20 deadlocked on 2026-08-31)."""
     import datetime
     now = datetime.datetime.now(datetime.timezone.utc)
     for pr in prs:
@@ -109,7 +109,7 @@ def clear_stale_reviewing(prs):
 clear_stale_reviewing(prs)
 
 blocked_labels = {"agent:reviewing", "ready-for-human", "agent:blocked"}
-# 同時実行は 1 件だけ。別の PR をレビュー中（agent:reviewing がある）なら新しい run を起こさない。
+# Run only one review at a time. Do not start a new run while another PR is under review (agent:reviewing exists).
 if any("agent:reviewing" in {label["name"] for label in pr.get("labels", [])} for pr in prs):
     sys.exit(1)
 for pr in prs:

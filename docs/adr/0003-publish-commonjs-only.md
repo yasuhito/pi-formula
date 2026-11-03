@@ -1,22 +1,22 @@
-# ADR 0003: CommonJSだけを配布する
+# ADR 0003: Publish CommonJS only
 
-## 状況
+## Context
 
-pi-formulaは新しいパッケージなのでES Modulesを選べる。一方、qni-cliはCommonJSであり、pi-formulaの公開インターフェースと二重登録を防ぐ共有状態を直接使う。CommonJS版とES Modules版を両方配ると、Node.jsが同じパッケージを別のモジュールとして読み込み、共有状態が分かれる危険がある。
+As a new package, pi-formula could choose ES Modules. However, qni-cli uses CommonJS and directly consumes pi-formula's public interface and the shared state that prevents duplicate registration. Shipping both CommonJS and ES Modules risks Node.js loading the same package as separate modules, splitting the shared state.
 
-MathJax 4はCommonJSとES Modulesの両方を提供し、ResvgはCommonJSとして利用できる。Node.js 22はCommonJSを正式に扱う。
+MathJax 4 provides both CommonJS and ES Modules, and Resvg is available as CommonJS. Node.js 22 officially supports CommonJS.
 
-## 決定
+## Decision
 
-pi-formula 0.1.0はCommonJSだけを配布する。ES Modulesとの二重配布は行わない。
+pi-formula 0.1.0 ships CommonJS only. Do not publish dual CommonJS and ES Modules builds.
 
-## 結果
+## Consequences
 
-qni-cliから同期的に利用でき、数式描画の共有状態を一つに保てる。二種類の成果物と公開条件を管理せずに済む。
+qni-cli can use it synchronously, keeping math rendering's shared state unified. There is no need to manage two sets of artifacts and export conditions.
 
-ES Modules専用の利用者は直接importできない。必要性が生じた場合は、共有状態と二重読み込みを壊さない境界を改めて設計する。
+ES Modules-only consumers cannot import it directly. If the need arises, redesign the boundary without breaking shared state or protection against duplicate loading.
 
-## 検討した選択肢
+## Alternatives considered
 
-- ES Modulesだけを配る: 新しいNode.jsパッケージとして自然だが、CommonJSのqni-cliからの利用が複雑になるため採らない。
-- CommonJSとES Modulesを両方配る: 利用範囲は広がるが、二重読み込みと共有状態の分断を招くため採らない。
+- Publish ES Modules only: natural for a new Node.js package, but rejected because it complicates consumption from CommonJS qni-cli.
+- Publish both CommonJS and ES Modules: broadens consumption, but rejected because it risks duplicate loading and split shared state.

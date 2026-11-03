@@ -1,36 +1,36 @@
-# ADR 0001: 公開Pi APIでインライン数式と表示数式を描き分ける
+# ADR 0001: Use public Pi APIs to render inline and display math differently
 
-## 状況
+## Context
 
-Pi 0.84以降は、本文のLaTeXをUnicodeテキストとして描ける。MathJax画像は複雑な組版を論文に近い形で読める一方、本文中の小さな画像は文字より薄くなり、コピー、検索、折り返し、ベースラインも不自然になる。
+Pi 0.84 and later can render LaTeX in prose as Unicode text. MathJax images make complex typesetting readable in a paper-like form, but small images within prose look fainter than text and make copying, searching, wrapping, and baselines unnatural.
 
-先行する画像拡張にはPi内部のMarkdown描画処理を書き換えるものがある。この方式は細かな配置を制御できるが、非公開の内部構造へ依存し、Piの更新で壊れやすい。
+Some earlier image extensions rewrite Pi's internal Markdown rendering. This gives fine-grained control over placement but depends on private internals and is vulnerable to Pi updates.
 
-## 決定
+## Decision
 
-Pi 0.84以降の公開APIだけを使い、保存された会話とモデルへ渡るLaTeXを変更せず、画面上の表示だけを変える。
+Use only public APIs in Pi 0.84 and later. Change only the on-screen display, without changing saved conversations or the LaTeX passed to the model.
 
-- インライン数式は常にPi標準のUnicodeテキスト経路へ残す。
-- 表示数式は、画像対応端末ではMathJaxとResvgで画像にする。
-- 画像を使えない場合、表示数式もUnicodeテキスト経路へ戻す。
-- 最初に画像表示を保証する端末はGhosttyとKittyとする。
-- 画像配置はKitty Unicodeプレースホルダーの公開仕様を使う。
-- ストリーミング中も、閉じた表示数式は画像経路で描く。未完成の表示数式はテキスト経路に残す。以前は、差分描画で転送行と placeholder 行の対応が分断されることを避けるため、応答の確定まで表示数式をテキスト経路に残していた。#92 で確定待ちを外し、先行するツール出力を含む Issue 26 の逐次更新を実測した。各完了フレームで仮想配置と placeholder の画像 ID は対応し、全フレームで本文セルの APC 断片はなかった。この結果に基づいて確定待ちを外し、同じ状態をストリーミング中のプロトコル検査で継続して確認する。
-- 画像の転送チャンク列は各プレースホルダーの直前へ置き、Pi の Markdown 描画で他の本文と同じ描画行へ結合されないよう分離する。一時保存は端末上の画像の存在を保証しないため、同じ画像 ID も配置ごとに再転送する。
-- Pi内部の関数やプロトタイプは書き換えない。
+- Always leave inline math on Pi's standard Unicode text path.
+- Convert display math into images with MathJax and Resvg on image-capable terminals.
+- Fall back to the Unicode text path for display math when images are unavailable.
+- Ghostty and Kitty are the first terminals with guaranteed image support.
+- Use the public Kitty Unicode placeholder specification for image placement.
+- Render closed display math through the image path even during streaming. Leave incomplete display math on the text path. Previously, display math stayed on the text path until the response was finalized, to avoid differential rendering separating transfer lines from placeholder lines. #92 removed that wait and measured incremental updates of Issue 26, including preceding tool output. In each completed frame, virtual placements and placeholder image IDs matched, and no frame had APC fragments in body cells. These results justified removing the wait; streaming protocol checks continue to verify the same state.
+- Place image transfer chunks immediately before each placeholder, separated so that Pi's Markdown renderer does not merge them onto the same rendered line as other body content. A cache does not guarantee the image still exists in the terminal, so retransmit even the same image ID for each placement.
+- Do not rewrite Pi's internal functions or prototypes.
 
-## プロトコルと実表示検証の制約
+## Protocol and real-display verification constraints
 
-- Kitty の行・列 diacritic の順序は [上流の座標表](https://github.com/kovidgoyal/kitty/blob/master/gen/rowcolumn-diacritics.txt) に従う。`src/kitty.ts` と native 検証側の表は同じ順序を保つ必要があり、`test/diacritics.test.ts` が C の出力と全座標を照合する。
-- native 検証端末は Kitty の `a=q`、DA、DSR などへの応答を PTY へ返す。応答を捨てると Pi の端末 probe が待ち続け、実際の描画まで進まない。
-- 実表示検証の終了処理は process group 全体を停止する。macOS では全員が終了して未回収の group にシグナルを送ると `ESRCH` ではなく `EPERM` が返るため、どちらも停止済みとして扱う。停止の検査には `ps` の状態を使い、未回収の終了済み process (`Z`) と動作中を区別する。
+- The order of Kitty row and column diacritics follows the [upstream coordinate table](https://github.com/kovidgoyal/kitty/blob/master/gen/rowcolumn-diacritics.txt). The tables in `src/kitty.ts` and native verification must maintain the same order; `test/diacritics.test.ts` compares all coordinates against C output.
+- The native verification terminal writes responses to Kitty `a=q`, DA, DSR, and similar requests back to the PTY. Discarding responses leaves Pi's terminal probe waiting indefinitely, preventing rendering.
+- Real-display verification cleanup stops the entire process group. On macOS, signaling an unreaped group whose members have all exited returns `EPERM` rather than `ESRCH`, so treat either as already stopped. Use `ps` state to distinguish unreaped exited processes (`Z`) from running processes.
 
-## 結果
+## Consequences
 
-本文とインライン数式は同じ大きさ、濃さ、ベースラインで表示され、コピー、検索、折り返しを保てる。複雑な表示数式は画像による組版を使える。Piの非公開実装へ依存しない代わりに、古いPiと、確認していない画像プロトコルは保証しない。
+Prose and inline math have the same size, weight, and baseline, retaining copying, searching, and wrapping. Complex display math can use image-based typesetting. In exchange for avoiding Pi's private implementation, older Pi versions and unverified image protocols are not guaranteed.
 
-## 検討した選択肢
+## Alternatives considered
 
-- 全数式を画像にする: インライン数式の読みやすさと本文の操作性を損なうため採らない。
-- 全数式をUnicodeにする: 分数、総和、行列などの表示数式を論文に近い組版で読む目的を満たさないため採らない。
-- Pi内部のMarkdown描画処理を書き換える: 配置の自由度は上がるが、非公開APIへ依存するため採らない。
+- Render all math as images: rejected because it harms inline readability and interaction with prose.
+- Render all math as Unicode: rejected because it does not meet the goal of paper-like typesetting for display math such as fractions, sums, and matrices.
+- Rewrite Pi's internal Markdown rendering: rejected because the increased placement freedom depends on private APIs.

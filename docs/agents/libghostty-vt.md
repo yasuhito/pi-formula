@@ -1,101 +1,101 @@
 ---
-summary: libghostty-vt を固定した版からビルドし、プロトコル状態を検査する
+summary: Build libghostty-vt from a pinned version and inspect protocol state
 read_when:
-  - libghostty-vt の pin や vt-pty を更新する時
-  - 画像経路のプロトコル検査を追加する時
+  - Updating the libghostty-vt pin or vt-pty
+  - Adding image-path protocol checks
 ---
 
-# libghostty-vt のプロトコル検査
+# libghostty-vt protocol checks
 
-`vt-pty` は pty で子プロセスを起動し、その出力を libghostty-vt へ渡す。描画が落ち着くか、必要な仮想配置の後に同期出力の終了境界を受け取ると、Kitty 画像の placement と端末セルの状態を標準出力へ出す。`WRITE_PTY` の応答は pty へ書き戻す。PNG decoder は IHDR の寸法だけを読み、ゼロ埋め RGBA を返す。
+`vt-pty` starts a child process in a PTY and feeds its output into libghostty-vt. Once rendering settles, or a synchronized-output end boundary arrives after the required virtual placements, it writes Kitty image placements and terminal cell state to standard output. `WRITE_PTY` responses are written back to the PTY. The PNG decoder reads only the IHDR dimensions and returns zero-filled RGBA.
 
-## ビルド
+## Build
 
-Zig 0.16.0 と C compiler が必要になる。
+Requires Zig 0.16.0 and a C compiler.
 
 ```sh
 scripts/build-vt-pty
 ```
 
-既定の成果物は `$XDG_CACHE_HOME/pi-formula/libghostty-vt/<commit>/prefix`、`XDG_CACHE_HOME` がなければ `~/.cache` 以下へ置く。別の場所を使う場合は次のように指定する。
+The default artifacts go under `$XDG_CACHE_HOME/pi-formula/libghostty-vt/<commit>/prefix`, or under `~/.cache` if `XDG_CACHE_HOME` is unset. To use another location:
 
 ```sh
 scripts/build-vt-pty --prefix "$HOME/.local/state/pi-formula-native"
 ```
 
-ビルドは `native/libghostty-vt.commit` の一行だけを版の入力にする。Ghostty をその commit へ切り替え、次のコマンドで指定 prefix へ入れる。
+The build uses the single line in `native/libghostty-vt.commit` as its only version input. It checks out that Ghostty commit and installs into the specified prefix with:
 
 ```sh
 zig build -Demit-lib-vt -Doptimize=ReleaseFast --prefix <dir>
 ```
 
-`vt-pty` のコンパイルでは `<dir>/include` と `<dir>/lib` を明示する。システムの libghostty-vt や `pkg-config` は使わない。ビルド計画だけを確認する場合は `--print-plan` を付ける。この場合は clone、ビルド、ファイル作成を行わない。
+Compilation of `vt-pty` explicitly uses `<dir>/include` and `<dir>/lib`. It does not use system libghostty-vt or `pkg-config`. Add `--print-plan` to inspect only the build plan, without cloning, building, or creating files.
 
-CI は高価な libghostty-vt のヘッダとライブラリだけを pin ごとに cache する。`native/vt-pty.c` と `native/diacritics.h` から作る実行ファイルは cache に含めず、現在の checkout から毎回コンパイルする。
+CI caches only the expensive libghostty-vt headers and library per pin. The executable built from `native/vt-pty.c` and `native/diacritics.h` is not cached; it is compiled from the current checkout each time.
 
-## 実行と skip
+## Run and skip
 
 ```sh
 scripts/run-vt-pty.js -- <command> [args...]
 ```
 
-入口は `PI_FORMULA_VT_TOOL`、既定の cache 内にある `vt-pty` の順で探す。どちらにも実行可能なファイルがなければ、プロトコル検査を成功として skip し、その旨を標準出力へ出す。通常の `npm run check` は native 成果物を必要としない。
+The entry point searches `PI_FORMULA_VT_TOOL` first, then `vt-pty` in the default cache. If neither has an executable, it skips protocol checks successfully and reports the skip on standard output. Normal `npm run check` does not require native artifacts.
 
-配置数を指定しない場合は、子プロセスの出力が落ち着いた後にプロトコル状態を出す。`--wait-for-render-boundary` も指定した場合は、必要な仮想配置の後に `ESC[?2026l` の同期出力終了境界を受け取るまで PTY を読む。これにより、配置 APC と別の read に分かれた placeholder や本文も libghostty-vt へ渡しつつ、境界後の出力が続いても全体の静止を待たない。
+Without a placement count, it emits protocol state after the child's output settles. With `--wait-for-render-boundary`, it reads the PTY until the synchronized-output end boundary `ESC[?2026l` arrives after the required virtual placements. This feeds libghostty-vt placeholders and body content split into separate reads from placement APCs, without waiting for all output to settle if more output follows the boundary.
 
-`--wait-for-child-exit` を指定すると出力の静止ではなく子プロセスの正常終了を待つ。端末応答を受け取ったこと自体を検査する短命な fixture のように、応答後の出力有無を静止時間から推測できない場合に使う。
+`--wait-for-child-exit` waits for successful child exit rather than output quiescence. Use it when output after a response cannot be inferred from a quiet interval, such as short-lived fixtures that verify receipt of terminal responses.
 
-`--frames` を指定すると、pty から読むたびに同期出力の完了を示す `frame.complete`、Kitty APC の継続中を示す `frame.kitty_open`、Kitty storage と仮想配置、placeholder セル、本文セルの APC 断片を出力する。最後に従来の最終状態も出力する。timeout、起動失敗、PTY の入出力失敗、必須 libghostty-vt API の失敗は終了コード2にする。
+With `--frames`, every PTY read emits `frame.complete` for synchronized-output completion, `frame.kitty_open` for an ongoing Kitty APC, Kitty storage and virtual placements, placeholder cells, and APC fragments in body cells. The traditional final state is also emitted at the end. Timeouts, launch failures, PTY I/O failures, and required libghostty-vt API failures exit with code 2.
 
-native 専用の Cucumber シナリオも同じ順序で探す。専用 CI job は `PI_FORMULA_VT_TOOL` を設定してこのシナリオを実行する。
+Native-only Cucumber scenarios search in the same order. The dedicated CI job sets `PI_FORMULA_VT_TOOL` and runs these scenarios.
 
-## エンコーダ層のプロトコル検査
+## Encoder-layer protocol checks
 
 ```sh
 npm run verify:encoder-protocol
 ```
 
-この入口は最初に現在の checkout をビルドする。その後、`test/support/fake-pi.js` で画像経路を選び、Markdown transformer が出したバイト列を `vt-pty` へ直接流す。Pi とモデルは起動しない。利用者の設定と端末環境に左右されないよう、検査中は `XDG_CONFIG_HOME` を一時ディレクトリへ向け、`PI_FORMULA_MACROS` を空にし、`TMUX` を外して `TERM` を画像経路用の値へ固定する。storage の画像、仮想配置、placeholder セルの画像 ID・座標・下線色タグを検査する。同じ Markdown を二度変換し、二度目の出力も新しい端末の storage に画像を作ることも確かめる。
+This entry point first builds the current checkout. It then selects the image path with `test/support/fake-pi.js` and feeds bytes emitted by the Markdown transformer directly to `vt-pty`. It does not start Pi or a model. To isolate checks from user settings and terminal environment, it points `XDG_CONFIG_HOME` at a temporary directory, empties `PI_FORMULA_MACROS`, unsets `TMUX`, and fixes `TERM` to an image-path value. It checks storage images, virtual placements, and placeholder cell image IDs, coordinates, and underline color tags. It transforms the same Markdown twice and confirms that the second output also creates images in a fresh terminal's storage.
 
-PNG の転送形式 `f=100` と IHDR の寸法を転送計画として読み、libghostty-vt の storage と照合する。libghostty-vt は PNG decoder を通した画像を RGBA として保存するため、storage 側では RGBA へ正規化された形式を期待する。`vt-pty` は各 U+10EEEE セルについて foreground RGB から復元した画像 ID と、diacritics から復元した行・列を出力する。
+It reads PNG transfer format `f=100` and IHDR dimensions as the transfer plan and compares them with libghostty-vt storage. Because libghostty-vt stores PNG-decoded images as RGBA, storage is expected to have a format normalized to RGBA. For each U+10EEEE cell, `vt-pty` emits the image ID reconstructed from foreground RGB and the row and column reconstructed from diacritics.
 
-`--check` へ `storage`、`placement`、`image-id`、`coordinates`、`underline`、`cached` のいずれかを渡すと、その項目だけを検査できる。`missing-transfer` は画像転送を除いた退行確認用で、「placeholder が指す id に仮想配置がない」として失敗する。`vt-pty` がなければ成功として skip する。実装契約のシナリオは `npm run test:native-vt` で実行する。
+Pass `storage`, `placement`, `image-id`, `coordinates`, `underline`, or `cached` to `--check` to check only that item. `missing-transfer` is a regression check with image transfers removed; it fails because no virtual placement exists for the ID referenced by the placeholder. If `vt-pty` is unavailable, the check skips successfully. Run implementation-contract scenarios with `npm run test:native-vt`.
 
-## Pi を通したプロトコル検査
+## Protocol checks through Pi
 
 ```sh
 npm run verify:pi-protocol
 ```
 
-この検査は `docs/agents/verify-corpus/issue-52.md` から一時セッションを作り、`pi --session` で開く。Pi は `--offline` で起動し、保存済み assistant message を描くだけなのでモデルを呼ばない。拡張の自動探索、tool、skill、prompt template、context file、theme を無効にする。設定は一時 `XDG_CONFIG_HOME` へ隔離し、`PI_FORMULA_MACROS='{}'` で利用者マクロを空にする。
+This check creates a temporary session from `docs/agents/verify-corpus/issue-52.md` and opens it with `pi --session`. Pi starts with `--offline` and only renders saved assistant messages, without calling a model. Automatic extension discovery, tools, skills, prompt templates, context files, and themes are disabled. Settings are isolated in a temporary `XDG_CONFIG_HOME`, with user macros cleared by `PI_FORMULA_MACROS='{}'`.
 
-Pi の TUI は一回の描画を `ESC[?2026h` と `ESC[?2026l` で囲む。全表示数式の仮想配置を受け取った後、その Kitty APC より後の同期出力終了境界まで読み、pty の出力が止まるのを待たずに状態を検査する。この境界により、同じ描画にある placeholder と本文を処理済みだと判断できる。初回組版の途中に無出力時間があっても、配置と境界が揃うまでは確定しない。配置と境界を待つ期限は15秒とし、期限内に配置が揃わなければ、timeout 時点でもう一度配置を数え、必要数と実際の観測数を含む `vt-pty: timeout 15000ms waiting for ... placements` を出して終了コード2で失敗する。配置だけが揃って境界が来なければ `waiting for render boundary` と報告する。
+Pi's TUI wraps each render in `ESC[?2026h` and `ESC[?2026l`. After receiving virtual placements for all display math, the check reads through the synchronized-output end boundary following that Kitty APC and inspects state without waiting for PTY output to stop. This boundary establishes that placeholders and body content in the same render have been processed. Even if initial typesetting pauses output, it does not finalize until both placements and boundary arrive. The deadline for placements and boundary is 15 seconds. If placements are incomplete, it recounts them at timeout and fails with exit code 2, reporting `vt-pty: timeout 15000ms waiting for ... placements` with required and observed counts. If placements are complete but no boundary arrives, it reports `waiting for render boundary`.
 
-次のどれかに該当すると終了コード1で失敗する。
+Any of the following fails with exit code 1:
 
-- placeholder セルに `faint`、背景色、`inverse` のいずれかがある
-- 仮想配置の画像 ID に対応する placeholder セルがない
-- 本文セルに APC の ESC または ST が残る
-- 表示数式の数と、storage に image がある仮想配置の数が一致しない
+- A placeholder cell has `faint`, a background color, or `inverse`
+- A virtual placement's image ID has no corresponding placeholder cell
+- An APC ESC or ST remains in a body cell
+- The number of display math expressions differs from the number of virtual placements with an image in storage
 
-`vt-pty` がなければ通常のプロトコル検査と同様に成功として skip する。実装契約の回帰シナリオは `npm run test:native-vt` で実行する。
+If `vt-pty` is unavailable, the check skips successfully, like normal protocol checks. Run implementation-contract regression scenarios with `npm run test:native-vt`.
 
-## ストリーミング中のプロトコル検査
+## Streaming protocol checks
 
 ```sh
 npm run verify:streaming-protocol
 ```
 
-Pi の公開 Markdown transformer と `TuiMainScreen` を使い、先行する tool 出力を残したまま Issue 26 の未完了本文を3回伸ばし、最後に確定本文を描く。閉じた表示数式は各更新から画像経路を使う。TUI が生成した全画面再描画ではない差分書き込みを、そのまま `vt-pty` へ順に渡す。`vt-pty --frames` が記録したすべてのフレームで本文セルの APC 断片が0件であることを検査する。各完了フレームでは、仮想配置と placeholder の画像 ID が対応することを検査する。最終フレームでは、表示数式と storage 付き仮想配置の数が一致することも検査する。
+Using Pi's public Markdown transformer and `TuiMainScreen`, the check extends Issue 26's incomplete body three times while retaining preceding tool output, then renders the finalized body. Closed display math uses the image path on each update. Differential writes generated by the TUI, rather than full-screen redraws, are passed to `vt-pty` unchanged in sequence. It checks for zero APC fragments in body cells in every frame recorded by `vt-pty --frames`. In each completed frame, it checks that virtual placements and placeholder image IDs match. In the final frame, it also checks that display math and virtual placements with storage have matching counts.
 
-この検査により、ADR 0001 が定める「ストリーミング中も、閉じた表示数式は画像経路」という経路を時系列で確認する。3回の逐次更新では先行する tool 出力を保ち、仮想配置が1件、2件、3件と増える。確定時には同じ3件を保つ。pty の読み取り境界をまたぐ Kitty APC があっても、完了フレームでは対応する placeholder が揃い、本文セルに APC 断片を残さない。
+This verifies over time the path specified by ADR 0001: closed display math uses the image path even while streaming. The three incremental updates retain preceding tool output while virtual placements increase from one to two to three. Finalization retains the same three. Even if Kitty APCs cross PTY read boundaries, completed frames contain the corresponding placeholders and leave no APC fragments in body cells.
 
-`vt-pty` がなければ成功として skip する。native 専用の Cucumber シナリオは、複数フレーム、全フレームの APC、最終フレームを独立して検査する。
+If `vt-pty` is unavailable, the check skips successfully. Native-only Cucumber scenarios independently check multiple frames, APCs across all frames, and the final frame.
 
-## pin の更新
+## Updating the pin
 
-pin の更新は独立した PR にする。更新前後で次を確認する。
+Update the pin in a separate PR. Check the following before and after:
 
-1. `include/ghostty/vt/` の `terminal.h`、`render.h`、`style.h`、`kitty_graphics.h` の差分を読む。
-2. Tier A と Tier B の検査が通ることを確認する。
-3. ビルド時間と成果物サイズが極端に変わっていないことを確認する。
+1. Read changes to `terminal.h`, `render.h`, `style.h`, and `kitty_graphics.h` under `include/ghostty/vt/`.
+2. Confirm Tier A and Tier B checks pass.
+3. Confirm build time and artifact size have not changed drastically.

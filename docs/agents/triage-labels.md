@@ -1,15 +1,15 @@
 # Triage labels
 
-triage スキルの役割を、同名の GitHub label に対応させる。
+Map triage skill roles to the GitHub labels with the same names.
 
-| 役割 | GitHub label | 意味 |
+| Role | GitHub label | Meaning |
 | --- | --- | --- |
-| `needs-triage` | `needs-triage` | 保守者の評価待ち |
-| `needs-info` | `needs-info` | 報告者からの情報待ち |
-| `ready-for-agent` | `ready-for-agent` | エージェントが実装できる |
-| `ready-for-human` | `ready-for-human` | 人間の作業が必要 |
-| `wontfix` | `wontfix` | 対応しない |
+| `needs-triage` | `needs-triage` | Awaiting maintainer assessment |
+| `needs-info` | `needs-info` | Awaiting information from the reporter |
+| `ready-for-agent` | `ready-for-agent` | An agent can implement it |
+| `ready-for-human` | `ready-for-human` | Human work is needed |
+| `wontfix` | `wontfix` | Will not be addressed |
 
-スキルが役割名を示した場合は、この表の GitHub label を使う。
+When a skill names a role, use the GitHub label in this table.
 
-自動化ループ専用の `agent:*` label は `docs/agents/issue-tracker.md` を参照する。
+See `docs/agents/issue-tracker.md` for automation-only `agent:*` labels.

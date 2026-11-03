@@ -1,43 +1,43 @@
 # Issue tracker: GitHub
 
-このリポジトリの課題と仕様は GitHub Issues で管理する。すべての操作には `gh` CLI を使う。
+Manage this repository's tasks and specifications in GitHub Issues. Use the `gh` CLI for all operations.
 
-## 操作
+## Operations
 
-- 作成: `gh issue create --title "..." --body "..."`
-- 読み取り: `gh issue view <number> --comments`
-- 一覧: `gh issue list --state open --json number,title,body,labels,comments`
-- コメント: `gh issue comment <number> --body "..."`
-- ラベル: `gh issue edit <number> --add-label "..."`
-- 完了: `gh issue close <number> --comment "..."`
+- Create: `gh issue create --title "..." --body "..."`
+- Read: `gh issue view <number> --comments`
+- List: `gh issue list --state open --json number,title,body,labels,comments`
+- Comment: `gh issue comment <number> --body "..."`
+- Label: `gh issue edit <number> --add-label "..."`
+- Complete: `gh issue close <number> --comment "..."`
 
-リポジトリは `git remote -v` から判断する。「issue tracker へ公開」は GitHub Issue の作成を意味する。
+Determine the repository from `git remote -v`. "Publish to the issue tracker" means creating a GitHub Issue.
 
-## Pull Request
+## Pull requests
 
-外部 Pull Request は triage の依頼受付面として扱わない。Issue と Pull Request は同じ番号空間を使うため、種類が不明な番号は `gh pr view` と `gh issue view` で確認する。
+Do not treat external pull requests as an intake surface for triage requests. Issues and pull requests share the same numbering space, so check an ambiguous number with both `gh pr view` and `gh issue view`.
 
-## 子Issueと依存関係
+## Sub-issues and dependencies
 
-複数の作業へ分ける場合は GitHub の子Issueを使う。作業順は GitHub の依存関係で表し、依存関係を使えない場合だけIssue本文の `Blocked by:` 行へ記録する。未完了の依存先がなく、担当者がいないIssueを次の作業候補とする。
+Use GitHub sub-issues to split work into multiple tasks. Express work order with GitHub dependencies; only when dependencies are unavailable, record them in a `Blocked by:` line in the issue body. Issues without unfinished dependencies or an assignee are candidates for the next task.
 
-## 実装契約
+## Implementation contract
 
-自動実装に渡す issue の本文には、次の節を置く。
+Include these sections in the body of an issue handed to automated implementation.
 
-- `## What to build`: 何をどう変えるか
-- `## Acceptance criteria`: 検証できる条件のチェックリスト
-- `## Out of scope`（任意）: この issue でやらないこと
+- `## What to build`: what to change and how
+- `## Acceptance criteria`: a checklist of verifiable conditions
+- `## Out of scope` (optional): what this issue will not do
 
-## 自動化ループのラベル
+## Automation loop labels
 
-| label | 意味 |
+| label | Meaning |
 | --- | --- |
-| `agent:implement` | `ready-for-agent` と併用すると、issue coordinator が worker に渡す |
-| `agent:in-progress` | worker が実装中 |
-| `agent:waiting-dependency` | 依存 issue の完了待ち。依存がすべて閉じると自動で `agent:implement` に戻る |
-| `agent:blocked` | 自動処理を停止。原因を人間が確認するまで再実行しない |
-| `agent:review` | PR がレビュー待ち |
-| `agent:reviewing` | PR reviewer がレビュー中 |
+| `agent:implement` | Together with `ready-for-agent`, tells the issue coordinator to hand the issue to a worker |
+| `agent:in-progress` | A worker is implementing the issue |
+| `agent:waiting-dependency` | Waiting for dependency issues to finish; automatically returns to `agent:implement` once all dependencies close |
+| `agent:blocked` | Automation is stopped; do not rerun until a human checks the cause |
+| `agent:review` | The PR is awaiting review |
+| `agent:reviewing` | The PR reviewer is reviewing the PR |
 
-automation の定義は `docs/agents/automations/` を参照する。
+See `docs/agents/automations/` for automation definitions.
