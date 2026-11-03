@@ -43,134 +43,67 @@ function runProbe(inventory: string, text: string): TypesettingProbe {
 }
 
 Given(
-  "{word} のセリフ体候補がある画像経路",
+  "an image path with {word} serif font candidates",
   function (this: StepWorld, inventory: string) {
     this.fontInventory = inventory;
   },
 );
 
-Given("CJK 対応セリフ体がない画像経路", function (this: StepWorld) {
-  this.fontInventory = "fallback";
-});
+Given(
+  "an image path without a CJK-capable serif font",
+  function (this: StepWorld) {
+    this.fontInventory = "fallback";
+  },
+);
 
 When(
-  "日本語の text を含む表示数式を Resvg まで組版する",
+  "typeset display math containing Japanese text through Resvg",
   function (this: StepWorld) {
     this.probe = runProbe(this.fontInventory, "それ以外");
   },
 );
 
 When(
-  "ASCII の text を含む表示数式を Resvg まで組版する",
+  "typeset display math containing ASCII text through Resvg",
   function (this: StepWorld) {
     this.probe = runProbe(this.fontInventory, "otherwise");
   },
 );
 
-Then("優先候補の日本語の表示数式は画像になる", function (this: StepWorld) {
-  assert.deepEqual(this.probe.image, true);
-});
-
-Then("優先候補の日本語の画像にはPNG署名がある", function (this: StepWorld) {
-  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
-});
-
 Then(
-  "日本語の組版には優先候補のセリフ体設定がResvgへ渡る",
-  function (this: StepWorld) {
-    assert.deepEqual(this.probe.font, {
-      loadSystemFonts: true,
-      defaultFontFamily: "Noto Serif CJK JP",
-      serifFamily: "Noto Serif CJK JP",
-    });
-  },
-);
-
-Then("優先候補の日本語のSVGには19個のpathがある", function (this: StepWorld) {
-  assert.deepEqual(this.probe.pathCount, 19);
-});
-
-Then("日本語のtextの内容と尺度はResvgへ渡る", function (this: StepWorld) {
-  assert.deepEqual(this.probe.text, {
-    value: "それ以外",
-    family: "serif",
-    size: "884px",
-    baseline: "scale(1,-1)",
-  });
-});
-
-Then(
-  "診断には日本語に選んだ優先候補のセリフ体が表示される",
-  function (this: StepWorld) {
-    assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
-  },
-);
-
-Then(
-  "{string} が表示数式のセリフ体に選ばれる",
-  function (this: StepWorld, family: string) {
-    assert.equal(this.probe.font.serifFamily, family);
-  },
-);
-
-Then("ASCIIの表示数式は画像になる", function (this: StepWorld) {
-  assert.deepEqual(this.probe.image, true);
-});
-
-Then("ASCIIの画像にはPNG署名がある", function (this: StepWorld) {
-  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
-});
-
-Then(
-  "ASCIIの組版には優先候補のセリフ体設定がResvgへ渡る",
-  function (this: StepWorld) {
-    assert.deepEqual(this.probe.font, {
-      loadSystemFonts: true,
-      defaultFontFamily: "Noto Serif CJK JP",
-      serifFamily: "Noto Serif CJK JP",
-    });
-  },
-);
-
-Then("ASCIIのSVGには26個のpathがある", function (this: StepWorld) {
-  assert.deepEqual(this.probe.pathCount, 26);
-});
-
-Then("ASCIIの組版にSVGのtextは含まれない", function (this: StepWorld) {
-  assert.deepEqual(this.probe.text, null);
-});
-
-Then("診断にはASCIIに選んだセリフ体が表示される", function (this: StepWorld) {
-  assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
-});
-
-Then(
-  "候補のセリフ体がなくても日本語の表示数式は画像になる",
+  "Japanese display math using the preferred candidate becomes an image",
   function (this: StepWorld) {
     assert.deepEqual(this.probe.image, true);
   },
 );
 
 Then(
-  "候補のセリフ体がない日本語の画像にもPNG署名がある",
+  "The Japanese image using the preferred candidate has a PNG signature",
   function (this: StepWorld) {
     assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
   },
 );
 
-Then("候補のセリフ体がない組版はsystem fontを使う", function (this: StepWorld) {
-  assert.deepEqual(this.probe.font, { loadSystemFonts: true });
-});
+Then(
+  "The preferred serif font settings are passed to Resvg for Japanese typesetting",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.font, {
+      loadSystemFonts: true,
+      defaultFontFamily: "Noto Serif CJK JP",
+      serifFamily: "Noto Serif CJK JP",
+    });
+  },
+);
 
 Then(
-  "候補のセリフ体がない日本語のSVGには19個のpathがある",
+  "The Japanese SVG using the preferred candidate contains 19 paths",
   function (this: StepWorld) {
     assert.deepEqual(this.probe.pathCount, 19);
   },
 );
 
 Then(
-  "system fontでも日本語のtextの内容と尺度はResvgへ渡る",
+  "Japanese text content and scale are passed to Resvg",
   function (this: StepWorld) {
     assert.deepEqual(this.probe.text, {
       value: "それ以外",
@@ -181,6 +114,97 @@ Then(
   },
 );
 
-Then("診断にはsystem fontへのfallbackが表示される", function (this: StepWorld) {
-  assert.deepEqual(this.probe.status, "serif: system fallback");
+Then(
+  "Diagnostics show the preferred serif font selected for Japanese",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
+  },
+);
+
+Then(
+  "{string} is selected as the display math serif font",
+  function (this: StepWorld, family: string) {
+    assert.equal(this.probe.font.serifFamily, family);
+  },
+);
+
+Then("ASCII display math becomes an image", function (this: StepWorld) {
+  assert.deepEqual(this.probe.image, true);
 });
+
+Then("The ASCII image has a PNG signature", function (this: StepWorld) {
+  assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
+});
+
+Then(
+  "The preferred serif font settings are passed to Resvg for ASCII typesetting",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.font, {
+      loadSystemFonts: true,
+      defaultFontFamily: "Noto Serif CJK JP",
+      serifFamily: "Noto Serif CJK JP",
+    });
+  },
+);
+
+Then("The ASCII SVG contains 26 paths", function (this: StepWorld) {
+  assert.deepEqual(this.probe.pathCount, 26);
+});
+
+Then("The typeset ASCII contains no SVG text", function (this: StepWorld) {
+  assert.deepEqual(this.probe.text, null);
+});
+
+Then(
+  "Diagnostics show the serif font selected for ASCII",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.status, "serif: Noto Serif CJK JP");
+  },
+);
+
+Then(
+  "Japanese display math becomes an image even without serif font candidates",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.image, true);
+  },
+);
+
+Then(
+  "The Japanese image without serif font candidates also has a PNG signature",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.pngSignature, "89504e470d0a1a0a");
+  },
+);
+
+Then(
+  "Typesetting without serif font candidates uses system fonts",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.font, { loadSystemFonts: true });
+  },
+);
+
+Then(
+  "The Japanese SVG without serif font candidates contains 19 paths",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.pathCount, 19);
+  },
+);
+
+Then(
+  "Japanese text content and scale are passed to Resvg even with system fonts",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.text, {
+      value: "それ以外",
+      family: "serif",
+      size: "884px",
+      baseline: "scale(1,-1)",
+    });
+  },
+);
+
+Then(
+  "Diagnostics show the fallback to system fonts",
+  function (this: StepWorld) {
+    assert.deepEqual(this.probe.status, "serif: system fallback");
+  },
+);

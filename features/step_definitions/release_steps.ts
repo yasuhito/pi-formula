@@ -43,16 +43,22 @@ After(function (this: StepWorld) {
   }
 });
 
-Given("package.json と異なる版の公開タグがある", function (this: StepWorld) {
-  this.releaseTag = "v9.9.9";
-});
+Given(
+  "a release tag differs from the package.json version",
+  function (this: StepWorld) {
+    this.releaseTag = "v9.9.9";
+  },
+);
 
-Given("package.json と同じ版の公開タグがある", function (this: StepWorld) {
-  const manifest = JSON.parse(readProjectFile("package.json"));
-  this.releaseTag = `v${manifest.version}`;
-});
+Given(
+  "a release tag matches the package.json version",
+  function (this: StepWorld) {
+    const manifest = JSON.parse(readProjectFile("package.json"));
+    this.releaseTag = `v${manifest.version}`;
+  },
+);
 
-When("公開準備を実行する", function (this: StepWorld) {
+When("run release preparation", function (this: StepWorld) {
   this.releaseDirectory = mkdtempSync(join(tmpdir(), "pi-formula-release-"));
   this.preparation = spawnSync(
     process.execPath,
@@ -61,12 +67,15 @@ When("公開準備を実行する", function (this: StepWorld) {
   );
 });
 
-Then("版が異なるタグの公開準備は終了コード1を返す", function (this: StepWorld) {
-  assert.deepEqual(this.preparation.status, 1);
-});
+Then(
+  "Release preparation for a mismatched version tag returns exit code 1",
+  function (this: StepWorld) {
+    assert.deepEqual(this.preparation.status, 1);
+  },
+);
 
 Then(
-  "公開準備はpackageの版とタグの不一致を表示する",
+  "Release preparation reports a package version and tag mismatch",
   function (this: StepWorld) {
     assert.deepEqual(
       /does not match package\.json version/u.test(this.preparation.stderr),
@@ -76,27 +85,33 @@ Then(
 );
 
 Then(
-  "版が異なるタグの公開準備では配布ファイルを作らない",
+  "Release preparation for a mismatched version tag creates no distribution files",
   function (this: StepWorld) {
     assert.deepEqual(require("node:fs").readdirSync(this.releaseDirectory), []);
   },
 );
 
-Then("版が一致する公開準備は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.preparation.status, 0);
-});
-
-Then("公開準備コマンドは全チェックを通してから配布物を作る", () => {
-  const manifest = JSON.parse(readProjectFile("package.json"));
-  const packageScripts = manifest.scripts;
-  assert.deepEqual(
-    packageScripts["release:prepare"],
-    "npm run check && node scripts/prepare-release.js",
-  );
-});
+Then(
+  "Release preparation with matching versions succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.preparation.status, 0);
+  },
+);
 
 Then(
-  "公開準備では同じ版のtarballとリリースノートが用意される",
+  "The release preparation command passes all checks before creating distribution files",
+  () => {
+    const manifest = JSON.parse(readProjectFile("package.json"));
+    const packageScripts = manifest.scripts;
+    assert.deepEqual(
+      packageScripts["release:prepare"],
+      "npm run check && node scripts/prepare-release.js",
+    );
+  },
+);
+
+Then(
+  "Release preparation produces a tarball and release notes for the same version",
   function (this: StepWorld) {
     const manifest = JSON.parse(readProjectFile("package.json"));
     const files = require("node:fs").readdirSync(this.releaseDirectory).sort();
@@ -107,7 +122,7 @@ Then(
   },
 );
 
-Then("公開workflowは公開準備コマンドを使う", () => {
+Then("The publish workflow uses the release preparation command", () => {
   assert.deepEqual(
     /npm run release:prepare --/u.test(
       readProjectFile(".github/workflows/release.yml"),
@@ -116,28 +131,37 @@ Then("公開workflowは公開準備コマンドを使う", () => {
   );
 });
 
-Given("npm 公開用の GitHub Actions がある", function (this: StepWorld) {
+Given("GitHub Actions for npm publishing exist", function (this: StepWorld) {
   this.releaseWorkflow = readProjectFile(".github/workflows/release.yml");
   this.releaseGuide = readProjectFile("docs/releasing.md");
 });
 
-When("公開ジョブの権限と環境を調べる", function (this: StepWorld) {
-  this.publishJob = this.releaseWorkflow;
-});
-
-Then("公開workflowは版のタグpushで起動する", function (this: StepWorld) {
-  assert.deepEqual(
-    /tags:\s*\n\s*- ['"]v\*\.\*\.\*['"]/u.test(this.publishJob),
-    true,
-  );
-});
-
-Then("公開workflowは承認用のnpm環境を使う", function (this: StepWorld) {
-  assert.deepEqual(/environment:\s*npm/u.test(this.publishJob), true);
-});
+When(
+  "inspect publish job permissions and environment",
+  function (this: StepWorld) {
+    this.publishJob = this.releaseWorkflow;
+  },
+);
 
 Then(
-  "npm環境で許可する操作はnpm publishと案内される",
+  "The publish workflow starts on version tag pushes",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      /tags:\s*\n\s*- ['"]v\*\.\*\.\*['"]/u.test(this.publishJob),
+      true,
+    );
+  },
+);
+
+Then(
+  "The publish workflow uses the npm environment for approval",
+  function (this: StepWorld) {
+    assert.deepEqual(/environment:\s*npm/u.test(this.publishJob), true);
+  },
+);
+
+Then(
+  "The npm environment documents npm publish as the permitted operation",
   function (this: StepWorld) {
     assert.deepEqual(
       /Allowed actions: `npm publish`/u.test(this.releaseGuide),
@@ -146,20 +170,26 @@ Then(
   },
 );
 
-Then("公開workflowにはOIDCのtoken発行権限がある", function (this: StepWorld) {
-  assert.deepEqual(/id-token:\s*write/u.test(this.publishJob), true);
-});
+Then(
+  "The publish workflow has permission to issue OIDC tokens",
+  function (this: StepWorld) {
+    assert.deepEqual(/id-token:\s*write/u.test(this.publishJob), true);
+  },
+);
 
-Then("npm公開では由来証明を付ける", function (this: StepWorld) {
+Then("The npm publish includes provenance", function (this: StepWorld) {
   assert.deepEqual(/npm publish .*--provenance/u.test(this.publishJob), true);
 });
 
-Then("公開workflowにはnpm tokenを設定しない", function (this: StepWorld) {
-  assert.deepEqual(!/NODE_AUTH_TOKEN|NPM_TOKEN/u.test(this.publishJob), true);
-});
+Then(
+  "The publish workflow does not configure an npm token",
+  function (this: StepWorld) {
+    assert.deepEqual(!/NODE_AUTH_TOKEN|NPM_TOKEN/u.test(this.publishJob), true);
+  },
+);
 
 Then(
-  "リリースノートは同じ版のCHANGELOGの本文と一致する",
+  "The release notes match the CHANGELOG body for the same version",
   function (this: StepWorld) {
     const manifest = JSON.parse(readProjectFile("package.json"));
     const changelogLines = readProjectFile("CHANGELOG.md").split("\n");
@@ -183,18 +213,18 @@ Then(
   },
 );
 
-Then("Releaseの題名にはpackageの版が含まれる", () => {
+Then("The Release title contains the package version", () => {
   const workflow = readProjectFile(".github/workflows/release.yml");
   assert.deepEqual(/--title "pi-formula \$\{VERSION\}"/u.test(workflow), true);
 });
 
-Then("Releaseの本文には同じ版のリリースノートを使う", () => {
+Then("The Release body uses release notes for the same version", () => {
   const workflow = readProjectFile(".github/workflows/release.yml");
   assert.deepEqual(/--notes-file .*release-notes\.md/u.test(workflow), true);
 });
 
 Given(
-  "CHANGELOG に現在の版から始まる別の版だけがある",
+  "the CHANGELOG contains only another version starting with the current version",
   function (this: StepWorld) {
     this.similarVersionChangelog = [
       "## 0.1.00 - Unreleased",
@@ -209,19 +239,25 @@ Given(
   },
 );
 
-When("現在の版の Release 本文を取り出す", function (this: StepWorld) {
-  this.releaseNotes = extractReleaseNotes(
-    this.similarVersionChangelog,
-    "0.1.0",
-  );
-});
+When(
+  "extract the Release body for the current version",
+  function (this: StepWorld) {
+    this.releaseNotes = extractReleaseNotes(
+      this.similarVersionChangelog,
+      "0.1.0",
+    );
+  },
+);
 
-Then("現在の版の Release 本文は見つからない", function (this: StepWorld) {
-  assert.equal(this.releaseNotes, null);
-});
+Then(
+  "No Release body is found for the current version",
+  function (this: StepWorld) {
+    assert.equal(this.releaseNotes, null);
+  },
+);
 
 Given(
-  "CHANGELOG に継続行を持つ箇条書きと次の箇条書きがある",
+  "the CHANGELOG contains a bullet with continuation lines followed by another bullet",
   function (this: StepWorld) {
     this.changelog = [
       "## 0.1.0 - Unreleased",
@@ -241,70 +277,94 @@ Given(
   },
 );
 
-Given("CHANGELOG の版に空の箇条書きしかない", function (this: StepWorld) {
-  this.changelog = "## 0.1.0 - Unreleased\n\n- \n";
-  this.changelogVersion = "0.1.0";
-});
+Given(
+  "a CHANGELOG version contains only empty bullets",
+  function (this: StepWorld) {
+    this.changelog = "## 0.1.0 - Unreleased\n\n- \n";
+    this.changelogVersion = "0.1.0";
+  },
+);
 
-When("その版の Release 本文を取り出す", function (this: StepWorld) {
+When("extract the Release body for that version", function (this: StepWorld) {
   this.releaseNotes = extractReleaseNotes(
     this.changelog,
     this.changelogVersion,
   );
 });
 
-Then("継続行と次の箇条書きが同じ順で保持される", function (this: StepWorld) {
-  assert.equal(
-    this.releaseNotes,
-    [
-      "- First change",
-      "  continues on the next line.",
-      "",
-      "- Second change",
-      "  also continues.",
-      "",
-    ].join("\n"),
-  );
-});
+Then(
+  "Continuation lines and the following bullet retain their order",
+  function (this: StepWorld) {
+    assert.equal(
+      this.releaseNotes,
+      [
+        "- First change",
+        "  continues on the next line.",
+        "",
+        "- Second change",
+        "  also continues.",
+        "",
+      ].join("\n"),
+    );
+  },
+);
 
-Then("Release 本文は見つからない", function (this: StepWorld) {
+Then("No Release body is found", function (this: StepWorld) {
   assert.equal(this.releaseNotes, null);
 });
 
-Given("継続公開の運用手順がある", function (this: StepWorld) {
+Given("ongoing publishing procedures exist", function (this: StepWorld) {
   this.releaseGuide = readProjectFile("docs/releasing.md");
 });
 
-When("公開後と公開失敗時の手順を調べる", function (this: StepWorld) {
-  this.operations = this.releaseGuide;
-});
-
-Then("公開後にnpmの版を確認する手順がある", function (this: StepWorld) {
-  assert.deepEqual(/npm view pi-formula/u.test(this.operations), true);
-});
-
-Then("公開後に遠隔タグを確認する手順がある", function (this: StepWorld) {
-  assert.deepEqual(
-    /git ls-remote[^\n]*refs\/tags/u.test(this.operations),
-    true,
-  );
-});
-
-Then("公開後にGitHub Releaseを確認する手順がある", function (this: StepWorld) {
-  assert.deepEqual(/gh release view/u.test(this.operations), true);
-});
-
-Then("公開後に由来証明を確認する手順がある", function (this: StepWorld) {
-  assert.deepEqual(/npm audit signatures/u.test(this.operations), true);
-});
+When(
+  "inspect post-publish and publish failure procedures",
+  function (this: StepWorld) {
+    this.operations = this.releaseGuide;
+  },
+);
 
 Then(
-  "外部条件が不足した公開は再試行しないと案内される",
+  "A procedure verifies the npm version after publishing",
+  function (this: StepWorld) {
+    assert.deepEqual(/npm view pi-formula/u.test(this.operations), true);
+  },
+);
+
+Then(
+  "A procedure verifies the remote tag after publishing",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      /git ls-remote[^\n]*refs\/tags/u.test(this.operations),
+      true,
+    );
+  },
+);
+
+Then(
+  "A procedure verifies the GitHub Release after publishing",
+  function (this: StepWorld) {
+    assert.deepEqual(/gh release view/u.test(this.operations), true);
+  },
+);
+
+Then(
+  "A procedure verifies provenance after publishing",
+  function (this: StepWorld) {
+    assert.deepEqual(/npm audit signatures/u.test(this.operations), true);
+  },
+);
+
+Then(
+  "Publishing with missing external prerequisites is documented as not retryable",
   function (this: StepWorld) {
     assert.deepEqual(/再試行しない/u.test(this.operations), true);
   },
 );
 
-Then("公開条件の不足を報告する手順がある", function (this: StepWorld) {
-  assert.deepEqual(/不足条件/u.test(this.operations), true);
-});
+Then(
+  "A procedure reports missing publishing prerequisites",
+  function (this: StepWorld) {
+    assert.deepEqual(/不足条件/u.test(this.operations), true);
+  },
+);

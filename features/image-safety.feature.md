@@ -1,95 +1,95 @@
-# Feature: 表示数式の安全上限と画像変換の実行範囲を守る
+# Feature: Respect display math safety limits and the image conversion execution boundary
 
-入力文字数、画像行数、縮尺などの安全上限を超える表示数式は原文へ戻します。その後に続く正しい表示数式は、引き続き画像へ変換できます。
+Display math exceeding safety limits such as input characters, image rows, or scale falls back to source. Subsequent valid display math can still become images.
 
-画像の変換はメモリ内で行い、ファイル保存、外部サービス、子プロセス、ブラウザ用 module を使いません。
+Image conversion runs in memory without file writes, external services, child processes, or browser modules.
 
-## Scenario: 画像処理の安全上限には定義された7項目が含まれる
+## Scenario: The image processing safety limits contain the 7 defined fields
 
-- Given pi-formula の画像処理設定を読む
-- When 固定上限を確認する
-- Then 画像処理の安全上限には定義された7項目が含まれる
+- Given read the pi-formula image processing settings
+- When inspect the fixed limits
+- Then The image processing safety limits contain the 7 defined fields
 
-## Scenario: 画像処理のすべての安全上限は有限の正整数である
+## Scenario: All image processing safety limits are finite positive integers
 
-- Given pi-formula の画像処理設定を読む
-- When 固定上限を確認する
-- Then 画像処理のすべての安全上限は有限の正整数である
+- Given read the pi-formula image processing settings
+- When inspect the fixed limits
+- Then All image processing safety limits are finite positive integers
 
-## Scenario: 入力文字数上限を超えた数式の一時保存キーは作られない
+## Scenario: No cache key is created for math exceeding the input character limit
 
-- Given 一時保存キーを作ろうとすると失敗する環境である
-- And 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 入力上限を超えた表示数式を変換する
-- Then 入力文字数上限を超えた数式の一時保存キーは作られない
+- Given the environment fails when a cache key is created
+- And Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math exceeding the input limit
+- Then No cache key is created for math exceeding the input character limit
 
-## Scenario: 入力文字数上限を超えた数式は画像処理部品を準備しない
+## Scenario: Math exceeding the input character limit does not initialize image processing components
 
-- Given 一時保存キーを作ろうとすると失敗する環境である
-- And 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 入力上限を超えた表示数式を変換する
-- Then 入力文字数上限を超えた数式は画像処理部品を準備しない
+- Given the environment fails when a cache key is created
+- And Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math exceeding the input limit
+- Then Math exceeding the input character limit does not initialize image processing components
 
-## Scenario: 入力文字数上限を超えた数式は原文のまま残る
+## Scenario: Math exceeding the input character limit remains as source
 
-- Given 一時保存キーを作ろうとすると失敗する環境である
-- And 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 入力上限を超えた表示数式を変換する
-- Then 入力文字数上限を超えた数式は原文のまま残る
+- Given the environment fails when a cache key is created
+- And Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math exceeding the input limit
+- Then Math exceeding the input character limit remains as source
 
-## Scenario: 入力文字数上限を超えた数式は変換結果に残る
+## Scenario: Math exceeding the input character limit remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 上限を超えた表示数式と正しい表示数式を変換する
-- Then 入力文字数上限を超えた数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform over-limit and valid display math
+- Then Math exceeding the input character limit remains in the transformed output
 
-## Scenario: 画像行数上限を超えた数式は変換結果に残る
+## Scenario: Math exceeding the image row limit remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 上限を超えた表示数式と正しい表示数式を変換する
-- Then 画像行数上限を超えた数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform over-limit and valid display math
+- Then Math exceeding the image row limit remains in the transformed output
 
-## Scenario: 上限を超えた数式の後の正しい数式1件が画像になる
+## Scenario: One valid formula after an over-limit formula becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 上限を超えた表示数式と正しい表示数式を変換する
-- Then 上限を超えた数式の後の正しい数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform over-limit and valid display math
+- Then One valid formula after an over-limit formula becomes an image
 
-## Scenario: 読めない縮尺になる数式は変換結果に残る
+## Scenario: Math with unreadable scaling remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 基準の半分より小さくなる表示数式と正しい表示数式を変換する
-- Then 読めない縮尺になる数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform display math scaled below half the baseline and valid display math
+- Then Math with unreadable scaling remains in the transformed output
 
-## Scenario: 読めない縮尺の数式の後の正しい数式1件が画像になる
+## Scenario: One valid formula after unreadably scaled math becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 基準の半分より小さくなる表示数式と正しい表示数式を変換する
-- Then 読めない縮尺の数式の後の正しい数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform display math scaled below half the baseline and valid display math
+- Then One valid formula after unreadably scaled math becomes an image
 
-## Scenario: 正確な RGB がない場合は文字へ戻す
+## Scenario: Fall back to text when exact RGB is unavailable
 
-- Given 正確な RGB を返さない画像経路の Pi がある
-- When 表示数式を変換する
-- Then RGB を得られない数式は原文のまま残る
+- Given Pi uses an image path that does not return exact RGB
+- When transform display math
+- Then Math without available RGB remains as source
 
-## Scenario: 画像の変換中にファイル保存も外部サービスも子プロセスも呼ばない
+## Scenario: Image conversion does not write files, call external services, or spawn child processes
 
-- Given 画像経路で数式を描ける Pi がある
-- When 外部作用を監視しながら表示数式を変換する
-- Then 画像の変換中にファイル保存も外部サービスも子プロセスも呼ばない
+- Given Pi can render math through the image path
+- When transform display math while monitoring external side effects
+- Then Image conversion does not write files, call external services, or spawn child processes
 
-## Scenario: 画像の変換でブラウザ用moduleを読み込まない
+## Scenario: Image conversion does not load browser modules
 
-- Given 画像経路で数式を描ける Pi がある
-- When 外部作用を監視しながら表示数式を変換する
-- Then 画像の変換でブラウザ用moduleを読み込まない
+- Given Pi can render math through the image path
+- When transform display math while monitoring external side effects
+- Then Image conversion does not load browser modules
 
-## Scenario: 外部作用を禁止しても表示数式1件を画像へ変換できる
+## Scenario: One display formula can become an image even when external side effects are prohibited
 
-- Given 画像経路で数式を描ける Pi がある
-- When 外部作用を監視しながら表示数式を変換する
-- Then 外部作用を禁止しても表示数式1件を画像へ変換できる
+- Given Pi can render math through the image path
+- When transform display math while monitoring external side effects
+- Then One display formula can become an image even when external side effects are prohibited

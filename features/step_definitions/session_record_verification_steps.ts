@@ -70,14 +70,14 @@ function assistantText(text: string) {
 }
 
 Given(
-  "`unsupported symbolic gate column` を含むセッション記録がある",
+  "a session record contains `unsupported symbolic gate column`",
   function (this: StepWorld) {
     this.session = regressionSession;
   },
 );
 
 Given(
-  "runner が単一の check コマンドで機能不足になったセッション記録がある",
+  "a session record has a runner capability limitation in a single check command",
   function (this: StepWorld) {
     createSession(this, [
       toolCall("runner-call", "runner", { commands: [["check"]] }),
@@ -87,7 +87,7 @@ Given(
 );
 
 Given(
-  "runner の2番目の deploy コマンドで途中停止したセッション記録がある",
+  "a session record has an interruption in the second runner deploy command",
   function (this: StepWorld) {
     createSession(this, [
       toolCall("runner-call", "runner", {
@@ -99,7 +99,7 @@ Given(
 );
 
 Given(
-  "失敗後にモデルが代替手段へ切り替えたセッション記録がある",
+  "a session record has the model switch to a fallback after failure",
   function (this: StepWorld) {
     createSession(this, [
       toolCall("bash-call", "bash", { command: "qni run --symbolic" }),
@@ -116,15 +116,18 @@ Given(
   },
 );
 
-Given("ツールが成功したセッション記録がある", function (this: StepWorld) {
-  createSession(this, [
-    toolCall("bash-call", "bash", { command: "printf ok" }),
-    toolResult("bash-call", "bash", "ok"),
-  ]);
-});
+Given(
+  "a session record has a successful tool result",
+  function (this: StepWorld) {
+    createSession(this, [
+      toolCall("bash-call", "bash", { command: "printf ok" }),
+      toolResult("bash-call", "bash", "ok"),
+    ]);
+  },
+);
 
 Given(
-  "成功したツールの後に「代わりに」を含む assistant 本文がある",
+  "an assistant body contains 「代わりに」 after a successful tool result",
   function (this: StepWorld) {
     createSession(this, [
       toolCall("bash-call", "bash", { command: "printf ok" }),
@@ -135,7 +138,7 @@ Given(
 );
 
 Given(
-  "失敗後の次の assistant 本文には代替表現がなく後続本文に fallback がある",
+  "the next assistant body after failure has no fallback wording but a later body mentions fallback",
   function (this: StepWorld) {
     createSession(this, [
       toolCall("bash-call", "bash", { command: "false" }),
@@ -146,33 +149,36 @@ Given(
   },
 );
 
-Given("既知の機能不足を許容する無視リストがある", function (this: StepWorld) {
-  this.session = regressionSession;
-  this.directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "pi-formula-session-ignore-"),
-  );
-  this.ignoreList = path.join(this.directory, "ignore-list.json");
-  fs.writeFileSync(
-    this.ignoreList,
-    `${JSON.stringify(
-      {
-        ignore: [
-          {
-            kind: "機能不足",
-            tool: "qni",
-            command: "qni run --symbolic",
-            pattern: "unsupported symbolic gate column",
-          },
-        ],
-      },
-      null,
-      2,
-    )}\n`,
-  );
-});
+Given(
+  "an ignore list allows known capability limitations",
+  function (this: StepWorld) {
+    this.session = regressionSession;
+    this.directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "pi-formula-session-ignore-"),
+    );
+    this.ignoreList = path.join(this.directory, "ignore-list.json");
+    fs.writeFileSync(
+      this.ignoreList,
+      `${JSON.stringify(
+        {
+          ignore: [
+            {
+              kind: "機能不足",
+              tool: "qni",
+              command: "qni run --symbolic",
+              pattern: "unsupported symbolic gate column",
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  },
+);
 
 Given(
-  /^`(kind|tool|command|pattern)` が空文字の無視リストがある$/u,
+  /^an ignore list has an empty `(kind|tool|command|pattern)` field$/u,
   function (this: StepWorld, field: string) {
     this.session = regressionSession;
     this.directory = fs.mkdtempSync(
@@ -186,7 +192,7 @@ Given(
   },
 );
 
-When("セッション記録検査を実行する", function (this: StepWorld) {
+When("run the session record check", function (this: StepWorld) {
   this.result = spawnSync(process.execPath, [checker, this.session], {
     encoding: "utf8",
     timeout: 5_000,
@@ -196,7 +202,7 @@ When("セッション記録検査を実行する", function (this: StepWorld) {
 });
 
 When(
-  "無視リストを使ってセッション記録検査を実行する",
+  "run the session record check with the ignore list",
   function (this: StepWorld) {
     this.result = spawnSync(
       process.execPath,
@@ -208,7 +214,7 @@ When(
 );
 
 Then(
-  "機能不足が qni の該当コマンドと文脈を伴って報告される",
+  "The capability limitation is reported with the corresponding qni command and context",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -218,7 +224,7 @@ Then(
 );
 
 Then(
-  "qni の非 0 終了が該当コマンドとともに報告される",
+  "The nonzero qni exit is reported with the corresponding command",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -228,7 +234,7 @@ Then(
 );
 
 Then(
-  "qni の途中停止が停止したコマンドとともに報告される",
+  "The interrupted qni execution is reported with the interrupted command",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -238,7 +244,7 @@ Then(
 );
 
 Then(
-  "機能不足のコマンドは runner check と報告される",
+  "The capability-limited command is reported as runner check",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -248,7 +254,7 @@ Then(
 );
 
 Then(
-  "途中停止のコマンドは runner deploy と報告される",
+  "The interrupted command is reported as runner deploy",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -258,7 +264,7 @@ Then(
 );
 
 Then(
-  "代替手段への切り替えが直前のツールとコマンドを伴って報告される",
+  "The fallback is reported with the preceding tool and command",
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
@@ -267,27 +273,36 @@ Then(
   },
 );
 
-Then("成功結果の後の代替表現は報告されない", function (this: StepWorld) {
-  assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
-});
-
-Then("失敗直後より後の代替表現は報告されない", function (this: StepWorld) {
-  assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
-});
-
-Then("セッション記録検査は終了コード1を返す", function (this: StepWorld) {
-  assert.equal(this.result.status, 1);
-});
+Then(
+  "Alternative wording after a successful result is not reported",
+  function (this: StepWorld) {
+    assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+  },
+);
 
 Then(
-  "正常なセッション記録の検査は終了コード0を返す",
+  "Fallback wording later than the immediate failure response is not reported",
+  function (this: StepWorld) {
+    assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+  },
+);
+
+Then(
+  "The session record check returns exit code 1",
+  function (this: StepWorld) {
+    assert.equal(this.result.status, 1);
+  },
+);
+
+Then(
+  "The successful session record check returns exit code 0",
   function (this: StepWorld) {
     assert.deepEqual(this.result.status, 0);
   },
 );
 
 Then(
-  "正常なセッション記録にはツール失敗がないことを表示する",
+  "A successful session record reports no tool failures",
   function (this: StepWorld) {
     assert.deepEqual(
       this.result.stdout,
@@ -296,18 +311,27 @@ Then(
   },
 );
 
-Then("許容した機能不足だけが報告から除外される", function (this: StepWorld) {
-  assert.doesNotMatch(this.result.stdout, /種類: 機能不足/u);
-});
+Then(
+  "Only allowed capability limitations are excluded from the report",
+  function (this: StepWorld) {
+    assert.doesNotMatch(this.result.stdout, /種類: 機能不足/u);
+  },
+);
 
-Then("無視対象外の非 0 終了が報告に残る", function (this: StepWorld) {
-  assert.match(this.result.stdout, /種類: 非 0 終了/u);
-});
+Then(
+  "Nonzero exits outside the ignore list remain in the report",
+  function (this: StepWorld) {
+    assert.match(this.result.stdout, /種類: 非 0 終了/u);
+  },
+);
 
-Then("無視対象外のヒットにより終了コード1を返す", function (this: StepWorld) {
-  assert.equal(this.result.status, 1);
-});
+Then(
+  "Matches outside the ignore list return exit code 1",
+  function (this: StepWorld) {
+    assert.equal(this.result.status, 1);
+  },
+);
 
-Then("無効な無視リストとして終了コード2を返す", function (this: StepWorld) {
+Then("The invalid ignore list returns exit code 2", function (this: StepWorld) {
   assert.equal(this.result.status, 2);
 });

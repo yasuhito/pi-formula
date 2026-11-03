@@ -1,84 +1,84 @@
-# Feature: 日本語を含む表示数式を揃えたセリフ体で組版する
+# Feature: Typeset display math containing Japanese in a consistent serif font
 
-利用者は、日本語を含む表示数式の文字を数式本体と揃えたセリフ体で読めます。利用できる書体を選び、候補がない場合の代替書体を使いながら、英字だけの表示数式も引き続き組版します。
+Users can read Japanese text in display math in a serif font consistent with the formula. Available fonts are selected with a fallback when no candidate is available, while ASCII-only display math continues to be typeset.
 
-## Scenario: 優先候補の日本語の表示数式は画像になる
+## Scenario: Japanese display math using the preferred candidate becomes an image
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 優先候補の日本語の表示数式は画像になる
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then Japanese display math using the preferred candidate becomes an image
 
-## Scenario: 優先候補の日本語の画像にはPNG署名がある
+## Scenario: The Japanese image using the preferred candidate has a PNG signature
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 優先候補の日本語の画像にはPNG署名がある
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then The Japanese image using the preferred candidate has a PNG signature
 
-## Scenario: 日本語の組版には優先候補のセリフ体設定がResvgへ渡る
+## Scenario: The preferred serif font settings are passed to Resvg for Japanese typesetting
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 日本語の組版には優先候補のセリフ体設定がResvgへ渡る
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then The preferred serif font settings are passed to Resvg for Japanese typesetting
 
-## Scenario: 優先候補の日本語のSVGには19個のpathがある
+## Scenario: The Japanese SVG using the preferred candidate contains 19 paths
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 優先候補の日本語のSVGには19個のpathがある
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then The Japanese SVG using the preferred candidate contains 19 paths
 
-## Scenario: 日本語のtextの内容と尺度はResvgへ渡る
+## Scenario: Japanese text content and scale are passed to Resvg
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 日本語のtextの内容と尺度はResvgへ渡る
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then Japanese text content and scale are passed to Resvg
 
-## Scenario: 診断には日本語に選んだ優先候補のセリフ体が表示される
+## Scenario: Diagnostics show the preferred serif font selected for Japanese
 
-- Given priority のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 診断には日本語に選んだ優先候補のセリフ体が表示される
+- Given an image path with priority serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then Diagnostics show the preferred serif font selected for Japanese
 
-## Scenario: ASCIIの表示数式は画像になる
+## Scenario: ASCII display math becomes an image
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then ASCIIの表示数式は画像になる
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then ASCII display math becomes an image
 
-## Scenario: ASCIIの画像にはPNG署名がある
+## Scenario: The ASCII image has a PNG signature
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then ASCIIの画像にはPNG署名がある
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then The ASCII image has a PNG signature
 
-## Scenario: ASCIIの組版には優先候補のセリフ体設定がResvgへ渡る
+## Scenario: The preferred serif font settings are passed to Resvg for ASCII typesetting
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then ASCIIの組版には優先候補のセリフ体設定がResvgへ渡る
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then The preferred serif font settings are passed to Resvg for ASCII typesetting
 
-## Scenario: ASCIIのSVGには26個のpathがある
+## Scenario: The ASCII SVG contains 26 paths
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then ASCIIのSVGには26個のpathがある
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then The ASCII SVG contains 26 paths
 
-## Scenario: ASCIIの組版にSVGのtextは含まれない
+## Scenario: The typeset ASCII contains no SVG text
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then ASCIIの組版にSVGのtextは含まれない
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then The typeset ASCII contains no SVG text
 
-## Scenario: 診断にはASCIIに選んだセリフ体が表示される
+## Scenario: Diagnostics show the serif font selected for ASCII
 
-- Given priority のセリフ体候補がある画像経路
-- When ASCII の text を含む表示数式を Resvg まで組版する
-- Then 診断にはASCIIに選んだセリフ体が表示される
+- Given an image path with priority serif font candidates
+- When typeset display math containing ASCII text through Resvg
+- Then Diagnostics show the serif font selected for ASCII
 
-## Scenario Outline: 実在するセリフ体を候補の優先順で選ぶ
+## Scenario Outline: Select an installed serif font in candidate priority order
 
-- Given <inventory> のセリフ体候補がある画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then "<family>" が表示数式のセリフ体に選ばれる
+- Given an image path with <inventory> serif font candidates
+- When typeset display math containing Japanese text through Resvg
+- Then "<family>" is selected as the display math serif font
 
 ### Examples:
 
@@ -89,38 +89,38 @@
   | source     | Source Han Serif    |
   | ipa        | IPAexMincho         |
 
-## Scenario: 候補のセリフ体がなくても日本語の表示数式は画像になる
+## Scenario: Japanese display math becomes an image even without serif font candidates
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 候補のセリフ体がなくても日本語の表示数式は画像になる
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then Japanese display math becomes an image even without serif font candidates
 
-## Scenario: 候補のセリフ体がない日本語の画像にもPNG署名がある
+## Scenario: The Japanese image without serif font candidates also has a PNG signature
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 候補のセリフ体がない日本語の画像にもPNG署名がある
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then The Japanese image without serif font candidates also has a PNG signature
 
-## Scenario: 候補のセリフ体がない組版はsystem fontを使う
+## Scenario: Typesetting without serif font candidates uses system fonts
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 候補のセリフ体がない組版はsystem fontを使う
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then Typesetting without serif font candidates uses system fonts
 
-## Scenario: 候補のセリフ体がない日本語のSVGには19個のpathがある
+## Scenario: The Japanese SVG without serif font candidates contains 19 paths
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 候補のセリフ体がない日本語のSVGには19個のpathがある
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then The Japanese SVG without serif font candidates contains 19 paths
 
-## Scenario: system fontでも日本語のtextの内容と尺度はResvgへ渡る
+## Scenario: Japanese text content and scale are passed to Resvg even with system fonts
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then system fontでも日本語のtextの内容と尺度はResvgへ渡る
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then Japanese text content and scale are passed to Resvg even with system fonts
 
-## Scenario: 診断にはsystem fontへのfallbackが表示される
+## Scenario: Diagnostics show the fallback to system fonts
 
-- Given CJK 対応セリフ体がない画像経路
-- When 日本語の text を含む表示数式を Resvg まで組版する
-- Then 診断にはsystem fontへのfallbackが表示される
+- Given an image path without a CJK-capable serif font
+- When typeset display math containing Japanese text through Resvg
+- Then Diagnostics show the fallback to system fonts

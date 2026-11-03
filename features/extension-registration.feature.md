@@ -1,145 +1,145 @@
-# Feature: 拡張を再登録し、単体版と同梱版を一緒に使う
+# Feature: Reregister extensions and use standalone and bundled versions together
 
-拡張を再登録しても、Markdown 描画とコマンドの登録は重複せず、新しい利用者マクロを使えます。
+Reregistering the extension does not duplicate Markdown renderer or command registrations and allows new user macros.
 
-単体版と同梱版を両方読み込む場合も、読み込み順序にかかわらず登録は重複せず、連携拡張の追加マクロを使えます。
+Loading both standalone and bundled versions does not duplicate registrations regardless of load order, and integration extension extra macros remain available.
 
-## Scenario: 再登録したruntimeのMarkdown描画は1個だけ登録される
+## Scenario: The reregistered runtime has only one Markdown renderer registered
 
-- Given 利用者マクロを読む拡張 runtime がある
-- When 元のruntimeのセッションを終了する
-- And XDGの利用者マクロを再読込用の定義へ変更する
-- And 環境変数の利用者マクロを再読込用の定義へ変更する
-- And 別のruntimeを読み込んで登録する
-- And 新しいruntimeで画像経路のセッションを開始する
-- And 新しいruntimeの利用者マクロでPNGを作る
-- Then 再登録したruntimeのMarkdown描画は1個だけ登録される
+- Given an extension runtime reads user macros
+- When end the original runtime session
+- And change the XDG user macro definition for reloading
+- And change the environment variable user macro definition for reloading
+- And load and register another runtime
+- And start an image path session in the new runtime
+- And create a PNG with the new runtime user macro
+- Then The reregistered runtime has only one Markdown renderer registered
 
-## Scenario: 再登録したruntimeのコマンドは1個だけ登録される
+## Scenario: The reregistered runtime has only one command registered
 
-- Given 利用者マクロを読む拡張 runtime がある
-- When 元のruntimeのセッションを終了する
-- And XDGの利用者マクロを再読込用の定義へ変更する
-- And 環境変数の利用者マクロを再読込用の定義へ変更する
-- And 別のruntimeを読み込んで登録する
-- And 新しいruntimeで画像経路のセッションを開始する
-- And 新しいruntimeの利用者マクロでPNGを作る
-- Then 再登録したruntimeのコマンドは1個だけ登録される
+- Given an extension runtime reads user macros
+- When end the original runtime session
+- And change the XDG user macro definition for reloading
+- And change the environment variable user macro definition for reloading
+- And load and register another runtime
+- And start an image path session in the new runtime
+- And create a PNG with the new runtime user macro
+- Then The reregistered runtime has only one command registered
 
-## Scenario: 再登録したruntimeでformulaコマンドを利用できる
+## Scenario: The formula command is available in the reregistered runtime
 
-- Given 利用者マクロを読む拡張 runtime がある
-- When 元のruntimeのセッションを終了する
-- And XDGの利用者マクロを再読込用の定義へ変更する
-- And 環境変数の利用者マクロを再読込用の定義へ変更する
-- And 別のruntimeを読み込んで登録する
-- And 新しいruntimeで画像経路のセッションを開始する
-- And 新しいruntimeの利用者マクロでPNGを作る
-- Then 再登録したruntimeでformulaコマンドを利用できる
+- Given an extension runtime reads user macros
+- When end the original runtime session
+- And change the XDG user macro definition for reloading
+- And change the environment variable user macro definition for reloading
+- And load and register another runtime
+- And start an image path session in the new runtime
+- And create a PNG with the new runtime user macro
+- Then The formula command is available in the reregistered runtime
 
-## Scenario: 再登録したruntimeで新しい利用者マクロを使える
+## Scenario: New user macros are available in the reregistered runtime
 
-- Given 利用者マクロを読む拡張 runtime がある
-- When 元のruntimeのセッションを終了する
-- And XDGの利用者マクロを再読込用の定義へ変更する
-- And 環境変数の利用者マクロを再読込用の定義へ変更する
-- And 別のruntimeを読み込んで登録する
-- And 新しいruntimeで画像経路のセッションを開始する
-- And 新しいruntimeの利用者マクロでPNGを作る
-- Then 再登録したruntimeで新しい利用者マクロを使える
+- Given an extension runtime reads user macros
+- When end the original runtime session
+- And change the XDG user macro definition for reloading
+- And change the environment variable user macro definition for reloading
+- And load and register another runtime
+- And start an image path session in the new runtime
+- And create a PNG with the new runtime user macro
+- Then New user macros are available in the reregistered runtime
 
-## Scenario: 単体版を先に読み込む場合、単体版と同梱版のMarkdown描画は1個だけ登録される
+## Scenario: Loading the standalone version first registers only one Markdown renderer across both versions
 
-- Given 単体版を同梱版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版のMarkdown描画は1個だけ登録される
+- Given the load order puts the standalone version before the bundled version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions register only one Markdown renderer
 
-## Scenario: 単体版を先に読み込む場合、単体版と同梱版のコマンドは1個だけ登録される
+## Scenario: Loading the standalone version first registers only one command across both versions
 
-- Given 単体版を同梱版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版のコマンドは1個だけ登録される
+- Given the load order puts the standalone version before the bundled version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions register only one command
 
-## Scenario: 単体版を先に読み込む場合、単体版と同梱版を読み込んでも連携拡張の追加マクロを使える
+## Scenario: Loading the standalone version first preserves integration extension extra macros with both versions loaded
 
-- Given 単体版を同梱版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版を読み込んでも連携拡張の追加マクロを使える
+- Given the load order puts the standalone version before the bundled version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then Integration extension extra macros remain available with both standalone and bundled versions loaded
 
-## Scenario: 単体版を先に読み込む場合、単体版と同梱版は異なるPi APIで登録されている
+## Scenario: Loading the standalone version first registers both versions with different Pi APIs
 
-- Given 単体版を同梱版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版は異なるPi APIで登録されている
+- Given the load order puts the standalone version before the bundled version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions are registered with different Pi APIs
 
-## Scenario: 同梱版を先に読み込む場合、単体版と同梱版のMarkdown描画は1個だけ登録される
+## Scenario: Loading the bundled version first registers only one Markdown renderer across both versions
 
-- Given 同梱版を単体版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版のMarkdown描画は1個だけ登録される
+- Given the load order puts the bundled version before the standalone version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions register only one Markdown renderer
 
-## Scenario: 同梱版を先に読み込む場合、単体版と同梱版のコマンドは1個だけ登録される
+## Scenario: Loading the bundled version first registers only one command across both versions
 
-- Given 同梱版を単体版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版のコマンドは1個だけ登録される
+- Given the load order puts the bundled version before the standalone version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions register only one command
 
-## Scenario: 同梱版を先に読み込む場合、単体版と同梱版を読み込んでも連携拡張の追加マクロを使える
+## Scenario: Loading the bundled version first preserves integration extension extra macros with both versions loaded
 
-- Given 同梱版を単体版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版を読み込んでも連携拡張の追加マクロを使える
+- Given the load order puts the bundled version before the standalone version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then Integration extension extra macros remain available with both standalone and bundled versions loaded
 
-## Scenario: 同梱版を先に読み込む場合、単体版と同梱版は異なるPi APIで登録されている
+## Scenario: Loading the bundled version first registers both versions with different Pi APIs
 
-- Given 同梱版を単体版より先に読み込む順序である
-- When 順序で最初の拡張を読み込む
-- And 順序で次の拡張を読み込む
-- And 順序で最初の拡張を登録する
-- And 順序で次の拡張を登録する
-- And 最初に登録したPiで画像経路のセッションを開始する
-- And 両方を登録したruntimeで連携拡張のPNGを作る
-- And 両方の拡張登録を調べる
-- Then 単体版と同梱版は異なるPi APIで登録されている
+- Given the load order puts the bundled version before the standalone version
+- When load the first extension in the load order
+- And load the next extension in the load order
+- And register the first extension in the load order
+- And register the next extension in the load order
+- And start an image path session in the first registered Pi
+- And create an integration extension PNG in the runtime with both registered
+- And inspect both extension registrations
+- Then The standalone and bundled versions are registered with different Pi APIs

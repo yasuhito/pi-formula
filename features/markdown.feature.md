@@ -1,545 +1,545 @@
-# Feature: 通常の Markdown を保ち、インライン数式と表示数式を描き分ける
+# Feature: Preserve ordinary Markdown and render inline and display math separately
 
-利用者は通常の文章、URL、コードをそのまま読み、インライン数式はテキストとして、閉じた表示数式は画像として読めます。区切りやマクロが不正な場合も、本文を失わずに変換します。
+Users can read ordinary prose, URLs, and code unchanged, inline math as text, and closed display math as images. Invalid delimiters or macros do not cause body text to be lost.
 
-動的字形を読み込めない表示数式は原文へ戻し、動的字形を使わない数式は引き続き画像へ変換します。
+Display math whose dynamic glyphs cannot be loaded falls back to its source, while math without dynamic glyphs continues to become images.
 
-## Scenario: 動的字形を読み込めない表示数式は原文へ戻る
+## Scenario: Display math with unavailable dynamic glyphs falls back to its source
 
-- Given 動的字形を読み込めない画像経路がある
-- When 動的字形を含む表示数式を描く
-- And 同じruntimeで動的字形を使わない表示数式を描く
-- Then 動的字形を読み込めない表示数式は原文へ戻る
+- Given an image path with unavailable dynamic glyphs
+- When render display math containing dynamic glyphs
+- And render display math without dynamic glyphs in the same runtime
+- Then Display math with unavailable dynamic glyphs falls back to its source
 
-## Scenario: 動的字形を使わない表示数式は引き続き画像になる
+## Scenario: Display math without dynamic glyphs still becomes an image
 
-- Given 動的字形を読み込めない画像経路がある
-- When 動的字形を含む表示数式を描く
-- And 同じruntimeで動的字形を使わない表示数式を描く
-- Then 動的字形を使わない表示数式は引き続き画像になる
+- Given an image path with unavailable dynamic glyphs
+- When render display math containing dynamic glyphs
+- And render display math without dynamic glyphs in the same runtime
+- Then Display math without dynamic glyphs still becomes an image
 
-## Scenario: ドル区切りのインライン数式は変換結果に残る
+## Scenario: Dollar-delimited inline math remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 4 種類の数式区切りを含む本文を変換する
-- Then ドル区切りのインライン数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform body text containing all four math delimiters
+- Then Dollar-delimited inline math remains in the transformed output
 
-## Scenario: 丸括弧区切りのインライン数式は変換結果に残る
+## Scenario: Parenthesis-delimited inline math remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 4 種類の数式区切りを含む本文を変換する
-- Then 丸括弧区切りのインライン数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform body text containing all four math delimiters
+- Then Parenthesis-delimited inline math remains in the transformed output
 
-## Scenario: 4種類の区切りのうち表示数式2件が画像になる
+## Scenario: The two display formulas among the four delimiter types become images
 
-- Given 画像経路で数式を描ける Pi がある
-- When 4 種類の数式区切りを含む本文を変換する
-- Then 4種類の区切りのうち表示数式2件が画像になる
+- Given Pi can render math through the image path
+- When transform body text containing all four math delimiters
+- Then The two display formulas among the four delimiter types become images
 
-## Scenario: ket 追加マクロをドル区切りのインライン数式で使う
+## Scenario: Use the ket extra macro in dollar-delimited inline math
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When ket 追加マクロを含むドル区切りのインライン数式を描く
-- Then ket 追加マクロが Unicode で描かれる
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When render dollar-delimited inline math containing the ket extra macro
+- Then The ket extra macro is rendered as Unicode
 
-## Scenario: コロン直後の表示数式を描く
+## Scenario: Render display math immediately after a colon
 
-- Given 画像経路で数式を描ける Pi がある
-- When コロン直後の表示数式を変換する
-- Then コロン直後の表示数式が画像になる
+- Given Pi can render math through the image path
+- When transform display math immediately after a colon
+- Then Display math immediately after a colon becomes an image
 
-## Scenario: コロン直後のインライン数式を描く
+## Scenario: Render inline math immediately after a colon
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When コロン直後の ket 追加マクロを描く
-- Then コロン直後の ket 追加マクロが Unicode で描かれる
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When render the ket extra macro immediately after a colon
+- Then The ket extra macro immediately after a colon is rendered as Unicode
 
-## Scenario: URL 内のシェル変数の後にあるインライン数式を描く
+## Scenario: Render inline math after a shell variable in a URL
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When URL 内のシェル変数と後続の ket 追加マクロを描く
-- Then URL 内のシェル変数は残り後続の ket 追加マクロが Unicode で描かれる
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When render a shell variable in a URL followed by the ket extra macro
+- Then The shell variable in the URL remains and the following ket extra macro is rendered as Unicode
 
-## Scenario: スキーム付き URL と www URL のインライン数式を保護する
+## Scenario: Protect inline math in scheme URLs and www URLs
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When スキーム付き URL と www URL の ket 追加マクロ風文字列を変換する
-- Then スキーム付き URL と www URL は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform ket-like extra macro strings in scheme URLs and www URLs
+- Then Scheme URLs and www URLs are unchanged
 
-## Scenario: スラッシュなしスキーム URL のインライン数式を保護する
+## Scenario: Protect inline math in scheme URLs without slashes
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When スラッシュなしスキーム URL の ket 追加マクロ風文字列を変換する
-- Then スラッシュなしスキーム URL は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform ket-like extra macro strings in scheme URLs without slashes
+- Then Scheme URLs without slashes are unchanged
 
-## Scenario: braket 追加マクロを丸括弧区切りのインライン数式で使う
+## Scenario: Use the braket extra macro in parenthesis-delimited inline math
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When braket 追加マクロを含む丸括弧区切りのインライン数式を描く
-- Then braket 追加マクロが Unicode で描かれる
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When render parenthesis-delimited inline math containing the braket extra macro
+- Then The braket extra macro is rendered as Unicode
 
-## Scenario: braket 利用者マクロをドル区切りのインライン数式で使う
+## Scenario: Use the braket user macro in dollar-delimited inline math
 
-- Given braket の利用者マクロを設定した画像経路の Pi がある
-- When braket 利用者マクロを含むドル区切りのインライン数式を描く
-- Then braket 利用者マクロが Unicode で描かれる
+- Given Pi uses the image path with a braket user macro configured
+- When render dollar-delimited inline math containing the braket user macro
+- Then The braket user macro is rendered as Unicode
 
-## Scenario: Object prototype 名を未登録マクロとして扱う
+## Scenario: Treat Object prototype names as unregistered macros
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When Object prototype 名と ket 追加マクロを含む本文を変換する
-- Then Object prototype 名は残り ket 追加マクロだけが展開される
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text containing Object prototype names and the ket extra macro
+- Then Object prototype names remain and only the ket extra macro is expanded
 
-## Scenario: 金額とシェル変数の後にあるインライン数式を描く
+## Scenario: Render inline math after currency amounts and shell variables
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When 金額とシェル変数の後に ket 追加マクロがある本文を描く
-- Then 金額とシェル変数は残り後続の ket 追加マクロが Unicode で描かれる
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When render body text with the ket extra macro after currency amounts and shell variables
+- Then Currency amounts and shell variables remain and the following ket extra macro is rendered as Unicode
 
-## Scenario: 相対 Markdown URL のマクロ風文字列を変換しない
+## Scenario: Do not transform macro-like strings in relative Markdown URLs
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When 相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する
-- Then 相対 Markdown URL は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text containing ket-like extra macro strings in relative Markdown URLs
+- Then Relative Markdown URLs are unchanged
 
-## Scenario: スキームなし URL のマクロ風文字列を変換しない
+## Scenario: Do not transform macro-like strings in URLs without schemes
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When スキームなし URL に ket 追加マクロ風文字列がある本文を変換する
-- Then スキームなし URL は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text containing ket-like extra macro strings in URLs without schemes
+- Then URLs without schemes are unchanged
 
-## Scenario: 引数付き追加マクロの直後に英字を置く
+## Scenario: Place a letter immediately after an extra macro with arguments
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When ket 追加マクロの直後に英字があるインライン数式を描く
-- Then ket 追加マクロと後続英字が Unicode で描かれる
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When render inline math with a letter immediately after the ket extra macro
+- Then The ket extra macro and following letter are rendered as Unicode
 
-## Scenario: 追加マクロの置換本体どおりに引数を展開する
+## Scenario: Expand arguments according to the extra macro replacement body
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When グループを持たない二乗追加マクロを変換する
-- Then 二乗追加マクロの引数は自動でグループ化されない
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When transform a squaring extra macro without grouping
+- Then The squaring extra macro argument is not automatically grouped
 
-## Scenario: 0 引数追加マクロの後の空白を TeX と同じく扱う
+## Scenario: Handle whitespace after a zero-argument extra macro like TeX
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When 0 引数追加マクロの後に空白と英字があるインライン数式を描く
-- Then 0 引数追加マクロと後続英字が Unicode で描かれる
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When render inline math with whitespace and a letter after a zero-argument extra macro
+- Then The zero-argument extra macro and following letter are rendered as Unicode
 
-## Scenario: 制御記号の後を追加マクロとして展開しない
+## Scenario: Do not expand text after a control symbol as an extra macro
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When バックスラッシュ制御記号の後に ket と同じ英字がある本文を変換する
-- Then バックスラッシュ制御記号の後は変更されない
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When transform body text with the letters ket after a backslash control symbol
+- Then Text after a backslash control symbol is unchanged
 
-## Scenario: 参照リンク定義のマクロ風文字列を変換しない
+## Scenario: Do not transform macro-like strings in reference link definitions
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When 参照リンク定義に ket 追加マクロ風文字列がある本文を変換する
-- Then 参照リンク定義は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text containing ket-like extra macro strings in reference link definitions
+- Then Reference link definitions are unchanged
 
-## Scenario: 丸括弧を含む相対 Markdown URL のマクロ風文字列を変換しない
+## Scenario: Do not transform macro-like strings in relative Markdown URLs containing parentheses
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When 丸括弧を含む相対 Markdown URL に ket 追加マクロ風文字列がある本文を変換する
-- Then 丸括弧を含む相対 Markdown URL は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text containing ket-like extra macro strings in relative Markdown URLs with parentheses
+- Then Relative Markdown URLs containing parentheses are unchanged
 
-## Scenario: Markdown 表のインライン数式で ket 追加マクロを使う
+## Scenario: Use the ket extra macro in inline math in a Markdown table
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When ket 追加マクロを含む Markdown 表を描く
-- Then 表の列を保ったまま ket 追加マクロが Unicode で描かれる
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When render a Markdown table containing the ket extra macro
+- Then The ket extra macro is rendered as Unicode while preserving table columns
 
-## Scenario: 同じ追加マクロを引数内で入れ子にする
+## Scenario: Nest the same extra macro inside its argument
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When 入れ子の ket 追加マクロを含むインライン数式を描く
-- Then 入れ子の ket 追加マクロが Unicode で描かれる
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When render inline math containing nested ket extra macros
+- Then Nested ket extra macros are rendered as Unicode
 
-## Scenario: 自分自身を呼ぶ追加マクロを原文のまま残す
+## Scenario: Preserve self-referencing extra macros as source
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When 自分自身を呼ぶ追加マクロを含むインライン数式を変換する
-- Then 再帰する追加マクロは原文のまま残る
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When transform inline math containing a self-referencing extra macro
+- Then Recursive extra macros remain as source
 
-## Scenario: 空文字列へ展開する利用者マクロを原文のまま残す
+## Scenario: Preserve user macros that expand to empty strings as source
 
-- Given 空文字列の利用者マクロを設定した画像経路の Pi がある
-- When 空文字列の利用者マクロを含むインライン数式を変換する
-- Then 空のインライン数式にせず原文のまま残る
+- Given Pi uses the image path with an empty-string user macro configured
+- When transform inline math containing an empty-string user macro
+- Then The source remains instead of becoming empty inline math
 
-## Scenario: 丸括弧区切りを含む bare URL を変換しない
+## Scenario: Do not transform bare URLs containing parenthesis delimiters
 
-- Given 置換境界を確認する追加マクロを登録した画像経路の Pi がある
-- When 丸括弧区切りの ket 追加マクロ風文字列を含む bare URL を変換する
-- Then 丸括弧区切りを含む bare URL は変更されない
+- Given Pi uses the image path with extra macros for testing substitution boundaries
+- When transform a bare URL containing a parenthesis-delimited ket-like extra macro string
+- Then Bare URLs containing parenthesis delimiters are unchanged
 
-## Scenario: 追加マクロがなければインライン数式を変えない
+## Scenario: Leave inline math unchanged without extra macros
 
-- Given 画像経路で数式を描ける Pi がある
-- When 未登録の ket を含むインライン数式を変換する
-- Then 未登録の ket は原文のまま残る
+- Given Pi can render math through the image path
+- When transform inline math containing an unregistered ket macro
+- Then An unregistered ket macro remains as source
 
-## Scenario: 展開後に描けないインライン数式を変えない
+## Scenario: Leave inline math unchanged when it cannot be rendered after expansion
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When 展開後も描けない命令を含むインライン数式を変換する
-- Then 描けないインライン数式は原文のまま残る
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform inline math containing commands that cannot be rendered even after expansion
+- Then Unrenderable inline math remains as source
 
-## Scenario: 追加マクロがあっても保護対象を変えない
+## Scenario: Leave protected content unchanged even with extra macros
 
-- Given 画像経路で数式を描ける Pi がある
-- And ket と braket の追加マクロを登録する
-- When コードと金額と URL とシェル変数に追加マクロがある本文を変換する
-- Then 追加マクロがある保護対象は変更されない
+- Given Pi can render math through the image path
+- And register the ket and braket extra macros
+- When transform body text with extra macros in code, currency amounts, URLs, and shell variables
+- Then Protected content containing extra macros is unchanged
 
-## Scenario: コード内の数式を変換しない
+## Scenario: Do not transform math inside code
 
-- Given 画像経路で数式を描ける Pi がある
-- When コードフェンスと文中コードに数式がある本文を変換する
-- Then コード内の本文は変更されない
+- Given Pi can render math through the image path
+- When transform body text containing math in code fences and inline code
+- Then Body text inside code is unchanged
 
-## Scenario: 長いバッククォートのフェンス内の表示数式は残る
+## Scenario: Display math inside long backtick fences remains
 
-- Given 画像経路で数式を描ける Pi がある
-- When 長い区切りと字下げと末尾空白を持つコードフェンスを変換する
-- Then 長いバッククォートのフェンス内の表示数式は残る
+- Given Pi can render math through the image path
+- When transform code fences with long delimiters, indentation, and trailing whitespace
+- Then Display math inside long backtick fences remains
 
-## Scenario: 長いチルダのフェンス内の表示数式は残る
+## Scenario: Display math inside long tilde fences remains
 
-- Given 画像経路で数式を描ける Pi がある
-- When 長い区切りと字下げと末尾空白を持つコードフェンスを変換する
-- Then 長いチルダのフェンス内の表示数式は残る
+- Given Pi can render math through the image path
+- When transform code fences with long delimiters, indentation, and trailing whitespace
+- Then Display math inside long tilde fences remains
 
-## Scenario: 長いフェンスの後の表示数式1件が画像になる
+## Scenario: One display formula after long fences becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 長い区切りと字下げと末尾空白を持つコードフェンスを変換する
-- Then 長いフェンスの後の表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform code fences with long delimiters, indentation, and trailing whitespace
+- Then One display formula after long fences becomes an image
 
-## Scenario: メタ文字を含むバッククォート行はフェンスを閉じない
+## Scenario: Backtick lines containing metacharacters do not close a fence
 
-- Given 画像経路で数式を描ける Pi がある
-- When 正規表現メタ文字を含む行があるコードフェンスを変換する
-- Then メタ文字を含むバッククォート行はフェンスを閉じない
+- Given Pi can render math through the image path
+- When transform code fences containing lines with regex metacharacters
+- Then Backtick lines containing metacharacters do not close a fence
 
-## Scenario: メタ文字を含むチルダ行はフェンスを閉じない
+## Scenario: Tilde lines containing metacharacters do not close a fence
 
-- Given 画像経路で数式を描ける Pi がある
-- When 正規表現メタ文字を含む行があるコードフェンスを変換する
-- Then メタ文字を含むチルダ行はフェンスを閉じない
+- Given Pi can render math through the image path
+- When transform code fences containing lines with regex metacharacters
+- Then Tilde lines containing metacharacters do not close a fence
 
-## Scenario: メタ文字を含むフェンスの後の表示数式1件が画像になる
+## Scenario: One display formula after fences containing metacharacters becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 正規表現メタ文字を含む行があるコードフェンスを変換する
-- Then メタ文字を含むフェンスの後の表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform code fences containing lines with regex metacharacters
+- Then One display formula after fences containing metacharacters becomes an image
 
-## Scenario: thinking を変換しない
+## Scenario: Do not transform thinking
 
-- Given 画像経路で数式を描ける Pi がある
-- When thinking の本文を変換する
-- Then thinking の本文は変更されない
+- Given Pi can render math through the image path
+- When transform thinking body text
+- Then Thinking body text is unchanged
 
-## Scenario: 通常のドル記号を数式と誤認しない
+## Scenario: Do not mistake ordinary dollar signs for math
 
-- Given 画像経路で数式を描ける Pi がある
-- When 金額と URL とシェル変数とエスケープ済みドル記号を含む本文を変換する
-- Then 通常のドル記号を含む本文は変更されない
+- Given Pi can render math through the image path
+- When transform body text containing currency amounts, URLs, shell variables, and escaped dollar signs
+- Then Body text containing ordinary dollar signs is unchanged
 
-## Scenario: 曖昧なドル記号では原文を優先する
+## Scenario: Prefer source text for ambiguous dollar signs
 
-- Given 画像経路で数式を描ける Pi がある
-- When 曖昧なドル記号を含む本文を変換する
-- Then 曖昧なドル記号を含む本文は変更されない
+- Given Pi can render math through the image path
+- When transform body text containing ambiguous dollar signs
+- Then Body text containing ambiguous dollar signs is unchanged
 
-## Scenario: 箇条書き内の表示数式を保つ
+## Scenario: Preserve display math in lists
 
-- Given 画像経路で数式を描ける Pi がある
-- When 箇条書き内の表示数式を変換する
-- Then 画像は箇条書きの字下げに残る
+- Given Pi can render math through the image path
+- When transform display math in a list
+- Then The image retains the list indentation
 
-## Scenario: 引用内の表示数式を保つ
+## Scenario: Preserve display math in blockquotes
 
-- Given 画像経路で数式を描ける Pi がある
-- When 引用内の表示数式を変換する
-- Then 画像は引用の階層に残る
+- Given Pi can render math through the image path
+- When transform display math in a blockquote
+- Then The image retains the blockquote nesting
 
-## Scenario: ストリーミング中の閉じた数式を画像で描く
+## Scenario: Render closed math as images while streaming
 
-- Given 画像経路で数式を描ける Pi がある
-- When 閉じた数式まで届いたストリーミング本文を変換する
-- Then 閉じた表示数式は画像経路で描かれる
+- Given Pi can render math through the image path
+- When transform streaming body text received through a closed formula
+- Then Closed display math is rendered through the image path
 
-## Scenario: ストリーミング中の未完成な数式を変換しない
+## Scenario: Do not transform incomplete math while streaming
 
-- Given 画像経路で数式を描ける Pi がある
-- When 未完成な数式まで届いたストリーミング本文を変換する
-- Then 未完成な数式は原文のまま残る
+- Given Pi can render math through the image path
+- When transform streaming body text received through an incomplete formula
+- Then Incomplete math remains as source
 
-## Scenario: 数式でない $$ の後ろにある表示数式を描く
+## Scenario: Render display math after non-math $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ と後続の表示数式を含む本文を変換する
-- Then 後続の表示数式だけが画像になる
+- Given Pi can render math through the image path
+- When transform body text containing non-math $$ followed by display math
+- Then Only the following display math becomes an image
 
-## Scenario: 数式でない $$ を含む本文を重複させない
+## Scenario: Do not duplicate body text containing non-math $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ と後続の表示数式を含む本文を変換する
-- Then 見送った本文は入力どおり一度だけ残る
+- Given Pi can render math through the image path
+- When transform body text containing non-math $$ followed by display math
+- Then Skipped body text remains exactly once as supplied
 
-## Scenario: $$ を含む金額を表示数式と誤認しない
+## Scenario: Do not mistake currency amounts containing $$ for display math
 
-- Given 画像経路で数式を描ける Pi がある
-- When $$ を含む金額を変換する
-- Then 金額は入力どおり残る
+- Given Pi can render math through the image path
+- When transform currency amounts containing $$
+- Then Currency amounts remain as supplied
 
-## Scenario: 再走査した金額の後ろにある表示数式を描く
+## Scenario: Render display math after rescanned currency amounts
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式1を先に描く
-- And 再走査される金額と後続の表示数式を含む本文を変換する
-- Then 画像経路で描かれる式は x = 1 だけになる
+- Given Pi can render math through the image path
+- When first render reference display formula 1
+- And transform body text containing rescanned currency amounts followed by display math
+- Then Only x = 1 is rendered through the image path
 
-## Scenario Outline: コロン付き金額の後はx = 1だけが画像になる
+## Scenario Outline: Only x = 1 becomes an image after currency amounts with colons
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用のx = 1を先に描く
-- And コロン付きラベル「<ラベル>」の再走査される金額と後続の表示数式を含む本文を変換する
-- Then コロン付き金額の後はx = 1だけが画像になる
+- Given Pi can render math through the image path
+- When first render the reference x = 1
+- And transform body text containing rescanned currency amounts with the colon label "<label>" followed by display math
+- Then Only x = 1 becomes an image after currency amounts with colons
 
 ### Examples:
 
-  | ラベル |
+  | label |
   | ------ |
   | 価格:  |
   | 価格： |
 
-## Scenario Outline: コロン付きラベルの金額は一度だけ残る
+## Scenario Outline: Currency amounts with colon labels remain exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用のx = 1を先に描く
-- And コロン付きラベル「<ラベル>」の再走査される金額と後続の表示数式を含む本文を変換する
-- Then コロン付きラベルの金額は一度だけ残る
+- Given Pi can render math through the image path
+- When first render the reference x = 1
+- And transform body text containing rescanned currency amounts with the colon label "<label>" followed by display math
+- Then Currency amounts with colon labels remain exactly once
 
 ### Examples:
 
-  | ラベル |
+  | label |
   | ------ |
   | 価格:  |
   | 価格： |
 
-## Scenario: 金額とシェルを含む本文ではx = 1だけが画像になる
+## Scenario: Only x = 1 becomes an image in body text containing currency amounts and shell text
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式2を先に描く
-- And 再走査される金額と表示数式と末尾のシェルの $$ を変換する
-- Then 金額とシェルを含む本文ではx = 1だけが画像になる
+- Given Pi can render math through the image path
+- When first render reference display formula 2
+- And transform rescanned currency amounts, display math, and trailing shell $$
+- Then Only x = 1 becomes an image in body text containing currency amounts and shell text
 
-## Scenario: 表示数式とシェルを含む本文の金額は一度だけ残る
+## Scenario: Currency amounts in body text containing display math and shell text remain exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式2を先に描く
-- And 再走査される金額と表示数式と末尾のシェルの $$ を変換する
-- Then 表示数式とシェルを含む本文の金額は一度だけ残る
+- Given Pi can render math through the image path
+- When first render reference display formula 2
+- And transform rescanned currency amounts, display math, and trailing shell $$
+- Then Currency amounts in body text containing display math and shell text remain exactly once
 
-## Scenario: 表示数式と金額を含む本文のシェルの$は一度だけ残る
+## Scenario: Shell $ in body text containing display math and currency amounts remains exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式2を先に描く
-- And 再走査される金額と表示数式と末尾のシェルの $$ を変換する
-- Then 表示数式と金額を含む本文のシェルの$$は一度だけ残る
+- Given Pi can render math through the image path
+- When first render reference display formula 2
+- And transform rescanned currency amounts, display math, and trailing shell $$
+- Then Shell $$ in body text containing display math and currency amounts remains exactly once
 
-## Scenario: 独立した区切り行ではx = 1だけが画像になる
+## Scenario: Only x = 1 becomes an image with standalone delimiter lines
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式3を先に描く
-- And 再走査される金額と独立した区切り行の表示数式を含む本文を変換する
-- Then 独立した区切り行ではx = 1だけが画像になる
+- Given Pi can render math through the image path
+- When first render reference display formula 3
+- And transform body text containing rescanned currency amounts and display math with standalone delimiter lines
+- Then Only x = 1 becomes an image with standalone delimiter lines
 
-## Scenario: 独立した表示数式の前の金額は一度だけ残る
+## Scenario: Currency amounts before standalone display math remain exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式3を先に描く
-- And 再走査される金額と独立した区切り行の表示数式を含む本文を変換する
-- Then 独立した表示数式の前の金額は一度だけ残る
+- Given Pi can render math through the image path
+- When first render reference display formula 3
+- And transform body text containing rescanned currency amounts and display math with standalone delimiter lines
+- Then Currency amounts before standalone display math remain exactly once
 
-## Scenario: 数式でない $$ の後ろにある数値だけの表示数式を描く
+## Scenario: Render numeric-only display math after non-math $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式4を先に描く
-- And 数式でない $$ と後続の数値だけの表示数式を含む本文を変換する
-- Then 画像経路で描かれる式は 100 だけになる
+- Given Pi can render math through the image path
+- When first render reference display formula 4
+- And transform body text containing non-math $$ followed by numeric-only display math
+- Then Only 100 is rendered through the image path
 
-## Scenario: 数式でない $$ の後ろにある複数行区切りの数値表示数式を描く
+## Scenario: Render numeric display math with multiline delimiters after non-math $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式5を先に描く
-- And 数式でない $$ と閉じ区切りを後続行に置いた数値表示数式を変換する
-- Then 画像経路で描かれる複数行区切りの式は 100 だけになる
+- Given Pi can render math through the image path
+- When first render reference display formula 5
+- And transform non-math $$ and numeric display math whose closing delimiter is on a later line
+- Then Only multiline-delimited 100 is rendered through the image path
 
-## Scenario: 数式でない $$ の後ろにあるラベル付き数値表示数式を描く
+## Scenario: Render labeled numeric display math after non-math $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式6を先に描く
-- And 数式でない $$ と行内ラベル付きの数値表示数式を変換する
-- Then 画像経路で描かれるラベル付きの式は 100 だけになる
+- Given Pi can render math through the image path
+- When first render reference display formula 6
+- And transform non-math $$ and numeric display math with an inline label
+- Then Only labeled 100 is rendered through the image path
 
-## Scenario: 数値数式と後続のy = 1だけが画像になる
+## Scenario: Only numeric math and the following y = 1 become images
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の数値100を先に描く
-- And 比較用のy = 1を次に描く
-- And 数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する
-- Then 数値数式と後続のy = 1だけが画像になる
+- Given Pi can render math through the image path
+- When first render the reference number 100
+- And next render the reference y = 1
+- And transform non-math $$, numeric display math, a single letter, and following display math
+- Then Only numeric math and the following y = 1 become images
 
-## Scenario: 二つの表示数式の間の単一英字は一度だけ残る
+## Scenario: The single letter between two display formulas remains exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の数値100を先に描く
-- And 比較用のy = 1を次に描く
-- And 数式でない $$ と数値表示数式と単一英字と後続の表示数式を変換する
-- Then 二つの表示数式の間の単一英字は一度だけ残る
+- Given Pi can render math through the image path
+- When first render the reference number 100
+- And next render the reference y = 1
+- And transform non-math $$, numeric display math, a single letter, and following display math
+- Then The single letter between two display formulas remains exactly once
 
-## Scenario: 未完の区切りより前にある100だけが画像になる
+## Scenario: Only 100 before the incomplete delimiter becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式7を先に描く
-- And 数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する
-- Then 未完の区切りより前にある100だけが画像になる
+- Given Pi can render math through the image path
+- When first render reference display formula 7
+- And transform non-math $$, numeric display math, a single letter, and unclosed $$
+- Then Only 100 before the incomplete delimiter becomes an image
 
-## Scenario: 未完の区切りと数値数式の間の単一英字は一度だけ残る
+## Scenario: The single letter between the incomplete delimiter and numeric math remains exactly once
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式7を先に描く
-- And 数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する
-- Then 未完の区切りと数値数式の間の単一英字は一度だけ残る
+- Given Pi can render math through the image path
+- When first render reference display formula 7
+- And transform non-math $$, numeric display math, a single letter, and unclosed $$
+- Then The single letter between the incomplete delimiter and numeric math remains exactly once
 
-## Scenario: 数値数式の後の未完の区切りは残る
+## Scenario: The incomplete delimiter after numeric math remains
 
-- Given 画像経路で数式を描ける Pi がある
-- When 比較用の表示数式7を先に描く
-- And 数式でない $$ と数値表示数式と単一英字と閉じていない $$ を変換する
-- Then 数値数式の後の未完の区切りは残る
+- Given Pi can render math through the image path
+- When first render reference display formula 7
+- And transform non-math $$, numeric display math, a single letter, and unclosed $$
+- Then The incomplete delimiter after numeric math remains
 
-## Scenario: 通常の表示数式を描く
+## Scenario: Render ordinary display math
 
-- Given 画像経路で数式を描ける Pi がある
-- When 通常の表示数式を変換する
-- Then 一つの表示数式が画像になる
+- Given Pi can render math through the image path
+- When transform ordinary display math
+- Then One display formula becomes an image
 
-## Scenario: $$ を含む URL を表示数式と誤認しない
+## Scenario: Do not mistake URLs containing $$ for display math
 
-- Given 画像経路で数式を描ける Pi がある
-- When $$ を含む URL を変換する
-- Then URL は入力どおり残る
+- Given Pi can render math through the image path
+- When transform URLs containing $$
+- Then URLs remain as supplied
 
-## Scenario: シェルの $$ を含む通常本文を保つ
+## Scenario: Preserve ordinary body text containing shell $$
 
-- Given 画像経路で数式を描ける Pi がある
-- When シェルの $$ と後続の表示数式を含む本文を変換する
-- Then シェルの通常本文は入力どおり残る
+- Given Pi can render math through the image path
+- When transform body text containing shell $$ followed by display math
+- Then Ordinary shell body text remains as supplied
 
-## Scenario: 一行のシェルの後で、シェルに続く表示数式1件が画像になる
+## Scenario: One display formula after single-line shell text becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When シェルの $$ と後続の表示数式を含む本文を変換する
-- Then シェルに続く表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform body text containing shell $$ followed by display math
+- Then One display formula following shell text becomes an image
 
-## Scenario: 一行のシェルの後で、シェルに続くx = 1のLaTeXは変換結果に残らない
+## Scenario: The LaTeX for x = 1 following single-line shell text does not remain in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When シェルの $$ と後続の表示数式を含む本文を変換する
-- Then シェルに続くx = 1のLaTeXは変換結果に残らない
+- Given Pi can render math through the image path
+- When transform body text containing shell $$ followed by display math
+- Then The LaTeX for x = 1 following shell text does not remain in the transformed output
 
-## Scenario: 改行を含むシェルの $$ を通常本文として保つ
+## Scenario: Preserve multiline shell $$ as ordinary body text
 
-- Given 画像経路で数式を描ける Pi がある
-- When 改行を含むシェルの $$ と後続の表示数式を含む本文を変換する
-- Then 改行を含むシェルの通常本文は入力どおり残る
+- Given Pi can render math through the image path
+- When transform body text containing multiline shell $$ followed by display math
+- Then Ordinary multiline shell body text remains as supplied
 
-## Scenario: 改行を含むシェルの後で、シェルに続く表示数式1件が画像になる
+## Scenario: One display formula following multiline shell text becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 改行を含むシェルの $$ と後続の表示数式を含む本文を変換する
-- Then シェルに続く表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform body text containing multiline shell $$ followed by display math
+- Then One display formula following shell text becomes an image
 
-## Scenario: 改行を含むシェルの後で、シェルに続くx = 1のLaTeXは変換結果に残らない
+## Scenario: The LaTeX for x = 1 following multiline shell text does not remain in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 改行を含むシェルの $$ と後続の表示数式を含む本文を変換する
-- Then シェルに続くx = 1のLaTeXは変換結果に残らない
+- Given Pi can render math through the image path
+- When transform body text containing multiline shell $$ followed by display math
+- Then The LaTeX for x = 1 following shell text does not remain in the transformed output
 
-## Scenario: 行頭の $$ を含む通常本文を保つ
+## Scenario: Preserve ordinary body text containing $$ at the start of a line
 
-- Given 画像経路で数式を描ける Pi がある
-- When 行頭の $$ を含む通常本文と後続の表示数式を変換する
-- Then 行頭の $$ を含む通常本文は入力どおり残る
+- Given Pi can render math through the image path
+- When transform ordinary body text containing $$ at the start of a line followed by display math
+- Then Ordinary body text containing $$ at the start of a line remains as supplied
 
-## Scenario: 行頭の通常本文の後で、非数式の$$に続く表示数式1件が画像になる
+## Scenario: One display formula after non-math $$ following ordinary line-start text becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 行頭の $$ を含む通常本文と後続の表示数式を変換する
-- Then 非数式の$$に続く表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform ordinary body text containing $$ at the start of a line followed by display math
+- Then One display formula following non-math $$ becomes an image
 
-## Scenario: 行頭の通常本文の後で、非数式の$$に続くx = 1のLaTeXは変換結果に残らない
+## Scenario: The LaTeX for x = 1 after non-math $$ following ordinary line-start text does not remain in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 行頭の $$ を含む通常本文と後続の表示数式を変換する
-- Then 非数式の$$に続くx = 1のLaTeXは変換結果に残らない
+- Given Pi can render math through the image path
+- When transform ordinary body text containing $$ at the start of a line followed by display math
+- Then The LaTeX for x = 1 following non-math $$ does not remain in the transformed output
 
-## Scenario: ラベル付き表示数式では、非数式の$$に続く表示数式1件が画像になる
+## Scenario: One labeled display formula following non-math $$ becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ とラベル付き表示数式を含む本文を変換する
-- Then 非数式の$$に続く表示数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform body text containing non-math $$ and labeled display math
+- Then One display formula following non-math $$ becomes an image
 
-## Scenario: ラベル付き表示数式では、非数式の$$に続くx = 1のLaTeXは変換結果に残らない
+## Scenario: The LaTeX for labeled x = 1 following non-math $$ does not remain in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ とラベル付き表示数式を含む本文を変換する
-- Then 非数式の$$に続くx = 1のLaTeXは変換結果に残らない
+- Given Pi can render math through the image path
+- When transform body text containing non-math $$ and labeled display math
+- Then The LaTeX for x = 1 following non-math $$ does not remain in the transformed output
 
-## Scenario: ラベル付き表示数式の前の本文を重複させない
+## Scenario: Do not duplicate body text before labeled display math
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ とラベル付き表示数式を含む本文を変換する
-- Then ラベル付き表示数式の前の本文は入力どおり一度だけ残る
+- Given Pi can render math through the image path
+- When transform body text containing non-math $$ and labeled display math
+- Then Body text before labeled display math remains exactly once as supplied
 
-## Scenario: 多数の数式でない $$ を現実的な時間で見送る
+## Scenario: Skip many non-math $$ within a practical time
 
-- Given 画像経路で数式を描ける Pi がある
-- When 数式でない $$ を一万個含む本文を変換する
-- Then 走査は一秒以内に終わる
+- Given Pi can render math through the image path
+- When transform body text containing ten thousand non-math $$
+- Then Scanning finishes within one second
 
-## Scenario: 不正な表示数式は変換結果に残る
+## Scenario: Invalid display math remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 不正な表示数式と正しい表示数式を含む本文を変換する
-- Then 不正な表示数式は変換結果に残る
+- Given Pi can render math through the image path
+- When transform body text containing invalid and valid display math
+- Then Invalid display math remains in the transformed output
 
-## Scenario: 不正な表示数式に続く本文は変換結果に残る
+## Scenario: Body text following invalid display math remains in the transformed output
 
-- Given 画像経路で数式を描ける Pi がある
-- When 不正な表示数式と正しい表示数式を含む本文を変換する
-- Then 不正な表示数式に続く本文は変換結果に残る
+- Given Pi can render math through the image path
+- When transform body text containing invalid and valid display math
+- Then Body text following invalid display math remains in the transformed output
 
-## Scenario: 不正な表示数式の後の正しい数式1件が画像になる
+## Scenario: One valid formula after invalid display math becomes an image
 
-- Given 画像経路で数式を描ける Pi がある
-- When 不正な表示数式と正しい表示数式を含む本文を変換する
-- Then 不正な表示数式の後の正しい数式1件が画像になる
+- Given Pi can render math through the image path
+- When transform body text containing invalid and valid display math
+- Then One valid formula after invalid display math becomes an image

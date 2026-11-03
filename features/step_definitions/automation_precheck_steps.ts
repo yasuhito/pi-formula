@@ -96,67 +96,67 @@ After(function (this: StepWorld) {
 });
 
 Given(
-  /^terminal の最終出力が「(.+)」である$/,
+  /^the terminal last output is "(.+)"$/,
   function (this: StepWorld, state: string) {
     prepareFakeCommands(this);
     this.terminalState = terminalStates[state];
   },
 );
 
-When(
-  /^「(.+)」precheck を実行する$/,
-  function (this: StepWorld, precheck: string) {
-    const result = spawnSync("bash", [prechecks[precheck]], {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        PATH: `${this.fakeCommandDirectory}:${process.env.PATH}`,
-        PI_FORMULA_REPO: root,
-        CLOSE_LOG: this.closeLog,
-        FAKE_TERMINAL_STATE: this.terminalState,
-      },
-    });
-    const closedTerminals = readFileSync(this.closeLog, {
-      encoding: "utf8",
-      flag: "a+",
-    })
-      .trim()
-      .split("\n")
-      .filter(Boolean);
-    this.precheckObservation = {
-      error: result.error?.message ?? null,
-      status: result.status,
-      signal: result.signal,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      closedTerminals,
-    };
+When(/^run the "(.+)" precheck$/, function (this: StepWorld, precheck: string) {
+  const result = spawnSync("bash", [prechecks[precheck]], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${this.fakeCommandDirectory}:${process.env.PATH}`,
+      PI_FORMULA_REPO: root,
+      CLOSE_LOG: this.closeLog,
+      FAKE_TERMINAL_STATE: this.terminalState,
+    },
+  });
+  const closedTerminals = readFileSync(this.closeLog, {
+    encoding: "utf8",
+    flag: "a+",
+  })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+  this.precheckObservation = {
+    error: result.error?.message ?? null,
+    status: result.status,
+    signal: result.signal,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    closedTerminals,
+  };
+});
+
+Then(
+  "The precheck has no child process launch error",
+  function (this: StepWorld) {
+    assert.equal(this.precheckObservation.error, null);
   },
 );
 
-Then("precheckの子プロセス起動にエラーはない", function (this: StepWorld) {
-  assert.equal(this.precheckObservation.error, null);
-});
-
-Then("precheckは終了コード0を返す", function (this: StepWorld) {
+Then("The precheck returns exit code 0", function (this: StepWorld) {
   assert.equal(this.precheckObservation.status, 0);
 });
 
-Then("precheckはシグナルで終了しない", function (this: StepWorld) {
+Then("The precheck does not exit due to a signal", function (this: StepWorld) {
   assert.equal(this.precheckObservation.signal, null);
 });
 
-Then("precheckは標準出力へ何も書かない", function (this: StepWorld) {
+Then("The precheck writes nothing to stdout", function (this: StepWorld) {
   assert.equal(this.precheckObservation.stdout, "");
 });
 
-Then("precheckは標準エラーへ何も書かない", function (this: StepWorld) {
+Then("The precheck writes nothing to stderr", function (this: StepWorld) {
   assert.equal(this.precheckObservation.stderr, "");
 });
 
 Then(
-  "terminal closeは {string} だけ呼ばれる",
+  "terminal close is called only with {string}",
   function (this: StepWorld, expected: string) {
     assert.deepEqual(
       this.precheckObservation.closedTerminals,

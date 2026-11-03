@@ -35,7 +35,7 @@ Before({ tags: "@native-vt" }, function (this: StepWorld) {
     this.vtTool = tool;
     return undefined;
   }
-  console.log("SKIP: libghostty-vt のプロトコル検査（vt-pty がありません）");
+  console.log("SKIP: libghostty-vt protocol check (vt-pty is unavailable)");
   return "skipped";
 });
 
@@ -45,7 +45,7 @@ After(function (this: StepWorld) {
   }
 });
 
-Given("vt-pty がない環境がある", function (this: StepWorld) {
+Given("an environment without vt-pty exists", function (this: StepWorld) {
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-native-test-"),
   );
@@ -57,28 +57,34 @@ Given("vt-pty がない環境がある", function (this: StepWorld) {
   this.entranceArguments = ["--", "printf", "hello"];
 });
 
-Given("環境変数で指定した vt-pty がある", function (this: StepWorld) {
-  this.nativeTestDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "pi-formula-native-test-"),
-  );
-  const selectedTool = path.join(this.nativeTestDirectory, "selected-vt-pty");
-  fs.writeFileSync(selectedTool, "#!/bin/sh\nprintf 'selected vt-pty\\n'\n");
-  fs.chmodSync(selectedTool, 0o755);
-  this.nativeEnvironment = {
-    ...process.env,
-    PI_FORMULA_VT_TOOL: selectedTool,
-  };
-  this.entranceArguments = ["--", "printf", "hello"];
-});
+Given(
+  "vt-pty is specified by an environment variable",
+  function (this: StepWorld) {
+    this.nativeTestDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), "pi-formula-native-test-"),
+    );
+    const selectedTool = path.join(this.nativeTestDirectory, "selected-vt-pty");
+    fs.writeFileSync(selectedTool, "#!/bin/sh\nprintf 'selected vt-pty\\n'\n");
+    fs.chmodSync(selectedTool, 0o755);
+    this.nativeEnvironment = {
+      ...process.env,
+      PI_FORMULA_VT_TOOL: selectedTool,
+    };
+    this.entranceArguments = ["--", "printf", "hello"];
+  },
+);
 
-Given("ホーム側のnative prefix設定がある", function (this: StepWorld) {
-  fs.mkdirSync(path.join(os.homedir(), ".cache"), { recursive: true });
-  this.nativeTestDirectory = fs.mkdtempSync(
-    path.join(os.homedir(), ".cache/pi-formula-native-plan-"),
-  );
-});
+Given(
+  "a native prefix setting exists in the home directory",
+  function (this: StepWorld) {
+    fs.mkdirSync(path.join(os.homedir(), ".cache"), { recursive: true });
+    this.nativeTestDirectory = fs.mkdtempSync(
+      path.join(os.homedir(), ".cache/pi-formula-native-plan-"),
+    );
+  },
+);
 
-Given("ビルド成果物がない検査用 checkout がある", function (this: StepWorld) {
+Given("a test checkout has no build artifacts", function (this: StepWorld) {
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-encoder-checkout-"),
   );
@@ -119,7 +125,7 @@ Given("ビルド成果物がない検査用 checkout がある", function (this:
 });
 
 Given(
-  "テキスト経路の利用者設定と tmux 端末環境がある",
+  "user settings select the text path in a tmux terminal environment",
   function (this: StepWorld) {
     const configHome = path.join(this.nativeTestDirectory, "user-config");
     const formulaConfig = path.join(configHome, "pi-formula");
@@ -145,14 +151,14 @@ Given(
 );
 
 Given(
-  "vt-ptyで文字を出力する子プロセスの命令がある",
+  "a child process command outputs text through vt-pty",
   function (this: StepWorld) {
     this.nativeCommand = ["--settle-ms", "20", "--", "printf", "hello"];
   },
 );
 
 Given(
-  "vt-pty の収束時間より遅れて仮想配置を出力する子プロセスがある",
+  "a child process emits virtual placements after the vt-pty settle interval",
   function (this: StepWorld) {
     const program = `
 const png = Buffer.alloc(24);
@@ -218,14 +224,16 @@ process.stdout.write(Buffer.concat([placement, Buffer.alloc(${padding})]), () =>
 }
 
 Given(
-  "必要な仮想配置の後も出力を続ける子プロセスがある",
+  "a child process continues output after the required virtual placements",
   function (this: StepWorld) {
     this.nativeCommand = placementFollowedByContinuousOutput(1);
   },
 );
 
-Given("仮想配置の後に異常終了する子プロセスがある", function (this: StepWorld) {
-  const program = `
+Given(
+  "a child process exits abnormally after a virtual placement",
+  function (this: StepWorld) {
+    const program = `
 const png = Buffer.alloc(24);
 png.set([137, 80, 78, 71]);
 png.writeUInt32BE(1, 16);
@@ -236,22 +244,23 @@ const output =
   "\\x1b\\\\\\x1b[?2026l";
 process.stdout.write(output, () => process.exit(1));
 `;
-  this.nativeCommand = [
-    "--settle-ms",
-    "20",
-    "--wait-for-placements",
-    "1",
-    "--wait-for-render-boundary",
-    "--wait-for-child-exit",
-    "--",
-    process.execPath,
-    "-e",
-    program,
-  ];
-});
+    this.nativeCommand = [
+      "--settle-ms",
+      "20",
+      "--wait-for-placements",
+      "1",
+      "--wait-for-render-boundary",
+      "--wait-for-child-exit",
+      "--",
+      process.execPath,
+      "-e",
+      program,
+    ];
+  },
+);
 
 Given(
-  "仮想配置の後に placeholder と本文を分けて出力し続ける子プロセスがある",
+  "a child process keeps emitting placeholders and body text separately after virtual placements",
   function (this: StepWorld) {
     const placeholder =
       "\x1b[38;2;0;0;1m\x1b[58:2::0:0:1m" +
@@ -266,14 +275,14 @@ Given(
 );
 
 Given(
-  "一部の仮想配置を出した後も出力を続ける子プロセスがある",
+  "a child process continues output after emitting some virtual placements",
   function (this: StepWorld) {
     this.nativeCommand = placementFollowedByContinuousOutput(2);
   },
 );
 
 Given(
-  "vt-ptyで長いgrapheme clusterを出力する子プロセスの命令がある",
+  "a child process command outputs a long grapheme cluster through vt-pty",
   function (this: StepWorld) {
     this.nativeCommand = [
       "--settle-ms",
@@ -286,32 +295,38 @@ Given(
   },
 );
 
-Given("vt-pty の期限を超えて動く子プロセスがある", function (this: StepWorld) {
-  this.nativeEnvironment = {
-    ...process.env,
-    PI_FORMULA_VT_TOOL: this.vtTool,
-  };
-  this.entranceArguments = [
-    "--timeout-ms",
-    "20",
-    "--wait-for-placements",
-    "1",
-    "--",
-    process.execPath,
-    "-e",
-    'process.stdout.write("start"); setTimeout(() => {}, 1000)',
-  ];
-});
+Given(
+  "a child process runs beyond the vt-pty deadline",
+  function (this: StepWorld) {
+    this.nativeEnvironment = {
+      ...process.env,
+      PI_FORMULA_VT_TOOL: this.vtTool,
+    };
+    this.entranceArguments = [
+      "--timeout-ms",
+      "20",
+      "--wait-for-placements",
+      "1",
+      "--",
+      process.execPath,
+      "-e",
+      'process.stdout.write("start"); setTimeout(() => {}, 1000)',
+    ];
+  },
+);
 
-Given("vt-pty から起動できない子プロセスがある", function (this: StepWorld) {
-  this.nativeEnvironment = {
-    ...process.env,
-    PI_FORMULA_VT_TOOL: this.vtTool,
-  };
-  this.entranceArguments = ["--", "pi-formula-command-that-does-not-exist"];
-});
+Given(
+  "a child process cannot be launched from vt-pty",
+  function (this: StepWorld) {
+    this.nativeEnvironment = {
+      ...process.env,
+      PI_FORMULA_VT_TOOL: this.vtTool,
+    };
+    this.entranceArguments = ["--", "pi-formula-command-that-does-not-exist"];
+  },
+);
 
-Given("本文セルに APC の断片を返す vt-pty がある", function (this: StepWorld) {
+Given("vt-pty returns APC fragments in body cells", function (this: StepWorld) {
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-apc-test-"),
   );
@@ -330,7 +345,7 @@ Given("本文セルに APC の断片を返す vt-pty がある", function (this:
 });
 
 Given(
-  "placeholder のない仮想配置を返す vt-pty がある",
+  "vt-pty returns a virtual placement without placeholders",
   function (this: StepWorld) {
     this.nativeTestDirectory = fs.mkdtempSync(
       path.join(os.tmpdir(), "pi-formula-missing-placeholder-test-"),
@@ -353,7 +368,7 @@ Given(
   },
 );
 
-Given("描画が落ち着かない vt-pty がある", function (this: StepWorld) {
+Given("vt-pty rendering does not settle", function (this: StepWorld) {
   this.nativeTestDirectory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-unsettled-test-"),
   );
@@ -366,7 +381,7 @@ Given("描画が落ち着かない vt-pty がある", function (this: StepWorld)
   this.nativeEnvironment = { ...process.env, PI_FORMULA_VT_TOOL: tool };
 });
 
-Given("Piで開く保存済みコーパスセッションがある", function (this: StepWorld) {
+Given("a saved corpus session can be opened in Pi", function (this: StepWorld) {
   this.nativeEnvironment = {
     ...process.env,
     PI_FORMULA_VT_TOOL: this.vtTool,
@@ -374,7 +389,7 @@ Given("Piで開く保存済みコーパスセッションがある", function (t
 });
 
 Given(
-  "Pi の未完了本文と確定本文を順に描く検査がある",
+  "a check renders incomplete and final Pi body text in order",
   function (this: StepWorld) {
     this.nativeEnvironment = {
       ...process.env,
@@ -384,7 +399,7 @@ Given(
 );
 
 Given(
-  "下線色をセミコロン形式へ戻した pi-formula がある",
+  "pi-formula has underline colors reverted to semicolon syntax",
   function (this: StepWorld) {
     this.nativeTestDirectory = fs.mkdtempSync(
       path.join(root, ".pi-formula-dirty-placeholder-test-"),
@@ -411,7 +426,7 @@ Given(
   },
 );
 
-When("プロトコル検査の入口を実行する", function (this: StepWorld) {
+When("run the protocol check entry point", function (this: StepWorld) {
   this.nativeResult = spawnSync(
     process.execPath,
     ["scripts/run-vt-pty.js", ...this.entranceArguments],
@@ -424,7 +439,7 @@ When("プロトコル検査の入口を実行する", function (this: StepWorld)
   );
 });
 
-When("libghostty-vt のビルド計画を出力する", function (this: StepWorld) {
+When("print the libghostty-vt build plan", function (this: StepWorld) {
   this.nativeResult = spawnSync(
     "scripts/build-vt-pty",
     ["--prefix", this.nativeTestDirectory, "--print-plan"],
@@ -458,16 +473,16 @@ function inspectEncoderProtocol(
   );
 }
 
-When("エンコーダ層のプロトコル検査を実行する", function (this: StepWorld) {
+When("run the encoder-layer protocol check", function (this: StepWorld) {
   inspectEncoderProtocol(this, "storage", this.nativeEnvironment);
 });
 
-When("エンコーダ層の storage を検査する", function (this: StepWorld) {
+When("check encoder-layer storage", function (this: StepWorld) {
   inspectEncoderProtocol(this, "storage");
 });
 
 When(
-  "文書化されたエンコーダ層の検査入口を実行する",
+  "run the documented encoder-layer check entry point",
   function (this: StepWorld) {
     this.nativeResult = spawnSync(
       "npm",
@@ -485,40 +500,40 @@ When(
   },
 );
 
-When("エンコーダ層の仮想配置を検査する", function (this: StepWorld) {
+When("check encoder-layer virtual placements", function (this: StepWorld) {
   inspectEncoderProtocol(this, "placement");
 });
 
-When(
-  "エンコーダ層の placeholder の画像 ID を検査する",
-  function (this: StepWorld) {
-    inspectEncoderProtocol(this, "image-id");
-  },
-);
+When("check encoder-layer placeholder image IDs", function (this: StepWorld) {
+  inspectEncoderProtocol(this, "image-id");
+});
 
-When("エンコーダ層の placeholder の座標を検査する", function (this: StepWorld) {
+When("check encoder-layer placeholder coordinates", function (this: StepWorld) {
   inspectEncoderProtocol(this, "coordinates");
 });
 
 When(
-  "エンコーダ層の placeholder の下線色タグを検査する",
+  "check encoder-layer placeholder underline color tags",
   function (this: StepWorld) {
     inspectEncoderProtocol(this, "underline");
   },
 );
 
 When(
-  "同じ Markdown の二回目のエンコーダ出力を検査する",
+  "check the second encoder output for the same Markdown",
   function (this: StepWorld) {
     inspectEncoderProtocol(this, "cached");
   },
 );
 
-When("画像転送を省いたエンコーダ出力を検査する", function (this: StepWorld) {
-  inspectEncoderProtocol(this, "missing-transfer");
-});
+When(
+  "check encoder output with image transfers omitted",
+  function (this: StepWorld) {
+    inspectEncoderProtocol(this, "missing-transfer");
+  },
+);
 
-When("子プロセスの出力が落ち着くまで待つ", function (this: StepWorld) {
+When("wait for child process output to settle", function (this: StepWorld) {
   this.nativeResult = spawnSync(this.vtTool, this.nativeCommand, {
     cwd: root,
     encoding: "utf8",
@@ -526,7 +541,7 @@ When("子プロセスの出力が落ち着くまで待つ", function (this: Step
   });
 });
 
-When("Pi を通したプロトコル検査を実行する", function (this: StepWorld) {
+When("run the protocol check through Pi", function (this: StepWorld) {
   this.nativeResult = spawnSync(
     process.execPath,
     ["scripts/verify-pi-protocol.js"],
@@ -539,7 +554,7 @@ When("Pi を通したプロトコル検査を実行する", function (this: Step
   );
 });
 
-When("ストリーミング中のプロトコル検査を実行する", function (this: StepWorld) {
+When("run the streaming protocol check", function (this: StepWorld) {
   this.nativeResult = spawnSync(
     process.execPath,
     ["scripts/verify-streaming-protocol.js"],
@@ -552,12 +567,12 @@ When("ストリーミング中のプロトコル検査を実行する", function
   );
 });
 
-Then("vt-ptyのないプロトコル検査は正常終了する", function (this: StepWorld) {
+Then("The protocol check succeeds without vt-pty", function (this: StepWorld) {
   assert.deepEqual(this.nativeResult.status, 0);
 });
 
 Then(
-  "プロトコル検査はvt-ptyがないためskipしたことを表示する",
+  "The protocol check reports a skip because vt-pty is unavailable",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
@@ -566,12 +581,15 @@ Then(
   },
 );
 
-Then("vt-ptyのないPiプロトコル検査は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.nativeResult.status, 0);
-});
+Then(
+  "The Pi protocol check succeeds without vt-pty",
+  function (this: StepWorld) {
+    assert.deepEqual(this.nativeResult.status, 0);
+  },
+);
 
 Then(
-  "Piプロトコル検査はvt-ptyがないためskipしたことを表示する",
+  "The Pi protocol check reports a skip because vt-pty is unavailable",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
@@ -580,15 +598,12 @@ Then(
   },
 );
 
-Then(
-  "vt-ptyのないストリーミング検査は正常終了する",
-  function (this: StepWorld) {
-    assert.deepEqual(this.nativeResult.status, 0);
-  },
-);
+Then("The streaming check succeeds without vt-pty", function (this: StepWorld) {
+  assert.deepEqual(this.nativeResult.status, 0);
+});
 
 Then(
-  "ストリーミング検査はvt-ptyがないためskipしたことを表示する",
+  "The streaming check reports a skip because vt-pty is unavailable",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
@@ -598,7 +613,7 @@ Then(
 );
 
 Then(
-  "複数のフレームが時系列で検査されたと報告される",
+  "Multiple frames are reported as checked in chronological order",
   function (this: StepWorld) {
     assert.equal(
       /streaming-protocol: frames=([2-9]|[1-9][0-9]+)/u.test(
@@ -611,7 +626,7 @@ Then(
 );
 
 Then(
-  "先行する tool 出力を保った3回の差分描画が報告される",
+  "Three differential renders preserving preceding tool output are reported",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes(
@@ -624,7 +639,7 @@ Then(
 );
 
 Then(
-  "各完了フレームの仮想配置と placeholder の画像 ID が対応すると報告される",
+  "Each completed frame reports matching virtual placement and placeholder image IDs",
   function (this: StepWorld) {
     assert.equal(
       /streaming-protocol: complete_frames=\d+ placement_placeholders=matched/u.test(
@@ -637,7 +652,7 @@ Then(
 );
 
 Then(
-  "途中のどのフレームにも APC の断片がないと報告される",
+  "No intermediate frame is reported as having APC fragments",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes("streaming-protocol: apc_leak=0"),
@@ -648,7 +663,7 @@ Then(
 );
 
 Then(
-  "最終フレームの表示数式と仮想配置の数が一致する",
+  "The final frame display formula and virtual placement counts match",
   function (this: StepWorld) {
     assert.equal(
       /streaming-protocol: final display_formulas=(\d+) virtual_images=\1/u.test(
@@ -660,20 +675,26 @@ Then(
   },
 );
 
-Then("環境変数で指定したvt-ptyは正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.nativeResult.status, 0);
-});
+Then(
+  "The vt-pty specified by the environment variable succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.nativeResult.status, 0);
+  },
+);
 
-Then("環境変数で指定したvt-ptyの出力が返る", function (this: StepWorld) {
-  assert.deepEqual(this.nativeResult.stdout, "selected vt-pty\n");
-});
+Then(
+  "The output of the vt-pty specified by the environment variable is returned",
+  function (this: StepWorld) {
+    assert.deepEqual(this.nativeResult.stdout, "selected vt-pty\n");
+  },
+);
 
-Then("vt-ptyのないエンコーダ検査は正常終了する", function (this: StepWorld) {
+Then("The encoder check succeeds without vt-pty", function (this: StepWorld) {
   assert.deepEqual(this.nativeResult.status, 0);
 });
 
 Then(
-  "エンコーダ検査はvt-ptyがないためskipしたことを表示する",
+  "The encoder check reports a skip because vt-pty is unavailable",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
@@ -682,32 +703,41 @@ Then(
   },
 );
 
-Then("storage に計画どおりの PNG 画像が一件ある", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stdout,
-    "encoder-protocol: storage ok\n",
-    this.nativeResult.stderr,
-  );
-});
-
-Then("隔離したエンコーダのstorage検査が報告される", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stdout.includes("encoder-protocol: storage ok"),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
-
-Then("仮想配置の列数と行数が計画と一致する", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stdout,
-    "encoder-protocol: placement ok\n",
-    this.nativeResult.stderr,
-  );
-});
+Then(
+  "Storage contains one PNG image matching the plan",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stdout,
+      "encoder-protocol: storage ok\n",
+      this.nativeResult.stderr,
+    );
+  },
+);
 
 Then(
-  "foreground RGB から復元した画像 ID が計画と一致する",
+  "The isolated encoder storage check is reported",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stdout.includes("encoder-protocol: storage ok"),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
+
+Then(
+  "Virtual placement columns and rows match the plan",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stdout,
+      "encoder-protocol: placement ok\n",
+      this.nativeResult.stderr,
+    );
+  },
+);
+
+Then(
+  "The image ID decoded from foreground RGB matches the plan",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout,
@@ -718,7 +748,7 @@ Then(
 );
 
 Then(
-  "diacritics から復元した座標が欠けも余りもなく並ぶ",
+  "Coordinates decoded from diacritics have no gaps or extras",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout,
@@ -729,7 +759,7 @@ Then(
 );
 
 Then(
-  "すべての placeholder セルの下線色タグが RGB である",
+  "All placeholder cell underline color tags are RGB",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout,
@@ -739,23 +769,26 @@ Then(
   },
 );
 
-Then("二回目も storage に画像がある", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stdout,
-    "encoder-protocol: cached ok\n",
-    this.nativeResult.stderr,
-  );
-});
+Then(
+  "Storage contains the image on the second pass too",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stdout,
+      "encoder-protocol: cached ok\n",
+      this.nativeResult.stderr,
+    );
+  },
+);
 
 Then(
-  "画像転送のないエンコーダ出力の検査は終了コード1を返す",
+  "The encoder output check without image transfers returns exit code 1",
   function (this: StepWorld) {
     assert.deepEqual(this.nativeResult.status, 1);
   },
 );
 
 Then(
-  "エンコーダ検査はplaceholderのIDに仮想配置がないことを表示する",
+  "The encoder check reports that the placeholder ID has no virtual placement",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stderr.trim(),
@@ -764,12 +797,12 @@ Then(
   },
 );
 
-Then("libghostty-vtのビルド計画は正常終了する", function (this: StepWorld) {
+Then("The libghostty-vt build plan succeeds", function (this: StepWorld) {
   assert.deepEqual(this.nativeResult.status, 0);
 });
 
 Then(
-  "libghostty-vtのビルド計画は固定したcommitを使う",
+  "The libghostty-vt build plan uses the pinned commit",
   function (this: StepWorld) {
     assert.deepEqual(
       this.buildPlan.pin,
@@ -779,14 +812,14 @@ Then(
 );
 
 Then(
-  "libghostty-vtのビルド計画は指定したprefixを使う",
+  "The libghostty-vt build plan uses the specified prefix",
   function (this: StepWorld) {
     assert.deepEqual(this.buildPlan.prefix, this.nativeTestDirectory);
   },
 );
 
 Then(
-  "ビルド計画のheaderは指定prefixのincludeにある",
+  "The build plan header is under include in the specified prefix",
   function (this: StepWorld) {
     assert.deepEqual(
       this.buildPlan.include,
@@ -795,29 +828,38 @@ Then(
   },
 );
 
-Then("ビルド計画のlibraryは指定prefixのlibにある", function (this: StepWorld) {
-  assert.deepEqual(
-    this.buildPlan.library,
-    path.join(this.nativeTestDirectory, "lib"),
-  );
-});
+Then(
+  "The build plan library is under lib in the specified prefix",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.buildPlan.library,
+      path.join(this.nativeTestDirectory, "lib"),
+    );
+  },
+);
 
-Then("ビルド計画のvt-ptyは指定prefixのbinにある", function (this: StepWorld) {
-  assert.deepEqual(
-    this.buildPlan["vt-tool"],
-    path.join(this.nativeTestDirectory, "bin/vt-pty"),
-  );
-});
+Then(
+  "The build plan vt-pty is under bin in the specified prefix",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.buildPlan["vt-tool"],
+      path.join(this.nativeTestDirectory, "bin/vt-pty"),
+    );
+  },
+);
 
-Then("Zigのビルド命令は指定prefixだけを使う", function (this: StepWorld) {
-  assert.deepEqual(
-    this.buildPlan["zig-command"],
-    "zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix " +
-      this.nativeTestDirectory,
-  );
-});
+Then(
+  "The Zig build command uses only the specified prefix",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.buildPlan["zig-command"],
+      "zig build -Demit-lib-vt -Doptimize=ReleaseFast -Dcpu=baseline --prefix " +
+        this.nativeTestDirectory,
+    );
+  },
+);
 
-Then("プロトコルの本文セルにhelloが報告される", function (this: StepWorld) {
+Then("The protocol body cells report hello", function (this: StepWorld) {
   assert.equal(
     this.nativeResult.stdout.includes('row[0]: placeholders=0 "hello"'),
     true,
@@ -826,7 +868,7 @@ Then("プロトコルの本文セルにhelloが報告される", function (this:
 });
 
 Then(
-  "必要な仮想配置を受け取ってからプロトコル状態が出力される",
+  "Protocol state is printed after receiving the required virtual placements",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes("kitty.placements=1"),
@@ -837,7 +879,7 @@ Then(
 );
 
 Then(
-  "出力の静止を待たずにプロトコル状態が出力される",
+  "Protocol state is printed without waiting for output to settle",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes("kitty.placements=1"),
@@ -848,7 +890,7 @@ Then(
 );
 
 Then(
-  "遅れて届いたplaceholderの画像IDと座標が報告される",
+  "The image IDs and coordinates of delayed placeholders are reported",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes(
@@ -860,16 +902,21 @@ Then(
   },
 );
 
-Then("timeout 時点の仮想配置数が出力される", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stderr.includes("waiting for 2 placements (observed 1)"),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
+Then(
+  "The virtual placement count at timeout is printed",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stderr.includes(
+        "waiting for 2 placements (observed 1)",
+      ),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
 
 Then(
-  "長いgrapheme clusterの本文セルにaが報告される",
+  "The long grapheme cluster body cells report a",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes('row[0]: placeholders=0 "a"'),
@@ -879,7 +926,7 @@ Then(
   },
 );
 
-Then("timeout は成功として扱われない", function (this: StepWorld) {
+Then("A timeout is not treated as success", function (this: StepWorld) {
   assert.equal(
     this.nativeResult.stderr.includes("waiting for 1 placements (observed 0)"),
     true,
@@ -887,24 +934,30 @@ Then("timeout は成功として扱われない", function (this: StepWorld) {
   );
 });
 
-Then("子プロセスの起動失敗は成功として扱われない", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stderr.includes("child exited with status 127"),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
-
-Then("本文セルの APC 断片を検出して失敗する", function (this: StepWorld) {
-  assert.equal(
-    /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
+Then(
+  "A child process launch failure is not treated as success",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stderr.includes("child exited with status 127"),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
 
 Then(
-  "仮想配置に対応する placeholder の欠落を検出して失敗する",
+  "The check fails on APC fragments in body cells",
+  function (this: StepWorld) {
+    assert.equal(
+      /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
+
+Then(
+  "The check fails on missing placeholders for virtual placements",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stderr.includes(
@@ -917,14 +970,14 @@ Then(
 );
 
 Then(
-  "描画が落ち着かないPiプロトコル検査は終了コード2を返す",
+  "The unsettled Pi protocol check returns exit code 2",
   function (this: StepWorld) {
     assert.deepEqual(this.nativeResult.status, 2);
   },
 );
 
 Then(
-  "Piプロトコル検査は描画の時間切れの理由を表示する",
+  "The Pi protocol check reports the render timeout reason",
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stderr.trim(),
@@ -933,7 +986,7 @@ Then(
   },
 );
 
-Then("placeholder セルの汚れがないと報告される", function (this: StepWorld) {
+Then("Placeholder cells are reported as clean", function (this: StepWorld) {
   assert.equal(
     this.nativeResult.stdout.includes("cells.dirty_placeholders=0"),
     true,
@@ -941,16 +994,19 @@ Then("placeholder セルの汚れがないと報告される", function (this: S
   );
 });
 
-Then("本文セルに APC の断片がないと報告される", function (this: StepWorld) {
-  assert.equal(
-    this.nativeResult.stdout.includes("cells.apc_leak=0"),
-    true,
-    this.nativeResult.stderr || this.nativeResult.stdout,
-  );
-});
+Then(
+  "Body cells are reported as having no APC fragments",
+  function (this: StepWorld) {
+    assert.equal(
+      this.nativeResult.stdout.includes("cells.apc_leak=0"),
+      true,
+      this.nativeResult.stderr || this.nativeResult.stdout,
+    );
+  },
+);
 
 Then(
-  "表示数式と storage 付き仮想配置の数が一致する",
+  "Display formula and storage-backed virtual placement counts match",
   function (this: StepWorld) {
     assert.equal(
       /pi-protocol: display_formulas=(\d+) virtual_images=\1/u.test(
@@ -962,7 +1018,7 @@ Then(
   },
 );
 
-Then("placeholder セルの汚れを検出して失敗する", function (this: StepWorld) {
+Then("The check fails on dirty placeholder cells", function (this: StepWorld) {
   assert.equal(
     /Pi を通した placeholder セルに汚れ/u.test(this.nativeResult.stderr),
     true,
@@ -971,7 +1027,7 @@ Then("placeholder セルの汚れを検出して失敗する", function (this: S
 });
 
 Then(
-  "プロトコル検査の終了コードは {int} である",
+  "The protocol check exit code is {int}",
   function (this: StepWorld, expected: number) {
     assert.equal(
       this.nativeResult.status,
@@ -981,7 +1037,7 @@ Then(
   },
 );
 
-Then("プロトコル検査の終了コードは0ではない", function (this: StepWorld) {
+Then("The protocol check exit code is nonzero", function (this: StepWorld) {
   assert.notEqual(
     this.nativeResult.status,
     0,
@@ -990,7 +1046,7 @@ Then("プロトコル検査の終了コードは0ではない", function (this: 
 });
 
 Then(
-  "隔離したcheckoutにextensionのビルド成果物が作られる",
+  "Extension build artifacts are created in the isolated checkout",
   function (this: StepWorld) {
     assert.equal(
       fs.existsSync(path.join(this.nativeTestDirectory, "dist/extension.js")),
@@ -1000,7 +1056,7 @@ Then(
   },
 );
 
-Then("プロトコルの画像配置数は0件と報告される", function (this: StepWorld) {
+Then("The protocol reports zero image placements", function (this: StepWorld) {
   assert.equal(
     this.nativeResult.stdout.includes("kitty.placements=0"),
     true,
@@ -1008,7 +1064,7 @@ Then("プロトコルの画像配置数は0件と報告される", function (thi
   );
 });
 
-Then("プロトコルのAPC漏れは0件と報告される", function (this: StepWorld) {
+Then("The protocol reports zero APC leaks", function (this: StepWorld) {
   assert.equal(
     this.nativeResult.stdout.includes("cells.apc_leak=0"),
     true,
@@ -1017,7 +1073,7 @@ Then("プロトコルのAPC漏れは0件と報告される", function (this: Ste
 });
 
 Then(
-  "仮想配置に続くafter-placement本文が報告される",
+  "The after-placement body text following a virtual placement is reported",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes("after-placement"),
@@ -1028,7 +1084,7 @@ Then(
 );
 
 Then(
-  "長いgrapheme clusterのAPC漏れは0件と報告される",
+  "The long grapheme cluster reports zero APC leaks",
   function (this: StepWorld) {
     assert.equal(
       this.nativeResult.stdout.includes("cells.apc_leak=0"),
@@ -1065,23 +1121,29 @@ process.stdout.write("\\x1b]${osc};?\\x1b\\\\");
 }
 
 Given(
-  "vt-pty の既定前景色を問い合わせる子プロセスがある",
+  "a child process queries the vt-pty default foreground color",
   function (this: StepWorld) {
     this.nativeCommand = terminalColorQuery(10);
   },
 );
 
 Given(
-  "vt-pty の既定背景色を問い合わせる子プロセスがある",
+  "a child process queries the vt-pty default background color",
   function (this: StepWorld) {
     this.nativeCommand = terminalColorQuery(11);
   },
 );
 
-Then("子プロセスが既定前景色の応答を受け取る", function (this: StepWorld) {
-  assert.match(this.nativeResult.stdout, /10;rgb:d8d8\/d8d8\/d8d8/u);
-});
+Then(
+  "The child process receives the default foreground color response",
+  function (this: StepWorld) {
+    assert.match(this.nativeResult.stdout, /10;rgb:d8d8\/d8d8\/d8d8/u);
+  },
+);
 
-Then("子プロセスが既定背景色の応答を受け取る", function (this: StepWorld) {
-  assert.match(this.nativeResult.stdout, /11;rgb:2828\/2c2c\/3434/u);
-});
+Then(
+  "The child process receives the default background color response",
+  function (this: StepWorld) {
+    assert.match(this.nativeResult.stdout, /11;rgb:2828\/2c2c\/3434/u);
+  },
+);

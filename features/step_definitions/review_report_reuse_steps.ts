@@ -52,12 +52,15 @@ After(function (this: StepWorld) {
   }
 });
 
-Given("現 HEAD の有効な PASS レポートが残っている", function (this: StepWorld) {
-  prepareReport(this, validReport);
-});
+Given(
+  "a valid PASS report for the current HEAD remains",
+  function (this: StepWorld) {
+    prepareReport(this, validReport);
+  },
+);
 
 Given(
-  /^現 HEAD のレポートが「(.+)」である$/,
+  /^the current HEAD report has defect "(.+)"$/,
   function (this: StepWorld, defect: string) {
     const reports: Record<string, string | undefined> = {
       ファイルなし: undefined,
@@ -69,7 +72,7 @@ Given(
   },
 );
 
-When("レビュー判定フローを解決する", function (this: StepWorld) {
+When("resolve the review verdict flow", function (this: StepWorld) {
   this.reviewResolutionProcess = spawnSync(
     "npm",
     [
@@ -86,48 +89,66 @@ When("レビュー判定フローを解決する", function (this: StepWorld) {
   this.reviewResolution = JSON.parse(this.reviewResolutionProcess.stdout);
 });
 
-Then("有効な独立レビューの解決は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.reviewResolutionProcess.status, 0);
-});
-
-Then("有効な独立レビューのレポートは保持される", function (this: StepWorld) {
-  assert.deepEqual(existsSync(this.reviewReportPath), true);
-});
-
-Then("現HEADの有効なレポートは有効と判定される", function (this: StepWorld) {
-  assert.deepEqual(this.reviewResolution.reportValid, true);
-});
+Then(
+  "Resolving a valid independent review succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.reviewResolutionProcess.status, 0);
+  },
+);
 
 Then(
-  "有効な独立レビューではterminal作成を要求しない",
+  "The valid independent review report is retained",
+  function (this: StepWorld) {
+    assert.deepEqual(existsSync(this.reviewReportPath), true);
+  },
+);
+
+Then(
+  "The valid report for the current HEAD is considered valid",
+  function (this: StepWorld) {
+    assert.deepEqual(this.reviewResolution.reportValid, true);
+  },
+);
+
+Then(
+  "A valid independent review does not require terminal creation",
   function (this: StepWorld) {
     assert.deepEqual(this.reviewResolution.createReviewTerminal, false);
   },
 );
 
-Then("有効な独立レビューの次の段階は6.2である", function (this: StepWorld) {
-  assert.deepEqual(this.reviewResolution.nextStep, "6.2");
-});
+Then(
+  "The next stage for a valid independent review is 6.2",
+  function (this: StepWorld) {
+    assert.deepEqual(this.reviewResolution.nextStep, "6.2");
+  },
+);
 
-Then("無効な独立レビューの解決は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.reviewResolutionProcess.status, 0);
-});
+Then(
+  "Resolving an invalid independent review succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.reviewResolutionProcess.status, 0);
+  },
+);
 
-Then("無効な独立レビューのレポートは削除される", function (this: StepWorld) {
-  assert.deepEqual(existsSync(this.reviewReportPath), false);
-});
+Then(
+  "The invalid independent review report is deleted",
+  function (this: StepWorld) {
+    assert.deepEqual(existsSync(this.reviewReportPath), false);
+  },
+);
 
-Then("欠陥のあるレポートは無効と判定される", function (this: StepWorld) {
+Then("The defective report is considered invalid", function (this: StepWorld) {
   assert.deepEqual(this.reviewResolution.reportValid, false);
 });
 
 Then(
-  "無効な独立レビューではterminal作成を要求する",
+  "An invalid independent review requires terminal creation",
   function (this: StepWorld) {
     assert.deepEqual(this.reviewResolution.createReviewTerminal, true);
   },
 );
 
-Then("再利用した PASS 判定の行き先は 7.5 である", function (this: StepWorld) {
+Then("The reused PASS verdict proceeds to 7.5", function (this: StepWorld) {
   assert.equal(this.reviewResolution.passGate, "7.5");
 });

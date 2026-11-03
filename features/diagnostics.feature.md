@@ -1,21 +1,21 @@
-# Feature: 数式表示の診断情報を安全に確認する
+# Feature: Safely inspect math display diagnostics
 
-数式表示に問題があるときは、診断機能で判定結果を確認できます。
+Diagnostics show detection results when math display has problems.
 
-診断には表示経路や選択理由などを、英語の印字可能な文字で表示します。
+Diagnostics show the display path, selection reason, and other details in printable English characters.
 
-利用者マクロは個数だけを表示し、秘密の内容を含めません。
+Only the user macro count is shown, without secret contents.
 
-## Scenario: 診断項目を決まった順序で表示する
+## Scenario: Display diagnostic fields in a fixed order
 
-- Given 端末 `Kitty` でPiを使っている
-- And 利用者マクロを1個設定している
-- And マクロの内容に秘密の文字列が含まれる
-- When セッションを開始する
-- And formula statusを実行する
-- Then 診断には次の項目だけがこの順に含まれる
+- Given Pi is running in the `Kitty` terminal
+- And one user macro is configured
+- And the macro contents include a secret string
+- When start a session
+- And run formula status
+- Then Diagnostics contain only the following fields in this order
 
-  | 項目 |
+  | field |
   | ---- |
   | 版 |
   | 経路 |
@@ -27,29 +27,29 @@
   | 一時保存 |
   | 直近の失敗 |
 
-## Scenario: 診断情報を英語の印字可能な文字で表示する
+## Scenario: Display diagnostics in printable English characters
 
-- Given 端末 `Kitty` でPiを使っている
-- And 利用者マクロを1個設定している
-- And マクロの内容に秘密の文字列が含まれる
-- When セッションを開始する
-- And formula statusを実行する
-- Then 診断情報はすべて印字可能なASCII文字である
+- Given Pi is running in the `Kitty` terminal
+- And one user macro is configured
+- And the macro contents include a secret string
+- When start a session
+- And run formula status
+- Then Diagnostics contain only printable ASCII characters
 
-## Scenario: 診断には利用者マクロの個数を表示する
+## Scenario: Show the user macro count in diagnostics
 
-- Given 端末 `Kitty` でPiを使っている
-- And 利用者マクロを1個設定している
-- And マクロの内容に秘密の文字列が含まれる
-- When セッションを開始する
-- And formula statusを実行する
-- Then 診断に表示される利用者マクロの数は1である
+- Given Pi is running in the `Kitty` terminal
+- And one user macro is configured
+- And the macro contents include a secret string
+- When start a session
+- And run formula status
+- Then The user macro count shown in diagnostics is 1
 
-## Scenario: 診断には秘密のマクロ内容を含めない
+## Scenario: Exclude secret macro contents from diagnostics
 
-- Given 端末 `Kitty` でPiを使っている
-- And 利用者マクロを1個設定している
-- And マクロの内容に秘密の文字列が含まれる
-- When セッションを開始する
-- And formula statusを実行する
-- Then 診断情報に秘密のマクロ内容は含まれない
+- Given Pi is running in the `Kitty` terminal
+- And one user macro is configured
+- And the macro contents include a secret string
+- When start a session
+- And run formula status
+- Then Diagnostics do not contain secret macro contents

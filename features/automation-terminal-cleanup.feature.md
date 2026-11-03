@@ -1,16 +1,16 @@
-# Feature: automation precheck で完了した端末だけを後片付けする
+# Feature: Clean up only completed terminals in the automation precheck
 
-Orca automation の precheck は、完了扱いの run に対応する terminal でも、agent がまだ働いている場合は閉じません。最終出力から端末の状態を判断して後片付けします。
+The Orca automation precheck does not close a terminal while its agent is still working, even if the corresponding run is marked complete. Cleanup determines terminal state from the last output.
 
-## Scenario Outline: precheckの子プロセス起動にエラーはない
+## Scenario Outline: The precheck has no child process launch error
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then precheckの子プロセス起動にエラーはない
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then The precheck has no child process launch error
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |
@@ -19,15 +19,15 @@ Orca automation の precheck は、完了扱いの run に対応する terminal 
   | 2分より前 | issue coordinator | worker-terminal |
   | 記録なし | issue coordinator | worker-terminal |
 
-## Scenario Outline: precheckは終了コード0を返す
+## Scenario Outline: The precheck returns exit code 0
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then precheckは終了コード0を返す
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then The precheck returns exit code 0
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |
@@ -36,15 +36,15 @@ Orca automation の precheck は、完了扱いの run に対応する terminal 
   | 2分より前 | issue coordinator | worker-terminal |
   | 記録なし | issue coordinator | worker-terminal |
 
-## Scenario Outline: precheckはシグナルで終了しない
+## Scenario Outline: The precheck does not exit due to a signal
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then precheckはシグナルで終了しない
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then The precheck does not exit due to a signal
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |
@@ -53,15 +53,15 @@ Orca automation の precheck は、完了扱いの run に対応する terminal 
   | 2分より前 | issue coordinator | worker-terminal |
   | 記録なし | issue coordinator | worker-terminal |
 
-## Scenario Outline: precheckは標準出力へ何も書かない
+## Scenario Outline: The precheck writes nothing to stdout
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then precheckは標準出力へ何も書かない
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then The precheck writes nothing to stdout
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |
@@ -70,15 +70,15 @@ Orca automation の precheck は、完了扱いの run に対応する terminal 
   | 2分より前 | issue coordinator | worker-terminal |
   | 記録なし | issue coordinator | worker-terminal |
 
-## Scenario Outline: precheckは標準エラーへ何も書かない
+## Scenario Outline: The precheck writes nothing to stderr
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then precheckは標準エラーへ何も書かない
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then The precheck writes nothing to stderr
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |
@@ -87,15 +87,15 @@ Orca automation の precheck は、完了扱いの run に対応する terminal 
   | 2分より前 | issue coordinator | worker-terminal |
   | 記録なし | issue coordinator | worker-terminal |
 
-## Scenario Outline: terminal closeは "指定値" だけ呼ばれる
+## Scenario Outline: terminal close is called only with the specified value
 
-- Given terminal の最終出力が「<状態>」である
-- When 「<precheck>」precheck を実行する
-- Then terminal closeは "<呼び出し>" だけ呼ばれる
+- Given the terminal last output is "<state>"
+- When run the "<precheck>" precheck
+- Then terminal close is called only with "<call>"
 
 ### Examples:
 
-  | 状態 | precheck | 呼び出し |
+  | state | precheck | call |
   | --- | --- | --- |
   | 直近 | PR reviewer | なし |
   | 2分より前 | PR reviewer | worker-terminal |

@@ -1,18 +1,18 @@
-# Feature: npm 配布物を導入し、利用できる内容を確認する
+# Feature: Install the npm distribution and check the available contents
 
-利用者は npm 配布物の案内から、表示、対応範囲、設定、安全性を確認できます。配布物には必要な利用者向けファイルが含まれ、公開 API と Pi 拡張として利用できます。
+Users can consult the npm distribution guidance for display behavior, supported scope, configuration, and safety. The distribution includes necessary user-facing files and can be used as a public API and a Pi extension.
 
-配布物に含まれる依存のライセンスと実行範囲を確認し、native の画像処理部品を実際に読み込めることを検査します。
+Check the licenses and execution scope of distributed dependencies and verify that native image processing components can actually be loaded.
 
-## Scenario Outline: 各言語のREADMEから個別の利用案内が分かる
+## Scenario Outline: Each language README provides individual usage guidance
 
-- Given pi-formula の英語と日本語の README がある
-- When 利用者向けの導入、設定、対応範囲を調べる
-- Then <言語> のREADMEに <案内> の案内がある
+- Given pi-formula English and Japanese READMEs exist
+- When inspect user-facing installation, configuration, and supported scope
+- Then the <language> README provides <guide> guidance
 
 ### Examples:
 
-  | 言語 | 案内 |
+  | language | guide |
   | --- | --- |
   | english | primaryInstall |
   | japanese | primaryInstall |
@@ -39,200 +39,200 @@
   | english | languageLink |
   | japanese | languageLink |
 
-## Scenario: Piパッケージの画像URLはGhostty表示見本を指す
+## Scenario: The Pi package image URL points to the Ghostty display sample
 
-- Given pi-formula の Pi パッケージ情報がある
-- When 画像情報を調べる
-- Then Piパッケージの画像URLはGhostty表示見本を指す
+- Given pi-formula Pi package metadata exists
+- When inspect image metadata
+- Then The Pi package image URL points to the Ghostty display sample
 
-## Scenario: Ghostty表示見本はPNG形式である
+## Scenario: The Ghostty display sample is a PNG
 
-- Given pi-formula の Pi パッケージ情報がある
-- When 画像情報を調べる
-- Then Ghostty表示見本はPNG形式である
+- Given pi-formula Pi package metadata exists
+- When inspect image metadata
+- Then The Ghostty display sample is a PNG
 
-## Scenario: npm tarball に利用者向け配布物だけを入れる
+## Scenario: Include only user-facing files in the npm tarball
 
-- When pi-formula の npm tarball を作る
-- And tarball のファイル一覧を調べる
-- Then src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品情報、表示見本だけが配布される
+- When create the pi-formula npm tarball
+- And inspect the tarball file list
+- Then Only src, dist, both READMEs, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed
 
-## Scenario: npm tarball に Ghostty の表示見本を入れる
+## Scenario: Include the Ghostty display sample in the npm tarball
 
-- When pi-formula の npm tarball を作る
-- And tarball のファイル一覧を調べる
-- Then Ghostty の表示見本が配布される
+- When create the pi-formula npm tarball
+- And inspect the tarball file list
+- Then The Ghostty display sample is distributed
 
-## Scenario: 古い成果物があるcheckoutでもbuildは正常終了する
+## Scenario: The build succeeds even in a checkout with stale artifacts
 
-- Given 削除済みソースに対応する古い成果物がある
-- When pi-formula を build する
-- Then 古い成果物があるcheckoutでもbuildは正常終了する
+- Given stale artifacts for deleted sources exist
+- When build pi-formula
+- Then The build succeeds even in a checkout with stale artifacts
 
-## Scenario: 生成後のdistには削除済みソースの成果物が残らない
+## Scenario: The generated dist retains no artifacts for deleted sources
 
-- Given 削除済みソースに対応する古い成果物がある
-- When pi-formula を build する
-- Then 生成後のdistには削除済みソースの成果物が残らない
+- Given stale artifacts for deleted sources exist
+- When build pi-formula
+- Then The generated dist retains no artifacts for deleted sources
 
-## Scenario: npm tarball から削除済みソースの古い成果物を除く
+## Scenario: Exclude stale artifacts for deleted sources from the npm tarball
 
-- Given 削除済みソースに対応する古い成果物がある
-- When pi-formula の npm tarball を作る
-- And tarball のファイル一覧を調べる
-- Then tarball に古い成果物が配布されない
+- Given stale artifacts for deleted sources exist
+- When create the pi-formula npm tarball
+- And inspect the tarball file list
+- Then The tarball does not distribute stale artifacts
 
-## Scenario: 導入したパッケージの拡張登録APIを呼び出せる
+## Scenario: The installed package extension registration API is callable
 
-- Given 公開APIを試す新しいnpm導入先がある
-- When 公開API試験用のtarballを作る
-- And 公開API試験用のtarballをnpmで導入する
-- And 導入したパッケージのルートを読み込む
-- Then 導入したパッケージの拡張登録APIを呼び出せる
+- Given a fresh npm installation directory exists for testing the public API
+- When create the public API test tarball
+- And install the public API test tarball with npm
+- And load the installed package root
+- Then The installed package extension registration API is callable
 
-## Scenario: 導入したパッケージのPNG作成APIを呼び出せる
+## Scenario: The installed package PNG creation API is callable
 
-- Given 公開APIを試す新しいnpm導入先がある
-- When 公開API試験用のtarballを作る
-- And 公開API試験用のtarballをnpmで導入する
-- And 導入したパッケージのルートを読み込む
-- Then 導入したパッケージのPNG作成APIを呼び出せる
+- Given a fresh npm installation directory exists for testing the public API
+- When create the public API test tarball
+- And install the public API test tarball with npm
+- And load the installed package root
+- Then The installed package PNG creation API is callable
 
-## Scenario: npm tarball の内部 subpath を公開しない
+## Scenario: Do not expose internal subpaths in the npm tarball
 
-- Given 公開APIを試す新しいnpm導入先がある
-- When 公開API試験用のtarballを作る
-- And 公開API試験用のtarballをnpmで導入する
-- And 導入したパッケージの内部 Markdown subpath を読み込む
-- Then 内部 subpath は公開されていない
+- Given a fresh npm installation directory exists for testing the public API
+- When create the public API test tarball
+- And install the public API test tarball with npm
+- And load the installed package internal Markdown subpath
+- Then Internal subpaths are not exported
 
-## Scenario: 公開候補のnpm packは正常終了する
+## Scenario: The release candidate npm pack succeeds
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 公開候補のnpm packは正常終了する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The release candidate npm pack succeeds
 
-## Scenario: 公開候補のPiへの導入は正常終了する
+## Scenario: Installing the release candidate into Pi succeeds
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 公開候補のPiへの導入は正常終了する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then Installing the release candidate into Pi succeeds
 
-## Scenario: 導入した配布物のResvg検査は正常終了する
+## Scenario: The installed distribution Resvg check succeeds
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 導入した配布物のResvg検査は正常終了する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The installed distribution Resvg check succeeds
 
-## Scenario: 公開APIは一時環境へ導入した配布物から読み込まれる
+## Scenario: The public API is loaded from the distribution installed in the temporary environment
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 公開APIは一時環境へ導入した配布物から読み込まれる
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The public API is loaded from the distribution installed in the temporary environment
 
-## Scenario: Resvgのnative部品は一時環境へ導入した配布物から読み込まれる
+## Scenario: The native Resvg component is loaded from the distribution installed in the temporary environment
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then Resvgのnative部品は一時環境へ導入した配布物から読み込まれる
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The native Resvg component is loaded from the distribution installed in the temporary environment
 
-## Scenario: 導入したResvgのnative部品は現在のOSとCPUに対応する
+## Scenario: The installed native Resvg component supports the current OS and CPU
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 導入したResvgのnative部品は現在のOSとCPUに対応する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The installed native Resvg component supports the current OS and CPU
 
-## Scenario: 導入したResvgでPNGデータを作れる
+## Scenario: The installed Resvg can create PNG data
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 導入したResvgでPNGデータを作れる
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The installed Resvg can create PNG data
 
-## Scenario: 配布物を調べた本物のPiは終了する
+## Scenario: Real Pi exits after inspecting the distribution
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 配布物を調べた本物のPiは終了する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then Real Pi exits after inspecting the distribution
 
-## Scenario: 本物のPiのコマンド一覧の応答は時間切れにならない
+## Scenario: The real Pi command list response does not time out
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 本物のPiのコマンド一覧の応答は時間切れにならない
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then The real Pi command list response does not time out
 
-## Scenario: 本物のPiが導入したformulaコマンドを発見する
+## Scenario: Real Pi discovers the installed formula command
 
-- Given 本物のPiを試す新しい導入先と利用者設定がある
-- When 公開候補のtarballを作る
-- And 公開候補のtarballを本物のPiへ導入する
-- And 導入した配布物のResvgと公開APIの由来を調べる
-- And 導入先で本物のPiのコマンド一覧を問い合わせる
-- Then 本物のPiが導入したformulaコマンドを発見する
+- Given a fresh installation directory and user settings exist for testing real Pi
+- When create the release candidate tarball
+- And install the release candidate tarball into real Pi
+- And inspect the origins of Resvg and the public API in the installed distribution
+- And query the real Pi command list in the installation directory
+- Then Real Pi discovers the installed formula command
 
-## Scenario: パッケージのライセンスはMITである
+## Scenario: The package license is MIT
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then パッケージのライセンスはMITである
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then The package license is MIT
 
-## Scenario: 第三者部品情報にqni-cliの取り込み元commitが示される
+## Scenario: Third-party notices identify the imported qni-cli commit
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then 第三者部品情報にqni-cliの取り込み元commitが示される
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then Third-party notices identify the imported qni-cli commit
 
-## Scenario: 依存監査の確認日は2026年8月31日である
+## Scenario: The dependency audit date is August 31, 2026
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then 依存監査の確認日は2026年8月31日である
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then The dependency audit date is August 31, 2026
 
-## Scenario: 監査対象の直接依存がpackage情報と一致する
+## Scenario: The audited direct dependencies match the package metadata
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then 監査対象の直接依存がpackage情報と一致する
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then The audited direct dependencies match the package metadata
 
-## Scenario: すべての直接依存が監査表に含まれる
+## Scenario: All direct dependencies are included in the audit table
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then すべての直接依存が監査表に含まれる
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then All direct dependencies are included in the audit table
 
-## Scenario: 直接依存の版と更新状況とライセンスの監査表が保持される
+## Scenario: An audit table of direct dependency versions, update status, and licenses is maintained
 
-- Given pi-formula のライセンスと第三者部品情報がある
-- When 由来、版、更新状況、ライセンス、既知の脆弱性を調べる
-- Then 直接依存の監査記録は次のとおりである
+- Given pi-formula license and third-party notices exist
+- When inspect origins, versions, update status, licenses, and known vulnerabilities
+- Then The direct dependency audit records are as follows
 
-  | 部品 | 宣言版 | 確認版 | 公開日 | 更新状況 | ライセンス | 脆弱性 |
+  | component | declared version | checked version | release date | update status | license | vulnerabilities |
   | --- | --- | --- | --- | --- | --- | --- |
   | @mathjax/src | `^4.1.3` (lockfile: `4.1.3`) | `4.1.3` | 2026-07-03 | Current | Apache-2.0 | None (`npm audit`) |
   | @resvg/resvg-js | `^2.6.2` (lockfile: `2.6.2`) | `2.6.2` | 2024-03-26 | Current stable; next `2.7.0-alpha.2` (2026-01-28) | MPL-2.0 | None (`npm audit`) |

@@ -1,96 +1,96 @@
-# Feature: セッション記録のツール失敗を検査する
+# Feature: Check session records for tool failures
 
-検証ハーネスが起動した Pi のセッション記録から、道具が期待どおり働かなかった状態を検出します。表示が正常でも、記録に残った機能不足や失敗を見逃さないようにします。
+Detect tools that did not work as expected in session records from Pi launched by the verification harness. Recorded capability limitations and failures must not be missed even when the display looks correct.
 
-## Scenario: シンボリック実行の機能不足を抽出する
+## Scenario: Extract symbolic execution capability limitations
 
-- Given `unsupported symbolic gate column` を含むセッション記録がある
-- When セッション記録検査を実行する
-- Then 機能不足が qni の該当コマンドと文脈を伴って報告される
+- Given a session record contains `unsupported symbolic gate column`
+- When run the session record check
+- Then The capability limitation is reported with the corresponding qni command and context
 
-## Scenario: ツールの非 0 終了を抽出する
+## Scenario: Extract nonzero tool exits
 
-- Given `unsupported symbolic gate column` を含むセッション記録がある
-- When セッション記録検査を実行する
-- Then qni の非 0 終了が該当コマンドとともに報告される
+- Given a session record contains `unsupported symbolic gate column`
+- When run the session record check
+- Then The nonzero qni exit is reported with the corresponding command
 
-## Scenario: 複数コマンドの途中停止を抽出する
+## Scenario: Extract interruptions among multiple commands
 
-- Given `unsupported symbolic gate column` を含むセッション記録がある
-- When セッション記録検査を実行する
-- Then qni の途中停止が停止したコマンドとともに報告される
+- Given a session record contains `unsupported symbolic gate column`
+- When run the session record check
+- Then The interrupted qni execution is reported with the interrupted command
 
-## Scenario: 単一コマンドを実行したツール名で報告する
+## Scenario: Report the tool name that executed the single command
 
-- Given runner が単一の check コマンドで機能不足になったセッション記録がある
-- When セッション記録検査を実行する
-- Then 機能不足のコマンドは runner check と報告される
+- Given a session record has a runner capability limitation in a single check command
+- When run the session record check
+- Then The capability-limited command is reported as runner check
 
-## Scenario: 途中停止したコマンドを実行したツール名で報告する
+## Scenario: Report the tool name that executed the interrupted command
 
-- Given runner の2番目の deploy コマンドで途中停止したセッション記録がある
-- When セッション記録検査を実行する
-- Then 途中停止のコマンドは runner deploy と報告される
+- Given a session record has an interruption in the second runner deploy command
+- When run the session record check
+- Then The interrupted command is reported as runner deploy
 
-## Scenario: 代替手段への切り替えを抽出する
+## Scenario: Extract fallback transitions
 
-- Given 失敗後にモデルが代替手段へ切り替えたセッション記録がある
-- When セッション記録検査を実行する
-- Then 代替手段への切り替えが直前のツールとコマンドを伴って報告される
+- Given a session record has the model switch to a fallback after failure
+- When run the session record check
+- Then The fallback is reported with the preceding tool and command
 
-## Scenario: 成功したツールの後にある通常の代替表現を無視する
+## Scenario: Ignore ordinary alternative wording after a successful tool result
 
-- Given 成功したツールの後に「代わりに」を含む assistant 本文がある
-- When セッション記録検査を実行する
-- Then 成功結果の後の代替表現は報告されない
+- Given an assistant body contains 「代わりに」 after a successful tool result
+- When run the session record check
+- Then Alternative wording after a successful result is not reported
 
-## Scenario: 失敗直後より後にある無関係な代替表現を無視する
+## Scenario: Ignore unrelated fallback wording later than the immediate failure response
 
-- Given 失敗後の次の assistant 本文には代替表現がなく後続本文に fallback がある
-- When セッション記録検査を実行する
-- Then 失敗直後より後の代替表現は報告されない
+- Given the next assistant body after failure has no fallback wording but a later body mentions fallback
+- When run the session record check
+- Then Fallback wording later than the immediate failure response is not reported
 
-## Scenario: ヒットがあれば検査に失敗する
+## Scenario: Fail the check when matches are found
 
-- Given `unsupported symbolic gate column` を含むセッション記録がある
-- When セッション記録検査を実行する
-- Then セッション記録検査は終了コード1を返す
+- Given a session record contains `unsupported symbolic gate column`
+- When run the session record check
+- Then The session record check returns exit code 1
 
-## Scenario: 正常なセッション記録の検査は終了コード0を返す
+## Scenario: The successful session record check returns exit code 0
 
-- Given ツールが成功したセッション記録がある
-- When セッション記録検査を実行する
-- Then 正常なセッション記録の検査は終了コード0を返す
+- Given a session record has a successful tool result
+- When run the session record check
+- Then The successful session record check returns exit code 0
 
-## Scenario: 正常なセッション記録にはツール失敗がないことを表示する
+## Scenario: A successful session record reports no tool failures
 
-- Given ツールが成功したセッション記録がある
-- When セッション記録検査を実行する
-- Then 正常なセッション記録にはツール失敗がないことを表示する
+- Given a session record has a successful tool result
+- When run the session record check
+- Then A successful session record reports no tool failures
 
-## Scenario: 既知の許容パターンを除外する
+## Scenario: Exclude known allowed patterns
 
-- Given 既知の機能不足を許容する無視リストがある
-- When 無視リストを使ってセッション記録検査を実行する
-- Then 許容した機能不足だけが報告から除外される
+- Given an ignore list allows known capability limitations
+- When run the session record check with the ignore list
+- Then Only allowed capability limitations are excluded from the report
 
-## Scenario: 無視対象外の非 0 終了を残す
+## Scenario: Retain nonzero exits outside the ignore list
 
-- Given 既知の機能不足を許容する無視リストがある
-- When 無視リストを使ってセッション記録検査を実行する
-- Then 無視対象外の非 0 終了が報告に残る
+- Given an ignore list allows known capability limitations
+- When run the session record check with the ignore list
+- Then Nonzero exits outside the ignore list remain in the report
 
-## Scenario: 無視対象外のヒットがあれば検査に失敗する
+## Scenario: Fail the check on matches outside the ignore list
 
-- Given 既知の機能不足を許容する無視リストがある
-- When 無視リストを使ってセッション記録検査を実行する
-- Then 無視対象外のヒットにより終了コード1を返す
+- Given an ignore list allows known capability limitations
+- When run the session record check with the ignore list
+- Then Matches outside the ignore list return exit code 1
 
-## Scenario Outline: 空文字の無視条件を拒否する
+## Scenario Outline: Reject empty ignore conditions
 
-- Given `<field>` が空文字の無視リストがある
-- When 無視リストを使ってセッション記録検査を実行する
-- Then 無効な無視リストとして終了コード2を返す
+- Given an ignore list has an empty `<field>` field
+- When run the session record check with the ignore list
+- Then The invalid ignore list returns exit code 2
 
 ### Examples:
 

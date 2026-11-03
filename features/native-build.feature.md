@@ -1,45 +1,45 @@
-# Feature: 固定した libghostty-vt を指定した場所へビルドする計画を作る
+# Feature: Plan a build of pinned libghostty-vt at the specified location
 
-ビルド計画は固定した commit の libghostty-vt を使い、指定された native prefix に header、library、vt-pty を配置します。Zig のビルド命令も、この prefix を参照します。
+The build plan uses libghostty-vt at a pinned commit and places the header, library, and vt-pty under the specified native prefix. The Zig build command also references this prefix.
 
-## Scenario: libghostty-vtのビルド計画は正常終了する
+## Scenario: The libghostty-vt build plan succeeds
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は正常終了する
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The libghostty-vt build plan succeeds
 
-## Scenario: libghostty-vtのビルド計画は固定したcommitを使う
+## Scenario: The libghostty-vt build plan uses the pinned commit
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は固定したcommitを使う
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The libghostty-vt build plan uses the pinned commit
 
-## Scenario: libghostty-vtのビルド計画は指定したprefixを使う
+## Scenario: The libghostty-vt build plan uses the specified prefix
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then libghostty-vtのビルド計画は指定したprefixを使う
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The libghostty-vt build plan uses the specified prefix
 
-## Scenario: ビルド計画のheaderは指定prefixのincludeにある
+## Scenario: The build plan header is under include in the specified prefix
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のheaderは指定prefixのincludeにある
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The build plan header is under include in the specified prefix
 
-## Scenario: ビルド計画のlibraryは指定prefixのlibにある
+## Scenario: The build plan library is under lib in the specified prefix
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のlibraryは指定prefixのlibにある
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The build plan library is under lib in the specified prefix
 
-## Scenario: ビルド計画のvt-ptyは指定prefixのbinにある
+## Scenario: The build plan vt-pty is under bin in the specified prefix
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then ビルド計画のvt-ptyは指定prefixのbinにある
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The build plan vt-pty is under bin in the specified prefix
 
-## Scenario: Zigのビルド命令は指定prefixだけを使う
+## Scenario: The Zig build command uses only the specified prefix
 
-- Given ホーム側のnative prefix設定がある
-- When libghostty-vt のビルド計画を出力する
-- Then Zigのビルド命令は指定prefixだけを使う
+- Given a native prefix setting exists in the home directory
+- When print the libghostty-vt build plan
+- Then The Zig build command uses only the specified prefix

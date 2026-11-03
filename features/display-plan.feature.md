@@ -1,209 +1,209 @@
-# Feature: 描画前に表示数式を含む出力の幅と高さを計画する
+# Feature: Plan output width and height including display math before rendering
 
-表示計画の道具は、コーパスから数式の画像行数と Markdown の折り返しを求め、必要な出力幅と高さを返します。表示経路の違いや描き直し後の寸法も計画に含めます。
+The display planning tool calculates math image rows and Markdown wrapping from a corpus and returns the required output width and height. The plan includes display path differences and dimensions after redraw.
 
-組版できない数式はテキストとして計画します。入力を読めない場合や必要な高さが上限を超える場合は、描画前に終了コードと診断を返します。
+Math that cannot be typeset is planned as text. Unreadable input or required height exceeding the limit returns an exit code and diagnostics before rendering.
 
-## Scenario: 組版失敗を含む出力高の計画は正常終了する
+## Scenario: Output height planning with typesetting failures succeeds
 
-- Given 組版できる式と組版できない式を含むコーパスがある
-- When 表示数式の画像行数を含む出力高を計画する
-- Then 組版失敗を含む出力高の計画は正常終了する
+- Given a corpus contains formulas that can and cannot be typeset
+- When plan output height including display math image rows
+- Then Output height planning with typesetting failures succeeds
 
-## Scenario: 組版失敗と残りの画像行を含む表示計画が返る
+## Scenario: A display plan containing typesetting failures and remaining image rows is returned
 
-- Given 組版できる式と組版できない式を含むコーパスがある
-- When 表示数式の画像行数を含む出力高を計画する
-- Then 組版失敗と残りの画像行を含む表示計画が返る
+- Given a corpus contains formulas that can and cannot be typeset
+- When plan output height including display math image rows
+- Then A display plan containing typesetting failures and remaining image rows is returned
 
-## Scenario: 組版失敗を含む検証用表示計画は正常終了する
+## Scenario: The verification display plan with typesetting failures succeeds
 
-- Given 組版できる式と組版できない式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 組版失敗を含む検証用表示計画は正常終了する
+- Given a corpus contains formulas that can and cannot be typeset
+- When run the real display verification display plan boundary
+- Then The verification display plan with typesetting failures succeeds
 
-## Scenario: 検証用表示計画は組版失敗を1件数える
+## Scenario: The verification display plan counts one typesetting failure
 
-- Given 組版できる式と組版できない式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 検証用表示計画は組版失敗を1件数える
+- Given a corpus contains formulas that can and cannot be typeset
+- When run the real display verification display plan boundary
+- Then The verification display plan counts one typesetting failure
 
-## Scenario: 検証用表示計画の診断に組版失敗1件が示される
+## Scenario: Verification display plan diagnostics show one typesetting failure
 
-- Given 組版できる式と組版できない式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 検証用表示計画の診断に組版失敗1件が示される
+- Given a corpus contains formulas that can and cannot be typeset
+- When run the real display verification display plan boundary
+- Then Verification display plan diagnostics show one typesetting failure
 
-## Scenario: 画像行のない検証用表示計画は正常終了する
+## Scenario: The verification display plan without image rows succeeds
 
-- Given 組版できない表示数式だけのコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 画像行のない検証用表示計画は正常終了する
+- Given a corpus contains only display math that cannot be typeset
+- When run the real display verification display plan boundary
+- Then The verification display plan without image rows succeeds
 
-## Scenario: 全数式の組版失敗後もテキスト用の表示計画が返る
+## Scenario: A text display plan is returned even after all formulas fail typesetting
 
-- Given 組版できない表示数式だけのコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 全数式の組版失敗後もテキスト用の表示計画が返る
+- Given a corpus contains only display math that cannot be typeset
+- When run the real display verification display plan boundary
+- Then A text display plan is returned even after all formulas fail typesetting
 
-## Scenario: 全数式の組版失敗後も失敗1件が診断に示される
+## Scenario: Diagnostics show one failure even after all formulas fail typesetting
 
-- Given 組版できない表示数式だけのコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 全数式の組版失敗後も失敗1件が診断に示される
+- Given a corpus contains only display math that cannot be typeset
+- When run the real display verification display plan boundary
+- Then Diagnostics show one failure even after all formulas fail typesetting
 
-## Scenario: テキスト経路の表示計画は正常終了する
+## Scenario: The text path display plan succeeds
 
-- Given 組版できない表示数式だけのコーパスがある
-- When テキスト経路の表示計画境界を実行する
-- Then テキスト経路の表示計画は正常終了する
+- Given a corpus contains only display math that cannot be typeset
+- When run the text path display plan boundary
+- Then The text path display plan succeeds
 
-## Scenario: テキスト経路の表示計画に画像行は含まれない
+## Scenario: The text path display plan contains no image rows
 
-- Given 組版できない表示数式だけのコーパスがある
-- When テキスト経路の表示計画境界を実行する
-- Then テキスト経路の表示計画に画像行は含まれない
+- Given a corpus contains only display math that cannot be typeset
+- When run the text path display plan boundary
+- Then The text path display plan contains no image rows
 
-## Scenario: テキスト経路の表示計画に画像組版失敗は含まれない
+## Scenario: The text path display plan contains no image typesetting failures
 
-- Given 組版できない表示数式だけのコーパスがある
-- When テキスト経路の表示計画境界を実行する
-- Then テキスト経路の表示計画に画像組版失敗は含まれない
+- Given a corpus contains only display math that cannot be typeset
+- When run the text path display plan boundary
+- Then The text path display plan contains no image typesetting failures
 
-## Scenario: 100列へのテキスト表示計画は正常終了する
+## Scenario: The text display plan at 100 columns succeeds
 
-- Given 100 列へのリフローで折り返しが増えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 100列へのテキスト表示計画は正常終了する
+- Given a corpus wraps onto more lines when reflowed to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then The text display plan at 100 columns succeeds
 
-## Scenario: 100列へのリフローを含む計画高は8856pxである
+## Scenario: The planned height including reflow to 100 columns is 8856px
 
-- Given 100 列へのリフローで折り返しが増えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 100列へのリフローを含む計画高は8856pxである
+- Given a corpus wraps onto more lines when reflowed to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then The planned height including reflow to 100 columns is 8856px
 
-## Scenario: リフロー前の計画幅は1920pxである
+## Scenario: The planned width before reflow is 1920px
 
-- Given 100 列へのリフローで折り返しが増えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then リフロー前の計画幅は1920pxである
+- Given a corpus wraps onto more lines when reflowed to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then The planned width before reflow is 1920px
 
-## Scenario: 100列へのリフロー後の計画幅は816pxである
+## Scenario: The planned width after reflow to 100 columns is 816px
 
-- Given 100 列へのリフローで折り返しが増えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 100列へのリフロー後の計画幅は816pxである
+- Given a corpus wraps onto more lines when reflowed to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then The planned width after reflow to 100 columns is 816px
 
-## Scenario: リフロー後に収まらない表示計画は終了コード2を返す
+## Scenario: A display plan that does not fit after reflow returns exit code 2
 
-- Given 100 列へのリフロー後だけ上限を超えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then リフロー後に収まらない表示計画は終了コード2を返す
+- Given a corpus exceeds the limit only after reflow to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then A display plan that does not fit after reflow returns exit code 2
 
-## Scenario: 高さ超過の診断にテキスト経路が示される
+## Scenario: Height overflow diagnostics show the text path
 
-- Given 100 列へのリフロー後だけ上限を超えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 高さ超過の診断にテキスト経路が示される
+- Given a corpus exceeds the limit only after reflow to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then Height overflow diagnostics show the text path
 
-## Scenario: 高さ超過の診断に100列へのリフローが示される
+## Scenario: Height overflow diagnostics show reflow to 100 columns
 
-- Given 100 列へのリフロー後だけ上限を超えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 高さ超過の診断に100列へのリフローが示される
+- Given a corpus exceeds the limit only after reflow to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then Height overflow diagnostics show reflow to 100 columns
 
-## Scenario: 高さ超過の診断に必要な高さ16056pxが示される
+## Scenario: Height overflow diagnostics show the required height of 16056px
 
-- Given 100 列へのリフロー後だけ上限を超えるコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 高さ超過の診断に必要な高さ16056pxが示される
+- Given a corpus exceeds the limit only after reflow to 100 columns
+- When run the display plan boundary at 100 columns through the text path
+- Then Height overflow diagnostics show the required height of 16056px
 
-## Scenario: Markdown の折り返しを表示計画へ含める
+## Scenario: Include Markdown wrapping in the display plan
 
-- Given 全角文字と空白を含む Markdown 表のコーパスがある
-- When 100 列とテキスト経路の表示計画境界を実行する
-- Then 表示計画は Markdown 表の折り返しを含む
+- Given a corpus contains a Markdown table with full-width characters and spaces
+- When run the display plan boundary at 100 columns through the text path
+- Then The display plan includes Markdown table wrapping
 
-## Scenario: 読めない縮尺の数式を含む表示計画は正常終了する
+## Scenario: The display plan containing unreadably scaled math succeeds
 
-- Given 100 列では読めない縮尺になる表示数式がある
-- When 100 列と画像経路の表示計画境界を実行する
-- Then 読めない縮尺の数式を含む表示計画は正常終了する
+- Given display math becomes unreadably scaled at 100 columns
+- When run the display plan boundary at 100 columns through the image path
+- Then The display plan containing unreadably scaled math succeeds
 
-## Scenario: 読めない縮尺の数式が組版失敗1件として計画される
+## Scenario: Unreadably scaled math is planned as one typesetting failure
 
-- Given 100 列では読めない縮尺になる表示数式がある
-- When 100 列と画像経路の表示計画境界を実行する
-- Then 読めない縮尺の数式が組版失敗1件として計画される
+- Given display math becomes unreadably scaled at 100 columns
+- When run the display plan boundary at 100 columns through the image path
+- Then Unreadably scaled math is planned as one typesetting failure
 
-## Scenario: 読めない縮尺の数式の組版失敗1件が診断に示される
+## Scenario: Diagnostics show one typesetting failure for unreadably scaled math
 
-- Given 100 列では読めない縮尺になる表示数式がある
-- When 100 列と画像経路の表示計画境界を実行する
-- Then 読めない縮尺の数式の組版失敗1件が診断に示される
+- Given display math becomes unreadably scaled at 100 columns
+- When run the display plan boundary at 100 columns through the image path
+- Then Diagnostics show one typesetting failure for unreadably scaled math
 
-## Scenario: 画像転送行で高さを超えた表示計画は終了コード2を返す
+## Scenario: A display plan exceeding the height limit due to image transfer rows returns exit code 2
 
-- Given 11 個の高い表示数式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 画像転送行で高さを超えた表示計画は終了コード2を返す
+- Given a corpus contains 11 tall display formulas
+- When run the real display verification display plan boundary
+- Then A display plan exceeding the height limit due to image transfer rows returns exit code 2
 
-## Scenario: 転送行の高さ超過の診断に画像経路が示される
+## Scenario: Transfer row height overflow diagnostics show the image path
 
-- Given 11 個の高い表示数式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 転送行の高さ超過の診断に画像経路が示される
+- Given a corpus contains 11 tall display formulas
+- When run the real display verification display plan boundary
+- Then Transfer row height overflow diagnostics show the image path
 
-## Scenario: 転送行の高さ超過の診断に16000px上限が示される
+## Scenario: Transfer row height overflow diagnostics show the 16000px limit
 
-- Given 11 個の高い表示数式を含むコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 転送行の高さ超過の診断に16000px上限が示される
+- Given a corpus contains 11 tall display formulas
+- When run the real display verification display plan boundary
+- Then Transfer row height overflow diagnostics show the 16000px limit
 
-## Scenario: 読めないコーパスの表示計画は終了コード2を返す
+## Scenario: The unreadable corpus display plan returns exit code 2
 
-- Given 読み取れないコーパスのパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 読めないコーパスの表示計画は終了コード2を返す
+- Given an unreadable corpus path exists
+- When run the real display verification display plan boundary
+- Then The unreadable corpus display plan returns exit code 2
 
-## Scenario: 表示計画の診断に読めないコーパスのファイル名が示される
+## Scenario: Display plan diagnostics show the unreadable corpus filename
 
-- Given 読み取れないコーパスのパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 表示計画の診断に読めないコーパスのファイル名が示される
+- Given an unreadable corpus path exists
+- When run the real display verification display plan boundary
+- Then Display plan diagnostics show the unreadable corpus filename
 
-## Scenario: 読取失敗の診断に高さ超過は示されない
+## Scenario: Read failure diagnostics do not show a height overflow
 
-- Given 読み取れないコーパスのパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 読取失敗の診断に高さ超過は示されない
+- Given an unreadable corpus path exists
+- When run the real display verification display plan boundary
+- Then Read failure diagnostics do not show a height overflow
 
-## Scenario: 入力文字数上限による失敗を含む表示計画は正常終了する
+## Scenario: The display plan containing an input character limit failure succeeds
 
-- Given 文字数上限を超える表示数式を含む収容可能なコーパスがある
-- When 表示数式の画像行数を含む出力高を計画する
-- Then 入力文字数上限による失敗を含む表示計画は正常終了する
+- Given a corpus that fits contains display math exceeding the character limit
+- When plan output height including display math image rows
+- Then The display plan containing an input character limit failure succeeds
 
-## Scenario: 長い数式をテキストとして一度だけ数えた表示計画が返る
+## Scenario: A display plan counting long math as text exactly once is returned
 
-- Given 文字数上限を超える表示数式を含む収容可能なコーパスがある
-- When 表示数式の画像行数を含む出力高を計画する
-- Then 長い数式をテキストとして一度だけ数えた表示計画が返る
+- Given a corpus that fits contains display math exceeding the character limit
+- When plan output height including display math image rows
+- Then A display plan counting long math as text exactly once is returned
 
-## Scenario: 高い表示数式の計画は描画前に終了コード2を返す
+## Scenario: The tall display math plan returns exit code 2 before rendering
 
-- Given 16000px を超える高い表示数式を含む短いコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 高い表示数式の計画は描画前に終了コード2を返す
+- Given a short corpus contains display math taller than 16000px
+- When run the real display verification display plan boundary
+- Then The tall display math plan returns exit code 2 before rendering
 
-## Scenario: 高い表示数式の診断に16000px上限が示される
+## Scenario: Tall display math diagnostics show the 16000px limit
 
-- Given 16000px を超える高い表示数式を含む短いコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 高い表示数式の診断に16000px上限が示される
+- Given a short corpus contains display math taller than 16000px
+- When run the real display verification display plan boundary
+- Then Tall display math diagnostics show the 16000px limit
 
-## Scenario: 高い表示数式の診断に読取失敗は示されない
+## Scenario: Tall display math diagnostics do not show a read failure
 
-- Given 16000px を超える高い表示数式を含む短いコーパスがある
-- When 実表示検証の表示計画境界を実行する
-- Then 高い表示数式の診断に読取失敗は示されない
+- Given a short corpus contains display math taller than 16000px
+- When run the real display verification display plan boundary
+- Then Tall display math diagnostics do not show a read failure

@@ -110,20 +110,26 @@ After(function (this: StepWorld) {
   rmSync(join(root, "dist/macro-settings.d.ts"), { force: true });
 });
 
-Given("pi-formula の英語と日本語の README がある", function (this: StepWorld) {
-  this.englishReadme = readProjectFile("README.md");
-  this.japaneseReadme = readProjectFile("README.ja.md");
-});
+Given(
+  "pi-formula English and Japanese READMEs exist",
+  function (this: StepWorld) {
+    this.englishReadme = readProjectFile("README.md");
+    this.japaneseReadme = readProjectFile("README.ja.md");
+  },
+);
 
-When("利用者向けの導入、設定、対応範囲を調べる", function (this: StepWorld) {
-  this.readmes = {
-    english: this.englishReadme,
-    japanese: this.japaneseReadme,
-  };
-});
+When(
+  "inspect user-facing installation, configuration, and supported scope",
+  function (this: StepWorld) {
+    this.readmes = {
+      english: this.englishReadme,
+      japanese: this.japaneseReadme,
+    };
+  },
+);
 
 Then(
-  "{word} のREADMEに {word} の案内がある",
+  "the {word} README provides {word} guidance",
   function (
     this: StepWorld,
     language: keyof StepWorld["readmes"],
@@ -164,17 +170,17 @@ Then(
   },
 );
 
-Given("pi-formula の Pi パッケージ情報がある", function (this: StepWorld) {
+Given("pi-formula Pi package metadata exists", function (this: StepWorld) {
   this.manifest = JSON.parse(readProjectFile("package.json"));
 });
 
-When("画像情報を調べる", function (this: StepWorld) {
+When("inspect image metadata", function (this: StepWorld) {
   this.galleryImage = this.manifest.pi?.image;
   this.preview = readProjectBinary("assets/ghostty-formulas.png");
 });
 
 Then(
-  "Piパッケージの画像URLはGhostty表示見本を指す",
+  "The Pi package image URL points to the Ghostty display sample",
   function (this: StepWorld) {
     assert.deepEqual(
       this.galleryImage,
@@ -183,11 +189,11 @@ Then(
   },
 );
 
-Then("Ghostty表示見本はPNG形式である", function (this: StepWorld) {
+Then("The Ghostty display sample is a PNG", function (this: StepWorld) {
   assert.deepEqual(this.preview.subarray(1, 4).toString("ascii"), "PNG");
 });
 
-When("pi-formula の npm tarball を作る", function (this: StepWorld) {
+When("create the pi-formula npm tarball", function (this: StepWorld) {
   const packed = spawnSync("npm", ["pack", "--json"], {
     cwd: root,
     encoding: "utf8",
@@ -198,13 +204,13 @@ When("pi-formula の npm tarball を作る", function (this: StepWorld) {
   this.tarball = join(root, this.packResult.filename);
 });
 
-When("tarball のファイル一覧を調べる", function (this: StepWorld) {
+When("inspect the tarball file list", function (this: StepWorld) {
   this.packedFiles = this.packResult.files.map(({ path }) => path).sort();
   rmSync(this.tarball, { force: true });
 });
 
 Then(
-  "src、dist、両言語の README、LICENSE、CHANGELOG、第三者部品情報、表示見本だけが配布される",
+  "Only src, dist, both READMEs, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed",
   function (this: StepWorld) {
     const topLevel = [
       ...new Set(this.packedFiles.map((path) => path.split("/")[0])),
@@ -223,17 +229,17 @@ Then(
   },
 );
 
-Then("Ghostty の表示見本が配布される", function (this: StepWorld) {
+Then("The Ghostty display sample is distributed", function (this: StepWorld) {
   assert.equal(this.packedFiles.includes("assets/ghostty-formulas.png"), true);
 });
 
-Given("削除済みソースに対応する古い成果物がある", () => {
+Given("stale artifacts for deleted sources exist", () => {
   mkdirSync(join(root, "dist"), { recursive: true });
   writeFileSync(join(root, "dist/macro-settings.js"), "module.exports = {};\n");
   writeFileSync(join(root, "dist/macro-settings.d.ts"), "export {};\n");
 });
 
-When("pi-formula を build する", function (this: StepWorld) {
+When("build pi-formula", function (this: StepWorld) {
   this.build = spawnSync("npm", ["run", "build"], {
     cwd: root,
     encoding: "utf8",
@@ -241,13 +247,13 @@ When("pi-formula を build する", function (this: StepWorld) {
 });
 
 Then(
-  "古い成果物があるcheckoutでもbuildは正常終了する",
+  "The build succeeds even in a checkout with stale artifacts",
   function (this: StepWorld) {
     assert.deepEqual(this.build.status, 0);
   },
 );
 
-Then("生成後のdistには削除済みソースの成果物が残らない", () => {
+Then("The generated dist retains no artifacts for deleted sources", () => {
   const staleFiles = [
     "dist/macro-settings.js",
     "dist/macro-settings.d.ts",
@@ -262,23 +268,29 @@ Then("生成後のdistには削除済みソースの成果物が残らない", (
   assert.deepEqual(staleFiles, []);
 });
 
-Then("tarball に古い成果物が配布されない", function (this: StepWorld) {
-  assert.deepEqual(
-    this.packedFiles.filter((path) => path.includes("macro-settings")),
-    [],
-  );
-});
+Then(
+  "The tarball does not distribute stale artifacts",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.packedFiles.filter((path) => path.includes("macro-settings")),
+      [],
+    );
+  },
+);
 
-Given("公開APIを試す新しいnpm導入先がある", function (this: StepWorld) {
-  this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-exports-"));
-  this.packageRelease = join(this.packageTrialRoot, "release");
-  this.packageWork = join(this.packageTrialRoot, "work");
-  mkdirSync(this.packageRelease);
-  mkdirSync(this.packageWork);
-  writeFileSync(join(this.packageWork, "package.json"), '{"private":true}\n');
-});
+Given(
+  "a fresh npm installation directory exists for testing the public API",
+  function (this: StepWorld) {
+    this.packageTrialRoot = mkdtempSync(join(tmpdir(), "pi-formula-exports-"));
+    this.packageRelease = join(this.packageTrialRoot, "release");
+    this.packageWork = join(this.packageTrialRoot, "work");
+    mkdirSync(this.packageRelease);
+    mkdirSync(this.packageWork);
+    writeFileSync(join(this.packageWork, "package.json"), '{"private":true}\n');
+  },
+);
 
-When("導入したパッケージのルートを読み込む", function (this: StepWorld) {
+When("load the installed package root", function (this: StepWorld) {
   const api: typeof import("../../dist/api.js") =
     this.installedRequire("pi-formula");
   this.publicOperations = {
@@ -287,16 +299,22 @@ When("導入したパッケージのルートを読み込む", function (this: S
   };
 });
 
-Then("導入したパッケージの拡張登録APIを呼び出せる", function (this: StepWorld) {
-  assert.deepEqual(this.publicOperations.registerFormula, "function");
-});
+Then(
+  "The installed package extension registration API is callable",
+  function (this: StepWorld) {
+    assert.deepEqual(this.publicOperations.registerFormula, "function");
+  },
+);
 
-Then("導入したパッケージのPNG作成APIを呼び出せる", function (this: StepWorld) {
-  assert.deepEqual(this.publicOperations.createFormulaPng, "function");
-});
+Then(
+  "The installed package PNG creation API is callable",
+  function (this: StepWorld) {
+    assert.deepEqual(this.publicOperations.createFormulaPng, "function");
+  },
+);
 
 When(
-  "導入したパッケージの内部 Markdown subpath を読み込む",
+  "load the installed package internal Markdown subpath",
   function (this: StepWorld) {
     try {
       this.installedRequire("pi-formula/dist/markdown.js");
@@ -306,12 +324,12 @@ When(
   },
 );
 
-Then("内部 subpath は公開されていない", function (this: StepWorld) {
+Then("Internal subpaths are not exported", function (this: StepWorld) {
   assert.equal(this.subpathErrorCode, "ERR_PACKAGE_PATH_NOT_EXPORTED");
 });
 
 Given(
-  "本物のPiを試す新しい導入先と利用者設定がある",
+  "a fresh installation directory and user settings exist for testing real Pi",
   function (this: StepWorld) {
     this.packageTrialRoot = mkdtempSync(
       join(tmpdir(), "pi-formula-candidate-"),
@@ -332,7 +350,7 @@ Given(
 );
 
 When(
-  "公開候補のtarballを本物のPiへ導入する",
+  "install the release candidate tarball into real Pi",
   {
     timeout: PACKAGE_TRIAL_STEP_TIMEOUT_MS,
   },
@@ -350,23 +368,29 @@ When(
   },
 );
 
-Then("公開候補のnpm packは正常終了する", function (this: StepWorld) {
+Then("The release candidate npm pack succeeds", function (this: StepWorld) {
   const { packed } = this.packageTrial;
   assert.deepEqual(packed.status, 0);
 });
 
-Then("公開候補のPiへの導入は正常終了する", function (this: StepWorld) {
-  const { installed } = this.packageTrial;
-  assert.deepEqual(installed?.status, 0);
-});
-
-Then("導入した配布物のResvg検査は正常終了する", function (this: StepWorld) {
-  const { probe } = this.packageTrial;
-  assert.deepEqual(probe?.status, 0);
-});
+Then(
+  "Installing the release candidate into Pi succeeds",
+  function (this: StepWorld) {
+    const { installed } = this.packageTrial;
+    assert.deepEqual(installed?.status, 0);
+  },
+);
 
 Then(
-  "公開APIは一時環境へ導入した配布物から読み込まれる",
+  "The installed distribution Resvg check succeeds",
+  function (this: StepWorld) {
+    const { probe } = this.packageTrial;
+    assert.deepEqual(probe?.status, 0);
+  },
+);
+
+Then(
+  "The public API is loaded from the distribution installed in the temporary environment",
   function (this: StepWorld) {
     const { packagePath, probeResult } = this.packageTrial;
     assert.deepEqual(
@@ -379,7 +403,7 @@ Then(
 );
 
 Then(
-  "Resvgのnative部品は一時環境へ導入した配布物から読み込まれる",
+  "The native Resvg component is loaded from the distribution installed in the temporary environment",
   function (this: StepWorld) {
     const { probeResult } = this.packageTrial;
     const nodeModules = join(
@@ -398,7 +422,7 @@ Then(
 );
 
 Then(
-  "導入したResvgのnative部品は現在のOSとCPUに対応する",
+  "The installed native Resvg component supports the current OS and CPU",
   function (this: StepWorld) {
     const { probeResult } = this.packageTrial;
     assert.deepEqual(
@@ -412,39 +436,45 @@ Then(
   },
 );
 
-Then("導入したResvgでPNGデータを作れる", function (this: StepWorld) {
+Then("The installed Resvg can create PNG data", function (this: StepWorld) {
   const { probeResult } = this.packageTrial;
   assert.deepEqual(probeResult?.pngSignature, "PNG");
 });
 
-Then("配布物を調べた本物のPiは終了する", function (this: StepWorld) {
-  const { pi } = this.packageTrial;
-  assert.deepEqual(pi?.closed, true);
-});
+Then(
+  "Real Pi exits after inspecting the distribution",
+  function (this: StepWorld) {
+    const { pi } = this.packageTrial;
+    assert.deepEqual(pi?.closed, true);
+  },
+);
 
 Then(
-  "本物のPiのコマンド一覧の応答は時間切れにならない",
+  "The real Pi command list response does not time out",
   function (this: StepWorld) {
     const { pi } = this.packageTrial;
     assert.deepEqual(pi?.responseTimedOut, false);
   },
 );
 
-Then("本物のPiが導入したformulaコマンドを発見する", function (this: StepWorld) {
-  const { pi } = this.packageTrial;
-  const data = pi?.response?.data;
-  assert.deepEqual(
-    isRecord(data) &&
-      Array.isArray(data.commands) &&
-      data.commands.some(
-        (command: unknown) => isRecord(command) && command.name === "formula",
-      ),
-    true,
-  );
-});
+Then(
+  "Real Pi discovers the installed formula command",
+  function (this: StepWorld) {
+    const { pi } = this.packageTrial;
+    const data = pi?.response?.data;
+    assert.deepEqual(
+      isRecord(data) &&
+        Array.isArray(data.commands) &&
+        data.commands.some(
+          (command: unknown) => isRecord(command) && command.name === "formula",
+        ),
+      true,
+    );
+  },
+);
 
 Given(
-  "pi-formula のライセンスと第三者部品情報がある",
+  "pi-formula license and third-party notices exist",
   function (this: StepWorld) {
     this.license = readProjectFile("LICENSE");
     this.notices = readProjectFile("THIRD_PARTY_NOTICES.md");
@@ -453,7 +483,7 @@ Given(
 );
 
 When(
-  "由来、版、更新状況、ライセンス、既知の脆弱性を調べる",
+  "inspect origins, versions, update status, licenses, and known vulnerabilities",
   function (this: StepWorld) {
     this.directDependencies = {
       ...this.manifest.dependencies,
@@ -475,12 +505,12 @@ When(
   },
 );
 
-Then("パッケージのライセンスはMITである", function (this: StepWorld) {
+Then("The package license is MIT", function (this: StepWorld) {
   assert.deepEqual(this.license.startsWith("MIT License"), true);
 });
 
 Then(
-  "第三者部品情報にqni-cliの取り込み元commitが示される",
+  "Third-party notices identify the imported qni-cli commit",
   function (this: StepWorld) {
     assert.deepEqual(
       this.notices.includes("yasuhito/qni-cli") &&
@@ -490,36 +520,45 @@ Then(
   },
 );
 
-Then("依存監査の確認日は2026年8月31日である", function (this: StepWorld) {
-  assert.deepEqual(/2026-08-31/u.test(this.notices), true);
-});
-
-Then("監査対象の直接依存がpackage情報と一致する", function (this: StepWorld) {
-  assert.deepEqual(
-    Object.keys(this.directDependencies).sort(),
-    [
-      "@mathjax/src",
-      "@resvg/resvg-js",
-      "@earendil-works/pi-coding-agent",
-      "@earendil-works/pi-tui",
-    ].sort(),
-  );
-});
-
-Then("すべての直接依存が監査表に含まれる", function (this: StepWorld) {
-  assert.deepEqual(
-    [...this.auditRows.keys()].sort(),
-    [
-      "@mathjax/src",
-      "@resvg/resvg-js",
-      "@earendil-works/pi-coding-agent",
-      "@earendil-works/pi-tui",
-    ].sort(),
-  );
-});
+Then(
+  "The dependency audit date is August 31, 2026",
+  function (this: StepWorld) {
+    assert.deepEqual(/2026-08-31/u.test(this.notices), true);
+  },
+);
 
 Then(
-  "直接依存の監査記録は次のとおりである",
+  "The audited direct dependencies match the package metadata",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      Object.keys(this.directDependencies).sort(),
+      [
+        "@mathjax/src",
+        "@resvg/resvg-js",
+        "@earendil-works/pi-coding-agent",
+        "@earendil-works/pi-tui",
+      ].sort(),
+    );
+  },
+);
+
+Then(
+  "All direct dependencies are included in the audit table",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      [...this.auditRows.keys()].sort(),
+      [
+        "@mathjax/src",
+        "@resvg/resvg-js",
+        "@earendil-works/pi-coding-agent",
+        "@earendil-works/pi-tui",
+      ].sort(),
+    );
+  },
+);
+
+Then(
+  "The direct dependency audit records are as follows",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const expectedRows = Object.fromEntries(
       table
@@ -537,7 +576,7 @@ Then(
   },
 );
 
-When("公開API試験用のtarballを作る", function (this: StepWorld) {
+When("create the public API test tarball", function (this: StepWorld) {
   const packed = spawnSync(
     "npm",
     ["pack", "--json", "--pack-destination", this.packageRelease],
@@ -551,20 +590,25 @@ When("公開API試験用のtarballを作る", function (this: StepWorld) {
   );
 });
 
-When("公開API試験用のtarballをnpmで導入する", function (this: StepWorld) {
-  const installed = spawnSync(
-    "npm",
-    ["install", "--ignore-scripts", "--no-audit", "--no-fund", this.tarball],
-    { cwd: this.packageWork, encoding: "utf8" },
-  );
-  if (installed.error || installed.status !== 0)
-    throw new Error(
-      installed.error?.message ?? (installed.stderr || installed.stdout),
+When(
+  "install the public API test tarball with npm",
+  function (this: StepWorld) {
+    const installed = spawnSync(
+      "npm",
+      ["install", "--ignore-scripts", "--no-audit", "--no-fund", this.tarball],
+      { cwd: this.packageWork, encoding: "utf8" },
     );
-  this.installedRequire = createRequire(join(this.packageWork, "package.json"));
-});
+    if (installed.error || installed.status !== 0)
+      throw new Error(
+        installed.error?.message ?? (installed.stderr || installed.stdout),
+      );
+    this.installedRequire = createRequire(
+      join(this.packageWork, "package.json"),
+    );
+  },
+);
 
-When("公開候補のtarballを作る", function (this: StepWorld) {
+When("create the release candidate tarball", function (this: StepWorld) {
   const release = join(this.packageTrialRoot, "release");
   mkdirSync(release);
   const packed = spawnSync(
@@ -583,7 +627,7 @@ When("公開候補のtarballを作る", function (this: StepWorld) {
 });
 
 When(
-  "導入した配布物のResvgと公開APIの由来を調べる",
+  "inspect the origins of Resvg and the public API in the installed distribution",
   function (this: StepWorld) {
     if (this.packageTrial.installed?.status !== 0) return;
     const agentDirectory = this.packageEnvironment.PI_CODING_AGENT_DIR;
@@ -627,7 +671,7 @@ When(
 );
 
 When(
-  "導入先で本物のPiのコマンド一覧を問い合わせる",
+  "query the real Pi command list in the installation directory",
   async function (this: StepWorld) {
     if (this.packageTrial.installed?.status !== 0) return;
     this.packageTrial.pi = await commandsFromRealPi(

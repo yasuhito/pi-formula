@@ -165,133 +165,142 @@ After(function (this: StepWorld) {
 });
 
 When(
-  "両方の利用者マクロを使う PNG を公開 API で作る",
+  "create a PNG using both user macros through the public API",
   async function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\configured+\\temporary", 80);
   },
 );
 
 Then(
-  "XDG 設定と環境変数の利用者マクロが一緒に使える",
+  "User macros from XDG settings and environment variables can be used together",
   function (this: StepWorld) {
     assert.equal(Buffer.isBuffer(this.image?.data), true);
   },
 );
 
 When(
-  "同名の利用者マクロを使う PNG を公開 API で作る",
+  "create a PNG using the user macro of the same name through the public API",
   function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\chosen", 80);
   },
 );
 
-Then("環境変数の利用者マクロで PNG が作られる", function (this: StepWorld) {
-  assert.deepEqual(this.image?.data, this.expectedImage?.data);
-});
+Then(
+  "A PNG is created with the environment variable user macro",
+  function (this: StepWorld) {
+    assert.deepEqual(this.image?.data, this.expectedImage?.data);
+  },
+);
 
 When(
-  "空文字列の利用者マクロを使う PNG を公開 API で作る",
+  "create a PNG using an empty-string user macro through the public API",
   function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\empty{}x", 80);
   },
 );
 
-Then("空文字列の利用者マクロが使える", function (this: StepWorld) {
+Then("An empty-string user macro can be used", function (this: StepWorld) {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
-Given("空文字列の追加マクロがある", async function (this: StepWorld) {
+Given("an empty-string extra macro exists", async function (this: StepWorld) {
   await registeredImageApi(this, { empty: "" });
 });
 
 When(
-  "空文字列の追加マクロを使う PNG を公開 API で作る",
+  "create a PNG using an empty-string extra macro through the public API",
   function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\empty{}x", 80);
   },
 );
 
-Then("空文字列の追加マクロが使える", function (this: StepWorld) {
+Then("An empty-string extra macro can be used", function (this: StepWorld) {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
 When(
-  "その利用者マクロを使う PNG を公開 API で作る",
+  "create a PNG using that user macro through the public API",
   async function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\hash", 80);
   },
 );
 
-Then("ハッシュ記号の PNG が作られる", function (this: StepWorld) {
+Then("A PNG of the hash sign is created", function (this: StepWorld) {
   assert.equal(Buffer.isBuffer(this.image?.data), true);
 });
 
-Then("正しい XDG 定義で PNG が作られる", function (this: StepWorld) {
+Then("A PNG is created with valid XDG definitions", function (this: StepWorld) {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
-When("正しい利用者マクロからPNGを作る", function (this: StepWorld) {
+When("create a PNG from a valid user macro", function (this: StepWorld) {
   this.usableImage = this.formula.createFormulaPng("\\usable", 80);
 });
 
-Then("正しい利用者マクロでPNGが作られる", function (this: StepWorld) {
+Then("A valid user macro produces a PNG", function (this: StepWorld) {
   assert.deepEqual(Buffer.isBuffer(this.usableImage?.data), true);
 });
 
-Then("壊れた利用者マクロではPNGを返さない", function (this: StepWorld) {
+Then("An invalid user macro returns no PNG", function (this: StepWorld) {
   assert.deepEqual(this.brokenImage, undefined);
 });
 
 When(
-  "XDG 設定の利用者マクロを使う PNG を公開 API で作る",
+  "create a PNG using the XDG user macro through the public API",
   async function (this: StepWorld) {
     this.image = this.formula.createFormulaPng("\\configured", 80);
   },
 );
 
 Then(
-  "壊れた環境変数に関係なく XDG 設定の利用者マクロが使える",
+  "XDG user macros remain available despite an invalid environment variable",
   function (this: StepWorld) {
     assert.equal(Buffer.isBuffer(this.image?.data), true);
   },
 );
 
 When(
-  "連携拡張の追加マクロを使う PNG を公開 API で作る",
+  "create a PNG using integration extension extra macros through the public API",
   function (this: StepWorld) {
     this.image = this.integration.createPng("\\trial{x}");
   },
 );
 
-Then("利用者設定では追加マクロを上書きできない", function (this: StepWorld) {
+Then("User settings cannot override extra macros", function (this: StepWorld) {
   assert.deepEqual(this.image?.data, this.expectedImage?.data);
 });
 
 Given(
-  "Object prototype と同名の追加マクロがある",
+  "an extra macro has the same name as an Object prototype member",
   async function (this: StepWorld) {
     await registeredImageApi(this, { constructor: "x" });
   },
 );
 
-When("その追加マクロを使う PNG を公開 API で作る", function (this: StepWorld) {
-  this.image = this.formula.createFormulaPng("\\constructor", 80);
-});
+When(
+  "create a PNG using that extra macro through the public API",
+  function (this: StepWorld) {
+    this.image = this.formula.createFormulaPng("\\constructor", 80);
+  },
+);
 
-Then("Object prototype と同名の追加マクロが使える", function (this: StepWorld) {
-  assert.deepEqual(this.image?.data, this.expectedImage?.data);
-});
+Then(
+  "An extra macro named after an Object prototype member can be used",
+  function (this: StepWorld) {
+    assert.deepEqual(this.image?.data, this.expectedImage?.data);
+  },
+);
 
-Given("pi-formula の CommonJS 公開 API がある", function (this: StepWorld) {
+Given("the pi-formula CommonJS public API exists", function (this: StepWorld) {
   this.formula = freshApi();
 });
 
-When("公開された名前を調べる", function (this: StepWorld) {
+When("inspect the exported names", function (this: StepWorld) {
   this.publicNames = Object.keys(this.formula).sort();
 });
 
 Then(
-  "既存の公開 API と画像経路向け API が公開される",
+  "The existing public API and image path API are exported",
   function (this: StepWorld) {
     assert.deepEqual(this.publicNames, [
       "createFormulaPng",
@@ -302,14 +311,17 @@ Then(
   },
 );
 
-Given("画像経路を使う試験用の連携拡張がある", async function (this: StepWorld) {
-  this.pi = fakePi();
-  this.integration = registerIntegrationExtension(this.pi.api);
-  this.started = await startWithKitty(this.pi);
-});
+Given(
+  "a test integration extension uses the image path",
+  async function (this: StepWorld) {
+    this.pi = fakePi();
+    this.integration = registerIntegrationExtension(this.pi.api);
+    this.started = await startWithKitty(this.pi);
+  },
+);
 
 When(
-  "公開APIへ {word} のLaTeX入力を渡す",
+  "pass {word} LaTeX input to the public API",
   function (this: StepWorld, input: string) {
     const values: Record<string, unknown> = {
       null: null,
@@ -325,16 +337,22 @@ When(
   },
 );
 
-Then("公開 API は例外を出さず画像を返さない", function (this: StepWorld) {
-  assert.equal(this.invalidImage, undefined);
-});
+Then(
+  "The public API returns no image without throwing",
+  function (this: StepWorld) {
+    assert.equal(this.invalidImage, undefined);
+  },
+);
 
-When("連携拡張が公開 API で PNG を作る", function (this: StepWorld) {
-  this.image = this.integration.createPng("\\trial{x}");
-});
+When(
+  "The integration extension creates a PNG through the public API",
+  function (this: StepWorld) {
+    this.image = this.integration.createPng("\\trial{x}");
+  },
+);
 
 Then(
-  "公開PNGの返り値には画像データと寸法だけが含まれる",
+  "The public PNG result contains only image data and dimensions",
   function (this: StepWorld) {
     assert.deepEqual(Object.keys(this.image ?? {}).sort(), [
       "columns",
@@ -346,20 +364,20 @@ Then(
   },
 );
 
-Then("公開PNGのデータはPNG形式である", function (this: StepWorld) {
+Then("The public PNG data is in PNG format", function (this: StepWorld) {
   assert.deepEqual(this.image?.data.subarray(1, 4).toString("ascii"), "PNG");
 });
 
-Then("公開PNGの幅は正数である", function (this: StepWorld) {
+Then("The public PNG width is positive", function (this: StepWorld) {
   assert.ok((this.image?.widthPx ?? 0) > 0);
 });
 
-When("変更前の公開PNGを作る", function (this: StepWorld) {
+When("create a public PNG before mutation", function (this: StepWorld) {
   this.mutableImage = this.integration.createPng("x");
 });
 
 Then(
-  "変更されたBufferから次の公開PNGへ破損が伝わらない",
+  "A mutated Buffer does not corrupt the next public PNG",
   function (this: StepWorld) {
     assert.deepEqual(
       this.imageAfterMutation?.data.subarray(0, 4).toString("hex"),
@@ -369,27 +387,32 @@ Then(
 );
 
 Then(
-  "変更されたBufferからMarkdownの画像へ破損が伝わらない",
+  "A mutated Buffer does not corrupt the Markdown image",
   function (this: StepWorld) {
     assert.deepEqual(this.markdownAfterMutation.includes("iVBOR"), true);
   },
 );
 
-When("テーマ変更前の公開PNGを作る", function (this: StepWorld) {
+When("create a public PNG before the theme change", function (this: StepWorld) {
   this.imageBeforeThemeChange = this.integration.createPng("x");
 });
 
-Then("変更後の文字色で新しい PNG が作られる", function (this: StepWorld) {
-  assert.equal(
-    this.imageBeforeThemeChange && this.imageAfterThemeChange
-      ? this.imageBeforeThemeChange.data.equals(this.imageAfterThemeChange.data)
-      : undefined,
-    false,
-  );
-});
+Then(
+  "A new PNG is created with the changed text color",
+  function (this: StepWorld) {
+    assert.equal(
+      this.imageBeforeThemeChange && this.imageAfterThemeChange
+        ? this.imageBeforeThemeChange.data.equals(
+            this.imageAfterThemeChange.data,
+          )
+        : undefined,
+      false,
+    );
+  },
+);
 
 Given(
-  "テキスト経路を使う試験用の連携拡張がある",
+  "a test integration extension uses the text path",
   async function (this: StepWorld) {
     this.pi = fakePi();
     this.integration = registerIntegrationExtension(this.pi.api);
@@ -398,75 +421,93 @@ Given(
 );
 
 When(
-  "{string} を含む表示数式の PNG を公開 API で作る",
+  "create a PNG of display math containing {string} through the public API",
   function (this: StepWorld, latex: string) {
     this.image = this.integration.createPng(latex);
   },
 );
 
-Then("動的字形を含む表示数式の PNG が返る", function (this: StepWorld) {
-  assert.equal(Buffer.isBuffer(this.image?.data), true);
-});
+Then(
+  "A PNG of display math containing dynamic glyphs is returned",
+  function (this: StepWorld) {
+    assert.equal(Buffer.isBuffer(this.image?.data), true);
+  },
+);
 
-Then("既存の字形を含む表示数式の PNG が返る", function (this: StepWorld) {
-  assert.equal(Buffer.isBuffer(this.image?.data), true);
-});
+Then(
+  "A PNG of display math containing existing glyphs is returned",
+  function (this: StepWorld) {
+    assert.equal(Buffer.isBuffer(this.image?.data), true);
+  },
+);
 
 When(
-  "動的字形を含む表示数式の PNG を公開 API で作る",
+  "create a PNG of display math containing dynamic glyphs through the public API",
   function (this: StepWorld) {
     this.image = this.integration.createPng("\\mathcal{L}");
   },
 );
 
-Then("公開 API は同期的に PNG を返す", function (this: StepWorld) {
+Then("The public API returns a PNG synchronously", function (this: StepWorld) {
   assert.equal(Object.prototype.toString.call(this.image), "[object Object]");
 });
 
-Given("動的字形を読み込めない画像経路がある", async function (this: StepWorld) {
-  this.isolatedRenderer = isolatedRenderer({ blockDynamicFont: true });
-  await this.isolatedRenderer.request("load");
-  await this.isolatedRenderer.request("register");
-  await this.isolatedRenderer.request("start");
-  this.dynamicFontResult = {};
-});
+Given(
+  "an image path with unavailable dynamic glyphs",
+  async function (this: StepWorld) {
+    this.isolatedRenderer = isolatedRenderer({ blockDynamicFont: true });
+    await this.isolatedRenderer.request("load");
+    await this.isolatedRenderer.request("register");
+    await this.isolatedRenderer.request("start");
+    this.dynamicFontResult = {};
+  },
+);
 
-When("動的字形を含む表示数式を描く", async function (this: StepWorld) {
-  const result = await this.isolatedRenderer.request("render", {
-    markdown: "$$\\mathcal{L}$$",
-  });
-  this.dynamicFontResult.dynamic = result.markdown;
-});
-
-Then("動的字形を読み込めない表示数式は原文へ戻る", function (this: StepWorld) {
-  assert.deepEqual(this.dynamicFontResult.dynamic, "$$\\mathcal{L}$$");
-});
+When(
+  "render display math containing dynamic glyphs",
+  async function (this: StepWorld) {
+    const result = await this.isolatedRenderer.request("render", {
+      markdown: "$$\\mathcal{L}$$",
+    });
+    this.dynamicFontResult.dynamic = result.markdown;
+  },
+);
 
 Then(
-  "動的字形を使わない表示数式は引き続き画像になる",
+  "Display math with unavailable dynamic glyphs falls back to its source",
+  function (this: StepWorld) {
+    assert.deepEqual(this.dynamicFontResult.dynamic, "$$\\mathcal{L}$$");
+  },
+);
+
+Then(
+  "Display math without dynamic glyphs still becomes an image",
   function (this: StepWorld) {
     assert.deepEqual(this.dynamicFontResult.ordinaryImage, true);
   },
 );
 
-Then("公開 API は画像を返さない", function (this: StepWorld) {
+Then("The public API returns no image", function (this: StepWorld) {
   assert.equal(this.image, undefined);
 });
 
-When("現在の表示経路を公開 API で問い合わせる", function (this: StepWorld) {
-  this.path = freshApi().getFormulaPath();
-});
+When(
+  "query the current display path through the public API",
+  function (this: StepWorld) {
+    this.path = freshApi().getFormulaPath();
+  },
+);
 
-Then("現在の表示経路は画像経路である", function (this: StepWorld) {
+Then("The current display path is the image path", function (this: StepWorld) {
   assert.equal(this.path, "image");
 });
 
-Then("現在の表示経路はテキスト経路である", function (this: StepWorld) {
+Then("The current display path is the text path", function (this: StepWorld) {
   assert.equal(this.path, "text");
 });
 
 Given(
-  "危険域のバイトを含む画像 ID になる既成 PNG がある",
+  "a prebuilt PNG produces an image ID containing bytes in the unsafe range",
   async function (this: StepWorld) {
     await registeredImageApi(this);
     this.dangerousIdPng = createPngFromScanlines(
@@ -477,127 +518,186 @@ Given(
   },
 );
 
-When("Buffer の既成 PNG を公開 API で描く", function (this: StepWorld) {
-  const png = this.dangerousIdPng ?? pngWithDimensions(100, 50);
-  this.renderedPng = freshApi().renderPng(png, 8);
-});
+When(
+  "render a prebuilt PNG Buffer through the public API",
+  function (this: StepWorld) {
+    const png = this.dangerousIdPng ?? pngWithDimensions(100, 50);
+    this.renderedPng = freshApi().renderPng(png, 8);
+  },
+);
 
-Then("既成PNGの描画は成功する", function (this: StepWorld) {
+Then("Rendering the prebuilt PNG succeeds", function (this: StepWorld) {
   assert.deepEqual(this.renderedPng.rendered, true);
 });
 
-Then("既成PNGの描画成功時に拒否理由はない", function (this: StepWorld) {
-  assert.deepEqual(unexpectedReason(this.renderedPng), undefined);
-});
+Then(
+  "Successful prebuilt PNG rendering has no rejection reason",
+  function (this: StepWorld) {
+    assert.deepEqual(unexpectedReason(this.renderedPng), undefined);
+  },
+);
 
-Then("既成PNGの描画結果には画像転送が含まれる", function (this: StepWorld) {
-  assert.deepEqual(
-    (this.renderedPng.rendered ? this.renderedPng.output : undefined)?.includes(
-      "\x1b_Ga=T,f=100",
-    ),
-    true,
-  );
-});
+Then(
+  "The prebuilt PNG render result contains an image transfer",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      (this.renderedPng.rendered
+        ? this.renderedPng.output
+        : undefined
+      )?.includes("\x1b_Ga=T,f=100"),
+      true,
+    );
+  },
+);
 
-Then("既成PNGの描画結果にはplaceholderが含まれる", function (this: StepWorld) {
-  assert.deepEqual(
-    (this.renderedPng.rendered ? this.renderedPng.output : undefined)?.includes(
-      String.fromCodePoint(0x10eeee),
-    ),
-    true,
-  );
-});
+Then(
+  "The prebuilt PNG render result contains placeholders",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      (this.renderedPng.rendered
+        ? this.renderedPng.output
+        : undefined
+      )?.includes(String.fromCodePoint(0x10eeee)),
+      true,
+    );
+  },
+);
 
-Then("既成PNGの配置は8列以内に収まる", function (this: StepWorld) {
-  assert.deepEqual(
-    this.renderedPng.rendered ? this.renderedPng.columns <= 8 : false,
-    true,
-  );
-});
+Then(
+  "The prebuilt PNG placement fits within 8 columns",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.renderedPng.rendered ? this.renderedPng.columns <= 8 : false,
+      true,
+    );
+  },
+);
 
-Then("既成PNGの配置は1行以上を使う", function (this: StepWorld) {
-  assert.deepEqual(
-    this.renderedPng.rendered ? this.renderedPng.rows > 0 : false,
-    true,
-  );
-});
+Then(
+  "The prebuilt PNG placement uses at least one row",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      this.renderedPng.rendered ? this.renderedPng.rows > 0 : false,
+      true,
+    );
+  },
+);
 
-Then("既成PNGの画像IDは危険域の3バイトを保持する", function (this: StepWorld) {
-  const output =
-    (this.renderedPng.rendered ? this.renderedPng.output : undefined) ?? "";
-  const id = Number(/(?:^|,)i=(\d+)(?:,|$)/u.exec(output)?.[1]);
-  assert.deepEqual(
-    [(id >> 16) & 0xff, (id >> 8) & 0xff, id & 0xff],
-    [216, 242, 43],
-  );
-});
+Then(
+  "The prebuilt PNG image ID preserves the 3 bytes in the unsafe range",
+  function (this: StepWorld) {
+    const output =
+      (this.renderedPng.rendered ? this.renderedPng.output : undefined) ?? "";
+    const id = Number(/(?:^|,)i=(\d+)(?:,|$)/u.exec(output)?.[1]);
+    assert.deepEqual(
+      [(id >> 16) & 0xff, (id >> 8) & 0xff, id & 0xff],
+      [216, 242, 43],
+    );
+  },
+);
 
-Then("placeholderの下線色はコロン形式で表現される", function (this: StepWorld) {
-  const output =
-    (this.renderedPng.rendered ? this.renderedPng.output : undefined) ?? "";
-  assert.deepEqual(/\x1b\[58:2::216:242:43m/u.test(output), true);
-});
+Then(
+  "Placeholder underline colors use colon syntax",
+  function (this: StepWorld) {
+    const output =
+      (this.renderedPng.rendered ? this.renderedPng.output : undefined) ?? "";
+    assert.deepEqual(/\x1b\[58:2::216:242:43m/u.test(output), true);
+  },
+);
 
-Then("placeholder出力後に背景色は残らない", function (this: StepWorld) {
-  assert.equal(this.placeholderRendition.background, null);
-});
+Then(
+  "Background color does not remain after placeholder output",
+  function (this: StepWorld) {
+    assert.equal(this.placeholderRendition.background, null);
+  },
+);
 
-Then("placeholder出力後にdimは残らない", function (this: StepWorld) {
-  assert.equal(this.placeholderRendition.dim, false);
-});
+Then(
+  "Dim does not remain after placeholder output",
+  function (this: StepWorld) {
+    assert.equal(this.placeholderRendition.dim, false);
+  },
+);
 
-When("ファイルの既成 PNG を公開 API で描く", function (this: StepWorld) {
-  const path = join(this.xdg, "existing.png");
-  writeFileSync(path, pngWithDimensions(120, 60));
-  this.renderedPng = freshApi().renderPng(path, 10);
-});
+When(
+  "render a prebuilt PNG file through the public API",
+  function (this: StepWorld) {
+    const path = join(this.xdg, "existing.png");
+    writeFileSync(path, pngWithDimensions(120, 60));
+    this.renderedPng = freshApi().renderPng(path, 10);
+  },
+);
 
-Then("ファイルの既成PNGは描画される", function (this: StepWorld) {
+Then("The prebuilt PNG file is rendered", function (this: StepWorld) {
   assert.equal(this.renderedPng.rendered, true);
 });
 
-Then("画像を使えない端末では既成PNGを描画しない", function (this: StepWorld) {
-  assert.deepEqual(this.renderedPng.rendered, false);
-});
+Then(
+  "Do not render prebuilt PNGs in terminals without image support",
+  function (this: StepWorld) {
+    assert.deepEqual(this.renderedPng.rendered, false);
+  },
+);
 
 Then(
-  "既成PNGを描画しない理由は画像経路を使えないことである",
+  "The prebuilt PNG is not rendered because the image path is unavailable",
   function (this: StepWorld) {
     assert.deepEqual(unexpectedReason(this.renderedPng), "image-unavailable");
   },
 );
 
-When("安全上限を超える既成 PNG を公開 API で描く", function (this: StepWorld) {
-  this.renderedPng = freshApi().renderPng(pngWithDimensions(1, 100_000), 80);
-});
+When(
+  "render a prebuilt PNG exceeding safety limits through the public API",
+  function (this: StepWorld) {
+    this.renderedPng = freshApi().renderPng(pngWithDimensions(1, 100_000), 80);
+  },
+);
 
-Then("安全上限を超えた既成PNGは描画しない", function (this: StepWorld) {
+Then(
+  "A prebuilt PNG exceeding safety limits is not rendered",
+  function (this: StepWorld) {
+    assert.deepEqual(this.renderedPng.rendered, false);
+  },
+);
+
+Then(
+  "The prebuilt PNG rejection reason is the safety limit",
+  function (this: StepWorld) {
+    assert.deepEqual(unexpectedReason(this.renderedPng), "safety-limit");
+  },
+);
+
+When(
+  "render a truncated prebuilt PNG through the public API",
+  function (this: StepWorld) {
+    const png = pngWithDimensions(10, 10);
+    this.renderedPng = freshApi().renderPng(
+      png.subarray(0, png.length - 5),
+      80,
+    );
+  },
+);
+
+Then("An invalid prebuilt PNG is not rendered", function (this: StepWorld) {
   assert.deepEqual(this.renderedPng.rendered, false);
 });
 
-Then("既成PNGの拒否理由は安全上限である", function (this: StepWorld) {
-  assert.deepEqual(unexpectedReason(this.renderedPng), "safety-limit");
-});
+Then(
+  "The prebuilt PNG rejection reason is invalid PNG format",
+  function (this: StepWorld) {
+    assert.deepEqual(unexpectedReason(this.renderedPng), "invalid-png");
+  },
+);
 
-When("途中で切れた既成 PNG を公開 API で描く", function (this: StepWorld) {
-  const png = pngWithDimensions(10, 10);
-  this.renderedPng = freshApi().renderPng(png.subarray(0, png.length - 5), 80);
-});
-
-Then("不正な既成PNGは描画しない", function (this: StepWorld) {
-  assert.deepEqual(this.renderedPng.rendered, false);
-});
-
-Then("既成PNGの拒否理由はPNG形式の不正である", function (this: StepWorld) {
-  assert.deepEqual(unexpectedReason(this.renderedPng), "invalid-png");
-});
-
-When("展開上限を超える既成 PNG を公開 API で描く", function (this: StepWorld) {
-  this.renderedPng = freshApi().renderPng(pngWithDimensions(3000, 2000), 80);
-});
+When(
+  "render a prebuilt PNG exceeding decompression limits through the public API",
+  function (this: StepWorld) {
+    this.renderedPng = freshApi().renderPng(pngWithDimensions(3000, 2000), 80);
+  },
+);
 
 Given(
-  "利用者マクロを読む拡張 runtime がある",
+  "an extension runtime reads user macros",
   async function (this: StepWorld) {
     writeConfig(this, { original: "x" });
     this.firstRuntime = loadStandaloneExtension();
@@ -607,7 +707,7 @@ Given(
   },
 );
 
-When("元のruntimeのセッションを終了する", async function (this: StepWorld) {
+When("end the original runtime session", async function (this: StepWorld) {
   await this.firstPi.handlers.get("session_shutdown")(
     { reason: "reload" },
     this.firstStarted.ctx,
@@ -615,7 +715,7 @@ When("元のruntimeのセッションを終了する", async function (this: Ste
 });
 
 Then(
-  "再登録したruntimeのMarkdown描画は1個だけ登録される",
+  "The reregistered runtime has only one Markdown renderer registered",
   function (this: StepWorld) {
     assert.deepEqual(
       this.secondPi.registrationCounts().transformerRegistrations,
@@ -625,7 +725,7 @@ Then(
 );
 
 Then(
-  "再登録したruntimeのコマンドは1個だけ登録される",
+  "The reregistered runtime has only one command registered",
   function (this: StepWorld) {
     assert.deepEqual(
       this.secondPi.registrationCounts().commandRegistrations,
@@ -635,34 +735,40 @@ Then(
 );
 
 Then(
-  "再登録したruntimeでformulaコマンドを利用できる",
+  "The formula command is available in the reregistered runtime",
   function (this: StepWorld) {
     assert.deepEqual(this.secondPi.commands.has("formula"), true);
   },
 );
 
 Then(
-  "再登録したruntimeで新しい利用者マクロを使える",
+  "New user macros are available in the reregistered runtime",
   function (this: StepWorld) {
     assert.deepEqual(Buffer.isBuffer(this.reloadedImage?.data), true);
   },
 );
 
-Given("単体版を同梱版より先に読み込む順序である", function (this: StepWorld) {
-  this.extensionOrder = "standalone";
-  const shared = {};
-  this.standalonePi = fakePi({ shared });
-  this.bundledPi = fakePi({ shared });
-});
+Given(
+  "the load order puts the standalone version before the bundled version",
+  function (this: StepWorld) {
+    this.extensionOrder = "standalone";
+    const shared = {};
+    this.standalonePi = fakePi({ shared });
+    this.bundledPi = fakePi({ shared });
+  },
+);
 
-Given("同梱版を単体版より先に読み込む順序である", function (this: StepWorld) {
-  this.extensionOrder = "bundled";
-  const shared = {};
-  this.standalonePi = fakePi({ shared });
-  this.bundledPi = fakePi({ shared });
-});
+Given(
+  "the load order puts the bundled version before the standalone version",
+  function (this: StepWorld) {
+    this.extensionOrder = "bundled";
+    const shared = {};
+    this.standalonePi = fakePi({ shared });
+    this.bundledPi = fakePi({ shared });
+  },
+);
 
-When("両方の拡張登録を調べる", function (this: StepWorld) {
+When("inspect both extension registrations", function (this: StepWorld) {
   this.result = {
     ...this.standalonePi.registrationCounts(),
     additionalMacro: Buffer.isBuffer(this.integrationImage?.data),
@@ -671,32 +777,35 @@ When("両方の拡張登録を調べる", function (this: StepWorld) {
 });
 
 Then(
-  "単体版と同梱版のMarkdown描画は1個だけ登録される",
+  "The standalone and bundled versions register only one Markdown renderer",
   function (this: StepWorld) {
     assert.deepEqual(this.result.transformerRegistrations, 1);
   },
 );
 
-Then("単体版と同梱版のコマンドは1個だけ登録される", function (this: StepWorld) {
-  assert.deepEqual(this.result.commandRegistrations, 1);
-});
+Then(
+  "The standalone and bundled versions register only one command",
+  function (this: StepWorld) {
+    assert.deepEqual(this.result.commandRegistrations, 1);
+  },
+);
 
 Then(
-  "単体版と同梱版を読み込んでも連携拡張の追加マクロを使える",
+  "Integration extension extra macros remain available with both standalone and bundled versions loaded",
   function (this: StepWorld) {
     assert.deepEqual(this.result.additionalMacro, true);
   },
 );
 
 Then(
-  "単体版と同梱版は異なるPi APIで登録されている",
+  "The standalone and bundled versions are registered with different Pi APIs",
   function (this: StepWorld) {
     assert.deepEqual(this.result.distinctApis, true);
   },
 );
 
 Given(
-  "XDG設定の利用者マクロは次のとおりである",
+  "the XDG user macros are as follows",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const macros = Object.fromEntries(
       table.rows().map(([name, replacement, arity]) => {
@@ -715,7 +824,7 @@ Given(
 );
 
 Given(
-  "環境変数の利用者マクロは次のとおりである",
+  "the environment variable user macros are as follows",
   (table: import("@cucumber/cucumber").DataTable) => {
     const macros = Object.fromEntries(
       table.rows().map(([name, replacement, arity]) => {
@@ -733,92 +842,110 @@ Given(
   },
 );
 
-Given("環境変数のマクロ設定は壊れたJSONである", () => {
+Given("the environment variable macro setting is invalid JSON", () => {
   process.env.PI_FORMULA_MACROS = "{";
 });
 
-Given("画像経路の公開APIを使っている", async function (this: StepWorld) {
+Given("the image path public API is in use", async function (this: StepWorld) {
   await registeredImageApi(this);
 });
 
 When(
-  "比較用の数式 {string} のPNGを公開APIで作る",
+  "create a PNG of the reference formula {string} through the public API",
   function (this: StepWorld, latex: string) {
     this.expectedImage = freshApi().createFormulaPng(latex, 80);
   },
 );
 
-When("壊れた利用者マクロからPNGを作る", function (this: StepWorld) {
+When("create a PNG from an invalid user macro", function (this: StepWorld) {
   this.brokenImage = this.formula.createFormulaPng("\\broken{x}", 80);
 });
 
-When("返された公開PNGのBufferを書き換える", function (this: StepWorld) {
+When("mutate the returned public PNG Buffer", function (this: StepWorld) {
   if (!this.mutableImage)
     throw new Error("Expected a PNG before mutating its buffer");
   this.mutableImage.data[0] = 0;
 });
 
-When("同じ数式の公開PNGをもう一度作る", function (this: StepWorld) {
-  this.imageAfterMutation = this.integration.createPng("x");
-});
+When(
+  "create another public PNG of the same formula",
+  function (this: StepWorld) {
+    this.imageAfterMutation = this.integration.createPng("x");
+  },
+);
 
-When("同じ数式をMarkdownの表示数式として描く", function (this: StepWorld) {
-  this.markdownAfterMutation = this.pi.transformer()("$$x$$", {
-    messageType: "assistant",
-    isStreaming: false,
-    availableWidth: 80,
-  });
-});
+When(
+  "render the same formula as Markdown display math",
+  function (this: StepWorld) {
+    this.markdownAfterMutation = this.pi.transformer()("$$x$$", {
+      messageType: "assistant",
+      isStreaming: false,
+      availableWidth: 80,
+    });
+  },
+);
 
-When("テーマの文字色をRGBの1・2・3へ変える", function (this: StepWorld) {
+When("change the theme text color to RGB 1, 2, 3", function (this: StepWorld) {
   this.started.setTextColor("\x1b[38;2;1;2;3m");
 });
 
-When("テーマ変更後の同じ数式の公開PNGを作る", function (this: StepWorld) {
-  this.imageAfterThemeChange = this.integration.createPng("x");
-});
+When(
+  "create a public PNG of the same formula after the theme change",
+  function (this: StepWorld) {
+    this.imageAfterThemeChange = this.integration.createPng("x");
+  },
+);
 
-When("XDGの利用者マクロを再読込用の定義へ変更する", function (this: StepWorld) {
-  writeConfig(this, { reloaded: "x" });
-});
+When(
+  "change the XDG user macro definition for reloading",
+  function (this: StepWorld) {
+    writeConfig(this, { reloaded: "x" });
+  },
+);
 
-When("環境変数の利用者マクロを再読込用の定義へ変更する", () => {
-  process.env.PI_FORMULA_MACROS = JSON.stringify({ temporary: "y" });
-});
+When(
+  "change the environment variable user macro definition for reloading",
+  () => {
+    process.env.PI_FORMULA_MACROS = JSON.stringify({ temporary: "y" });
+  },
+);
 
-When("別のruntimeを読み込んで登録する", function (this: StepWorld) {
+When("load and register another runtime", function (this: StepWorld) {
   this.secondRuntime = loadStandaloneExtension();
   this.secondPi = fakePi();
   this.secondRuntime.register(this.secondPi.api);
 });
 
 When(
-  "新しいruntimeで画像経路のセッションを開始する",
+  "start an image path session in the new runtime",
   async function (this: StepWorld) {
     await startWithKitty(this.secondPi);
   },
 );
 
-When("新しいruntimeの利用者マクロでPNGを作る", function (this: StepWorld) {
-  this.reloadedImage = this.secondRuntime.formula.createFormulaPng(
-    "\\reloaded+\\temporary",
-    80,
-  );
-});
+When(
+  "create a PNG with the new runtime user macro",
+  function (this: StepWorld) {
+    this.reloadedImage = this.secondRuntime.formula.createFormulaPng(
+      "\\reloaded+\\temporary",
+      80,
+    );
+  },
+);
 
 When(
-  "比較用の数式のPNGを公開APIで作る",
+  "create a PNG of the reference formula through the public API",
   function (this: StepWorld, latex: string) {
     this.expectedImage = freshApi().createFormulaPng(latex, 80);
   },
 );
 
-Then("公開PNGの高さは正数である", function (this: StepWorld) {
+Then("The public PNG height is positive", function (this: StepWorld) {
   assert.ok((this.image?.heightPx ?? 0) > 0);
 });
 
 When(
-  "同じruntimeで動的字形を使わない表示数式を描く",
+  "render display math without dynamic glyphs in the same runtime",
   async function (this: StepWorld) {
     const result = await this.isolatedRenderer.request("render", {
       markdown: "$$x$$",
@@ -828,32 +955,38 @@ When(
   },
 );
 
-When("順序で最初の拡張を読み込む", function (this: StepWorld) {
+When("load the first extension in the load order", function (this: StepWorld) {
   if (this.extensionOrder === "bundled")
     this.bundled = loadIntegrationExtension();
   else this.standalone = loadStandaloneExtension();
 });
 
-When("順序で次の拡張を読み込む", function (this: StepWorld) {
+When("load the next extension in the load order", function (this: StepWorld) {
   if (this.extensionOrder === "bundled")
     this.standalone = loadStandaloneExtension();
   else this.bundled = loadIntegrationExtension();
 });
 
-When("順序で最初の拡張を登録する", function (this: StepWorld) {
-  if (this.extensionOrder === "bundled")
-    this.integration = this.bundled.register(this.bundledPi.api);
-  else this.standalone.register(this.standalonePi.api);
-});
-
-When("順序で次の拡張を登録する", function (this: StepWorld) {
-  if (this.extensionOrder === "bundled")
-    this.standalone.register(this.standalonePi.api);
-  else this.integration = this.bundled.register(this.bundledPi.api);
-});
+When(
+  "register the first extension in the load order",
+  function (this: StepWorld) {
+    if (this.extensionOrder === "bundled")
+      this.integration = this.bundled.register(this.bundledPi.api);
+    else this.standalone.register(this.standalonePi.api);
+  },
+);
 
 When(
-  "最初に登録したPiで画像経路のセッションを開始する",
+  "register the next extension in the load order",
+  function (this: StepWorld) {
+    if (this.extensionOrder === "bundled")
+      this.standalone.register(this.standalonePi.api);
+    else this.integration = this.bundled.register(this.bundledPi.api);
+  },
+);
+
+When(
+  "start an image path session in the first registered Pi",
   async function (this: StepWorld) {
     await startWithKitty(
       this.extensionOrder === "bundled" ? this.bundledPi : this.standalonePi,
@@ -861,11 +994,14 @@ When(
   },
 );
 
-When("両方を登録したruntimeで連携拡張のPNGを作る", function (this: StepWorld) {
-  this.integrationImage = this.integration.createPng("\\trial{x}", 80);
-});
+When(
+  "create an integration extension PNG in the runtime with both registered",
+  function (this: StepWorld) {
+    this.integrationImage = this.integration.createPng("\\trial{x}", 80);
+  },
+);
 
-Then("ファイルの既成PNGはPNG画像を転送する", function (this: StepWorld) {
+Then("The prebuilt PNG file transfers a PNG image", function (this: StepWorld) {
   assert.equal(
     (this.renderedPng.rendered ? this.renderedPng.output : undefined)?.includes(
       "iVBOR",
@@ -874,18 +1010,21 @@ Then("ファイルの既成PNGはPNG画像を転送する", function (this: Step
   );
 });
 
-Then("拒否結果には描画状態と拒否理由だけがある", function (this: StepWorld) {
-  assert.deepEqual(Object.keys(this.renderedPng).sort(), [
-    "reason",
-    "rendered",
-  ]);
-});
+Then(
+  "The rejection result contains only render status and rejection reason",
+  function (this: StepWorld) {
+    assert.deepEqual(Object.keys(this.renderedPng).sort(), [
+      "reason",
+      "rendered",
+    ]);
+  },
+);
 
 After(async function (this: StepWorld) {
   if (this.isolatedRenderer) await this.isolatedRenderer.close();
 });
 
-When("placeholder出力後のSGR状態を読み取る", function (this: StepWorld) {
+When("read the SGR state after placeholder output", function (this: StepWorld) {
   this.placeholderRendition = finalSgrRendition(
     (this.renderedPng.rendered ? this.renderedPng.output : undefined) ?? "",
   );

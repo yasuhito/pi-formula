@@ -1,24 +1,24 @@
-# Feature: 初めて表示数式を描くときに画像処理部品を読み込む
+# Feature: Load image processing components when rendering the first display formula
 
-拡張の読み込み・登録やセッション開始では、MathJax と Resvg を読み込みません。初めて表示数式を画像へ変換するときに読み込みます。
+Loading or registering the extension and starting a session do not load MathJax or Resvg. They are loaded when display math is first converted to an image.
 
-## Scenario: 数式の描画前にはMathJaxもResvgも読み込まれていない
+## Scenario: Neither MathJax nor Resvg is loaded before rendering math
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 表示数式を初めて変換する
-- Then 数式の描画前にはMathJaxもResvgも読み込まれていない
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math for the first time
+- Then Neither MathJax nor Resvg is loaded before rendering math
 
-## Scenario: セッション開始だけではMathJaxもResvgも読み込まれない
+## Scenario: Starting a session alone does not load MathJax or Resvg
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 表示数式を初めて変換する
-- Then セッション開始だけではMathJaxもResvgも読み込まれない
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math for the first time
+- Then Starting a session alone does not load MathJax or Resvg
 
-## Scenario: 最初の表示数式でMathJaxとResvgが読み込まれる
+## Scenario: The first display formula loads MathJax and Resvg
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 表示数式を初めて変換する
-- Then 最初の表示数式でMathJaxとResvgが読み込まれる
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And transform display math for the first time
+- Then The first display formula loads MathJax and Resvg

@@ -1,215 +1,215 @@
-# Feature: 応答中の画像を配置し、逐次更新する
+# Feature: Place images in responses and update incrementally
 
-表示数式の画像は、転送チャンク、画像 ID、配置 ID、placeholder の行数が対応した状態で端末へ出力します。同じ数式を複数の場所へ配置する場合も、この対応を保ちます。
+Display math images are emitted to the terminal with corresponding transfer chunks, image IDs, placement IDs, and placeholder row counts. This correspondence is preserved when the same formula is placed in multiple locations.
 
-応答が逐次更新される間は、新しく閉じた表示数式を画像にし、必要な画像だけを転送します。先に表示されたツール結果も保ちます。
+During incremental response updates, newly closed display math becomes images and only necessary images are transferred. Previously displayed tool results are preserved.
 
-## Scenario: 変換結果の画像転送数は順に1・2・3・4件である
+## Scenario: The transformed output image transfer counts are 1, 2, 3, and 4 in order
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 変換結果の画像転送数は順に1・2・3・4件である
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then The transformed output image transfer counts are 1, 2, 3, and 4 in order
 
-## Scenario: 端末描画の転送行数は順に1・2・3・4件である
+## Scenario: The terminal render transfer line counts are 1, 2, 3, and 4 in order
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 端末描画の転送行数は順に1・2・3・4件である
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then The terminal render transfer line counts are 1, 2, 3, and 4 in order
 
-## Scenario: 各転送行には一つの画像転送だけがある
+## Scenario: Each transfer line contains only one image transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 各転送行には一つの画像転送だけがある
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then Each transfer line contains only one image transfer
 
-## Scenario: 各フレームの転送チャンクが完結する
+## Scenario: Each frame transfer chunks are complete
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 各フレームの転送チャンクが完結する
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then Each frame transfer chunks are complete
 
-## Scenario: 各フレームの画像IDと配置IDが一致する
+## Scenario: Each frame image ID matches its placement ID
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 各フレームの画像IDと配置IDが一致する
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then Each frame image ID matches its placement ID
 
-## Scenario: 各フレームのplaceholder行数が画像転送に対応する
+## Scenario: Each frame placeholder row count corresponds to its image transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 各フレームのplaceholder行数が画像転送に対応する
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then Each frame placeholder row count corresponds to its image transfer
 
-## Scenario: 各フレームの配置は対応する転送に隣接する
+## Scenario: Each frame placement is adjacent to its transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 再現本文の 1 番目までのフレームを描く
-- And 再現本文の 2 番目までのフレームを描く
-- And 再現本文の 3 番目までのフレームを描く
-- And 再現本文の 4 番目までのフレームを描く
-- Then 各フレームの配置は対応する転送に隣接する
+- Given Pi can render math through the image path
+- When render reproduction body frames through frame 1
+- And render reproduction body frames through frame 2
+- And render reproduction body frames through frame 3
+- And render reproduction body frames through frame 4
+- Then Each frame placement is adjacent to its transfer
 
-## Scenario: 逐次更新中も先行するツール描画を保つ
+## Scenario: Preserve preceding tool rendering during incremental updates
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 先行するツール描画が残る
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then The preceding tool rendering remains
 
-## Scenario: 逐次更新中から閉じた表示数式を画像にする
+## Scenario: Convert closed display math to images during incremental updates
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 画像経路で描く表示数式が1件ずつ増える
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then The number of display formulas rendered through the image path increases one at a time
 
-## Scenario: 逐次更新の差分描画で新しい表示数式だけを転送する
+## Scenario: Transfer only new display math in incremental differential renders
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 各差分描画は新しい表示数式を1件ずつ転送する
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then Each differential render transfers one new display formula
 
-## Scenario: 逐次更新の画像IDは各転送の画像IDと一致する
+## Scenario: Incremental update image IDs match the image IDs of each transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 逐次更新の画像IDは各転送の画像IDと一致する
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then Incremental update image IDs match the image IDs of each transfer
 
-## Scenario: 逐次更新のplaceholder行数は各転送の宣言行数と一致する
+## Scenario: Incremental update placeholder rows match the declared rows of each transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 逐次更新のplaceholder行数は各転送の宣言行数と一致する
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then Incremental update placeholder rows match the declared rows of each transfer
 
-## Scenario: 逐次更新の各配置の転送チャンクは完結する
+## Scenario: Transfer chunks for each incremental update placement are complete
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 逐次更新の各配置の転送チャンクは完結する
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then Transfer chunks for each incremental update placement are complete
 
-## Scenario: 逐次更新の各配置は対応する転送に隣接する
+## Scenario: Each incremental update placement is adjacent to its transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- And Issue 26のコーパスとket追加マクロがある
-- When Issue 26の 1 番目までの未完了本文を変換する
-- And Issue 26の 2 番目までの未完了本文を変換する
-- And Issue 26の 3 番目までの未完了本文を変換する
-- And Issue 26の確定本文を変換する
-- And 先行するqniツールの呼び出しと結果をTUIに描く
-- And Issue 26の 1 番目の未完了本文をTUIへ更新する
-- And Issue 26の 2 番目の未完了本文をTUIへ更新する
-- And Issue 26の 3 番目の未完了本文をTUIへ更新する
-- And Issue 26の確定本文をTUIへ更新する
-- Then 逐次更新の各配置は対応する転送に隣接する
+- Given Pi can render math through the image path
+- And the Issue 26 corpus and ket extra macro exist
+- When transform incomplete bodies through body 1 from Issue 26
+- And transform incomplete bodies through body 2 from Issue 26
+- And transform incomplete bodies through body 3 from Issue 26
+- And transform the final body from Issue 26
+- And render the preceding qni tool call and result in the TUI
+- And update the TUI with incomplete body 1 from Issue 26
+- And update the TUI with incomplete body 2 from Issue 26
+- And update the TUI with incomplete body 3 from Issue 26
+- And update the TUI with the final body from Issue 26
+- Then Each incremental update placement is adjacent to its transfer
 
-## Scenario: 同じ応答内の画像配置は2件である
+## Scenario: The same response contains 2 image placements
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 同じ応答内の画像配置は2件である
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then The same response contains 2 image placements
 
-## Scenario: 同じ応答内の各配置は同じ画像IDを使う
+## Scenario: Each placement in the same response uses the same image ID
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 同じ応答内の各配置は同じ画像IDを使う
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Each placement in the same response uses the same image ID
 
-## Scenario: 同じ応答内の各配置は複数行である
+## Scenario: Each placement in the same response spans multiple rows
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 同じ応答内の各配置は複数行である
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Each placement in the same response spans multiple rows
 
-## Scenario: 一時保存画像の画像IDは各転送の画像IDと一致する
+## Scenario: Cached image IDs match the image IDs of each transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 一時保存画像の画像IDは各転送の画像IDと一致する
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Cached image IDs match the image IDs of each transfer
 
-## Scenario: 一時保存画像のplaceholder行数は各転送の宣言行数と一致する
+## Scenario: Cached image placeholder rows match the declared rows of each transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 一時保存画像のplaceholder行数は各転送の宣言行数と一致する
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Cached image placeholder rows match the declared rows of each transfer
 
-## Scenario: 一時保存画像の各配置の転送チャンクは完結する
+## Scenario: Transfer chunks for each cached image placement are complete
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 一時保存画像の各配置の転送チャンクは完結する
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Transfer chunks for each cached image placement are complete
 
-## Scenario: 一時保存画像の各配置は対応する転送に隣接する
+## Scenario: Each cached image placement is adjacent to its transfer
 
-- Given 画像経路で数式を描ける Pi がある
-- When 同じ複数行表示数式を一回の確定応答内に二回配置する
-- Then 一時保存画像の各配置は対応する転送に隣接する
+- Given Pi can render math through the image path
+- When place the same multiline display formula twice in one final response
+- Then Each cached image placement is adjacent to its transfer

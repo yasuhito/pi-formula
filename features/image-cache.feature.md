@@ -1,144 +1,144 @@
-# Feature: 表示数式の画像の一時保存を管理する
+# Feature: Manage the display math image cache
 
-表示数式の画像は一時保存されます。必要に応じて、`/formula clear` で一時保存を削除できます。
+Display math images are cached. The cache can be cleared with `/formula clear` when needed.
 
-テーマ色と表示幅が異なる画像は別の項目として保存します。件数・バイト数の上限を超えた場合は、最近使われていない項目から取り除きます。失敗結果も一時保存の対象です。
+Images with different theme colors or display widths are stored separately. Exceeding entry or byte limits evicts the least recently used entries first. Failure results are also cached.
 
-一時保存した数式の再利用は、初回準備を除いた未キャッシュ数式の変換より短い時間で完了します。
+Reusing cached math finishes faster than converting uncached math, excluding initial setup.
 
-## Scenario: 表示数式の画像を一時保存する
+## Scenario: Cache display math images
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And 数式 "$$x$$" を画像へ変換する
-- Then 画像の一時保存に1件以上が含まれる
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And convert the formula "$$x$$" to an image
+- Then The image cache contains at least one entry
 
-## Scenario: formula clear で画像の一時保存を削除する
+## Scenario: Clear the image cache with formula clear
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And 数式 "$$x$$" を画像へ変換する
-- And formula clearを実行する
-- Then 画像の一時保存が空になる
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And convert the formula "$$x$$" to an image
+- And run formula clear
+- Then The image cache becomes empty
 
-## Scenario: テーマと幅の比較では3個の画像IDが得られる
+## Scenario: The theme and width comparison produces 3 image IDs
 
-- Given 画像経路で数式を描ける Pi がある
-- When テーマと幅の比較用数式を 80 列で描く
-- And テーマの文字色をRGBの10・20・30へ変える
-- And テーマと幅の比較用数式を 80 列で描く
-- And テーマの文字色をRGBの212・212・212へ戻す
-- And テーマと幅の比較用数式を 40 列で描く
-- Then テーマと幅の比較では3個の画像IDが得られる
+- Given Pi can render math through the image path
+- When render the theme and width comparison formula at 80 columns
+- And change the theme text color to RGB 10, 20, 30
+- And render the theme and width comparison formula at 80 columns
+- And restore the theme text color to RGB 212, 212, 212
+- And render the theme and width comparison formula at 40 columns
+- Then The theme and width comparison produces 3 image IDs
 
-## Scenario: テーマ色と表示幅の各変更が別の一時保存項目になる
+## Scenario: Each change to theme color or display width produces a separate cache entry
 
-- Given 画像経路で数式を描ける Pi がある
-- When テーマと幅の比較用数式を 80 列で描く
-- And テーマの文字色をRGBの10・20・30へ変える
-- And テーマと幅の比較用数式を 80 列で描く
-- And テーマの文字色をRGBの212・212・212へ戻す
-- And テーマと幅の比較用数式を 40 列で描く
-- Then テーマ色と表示幅の各変更が別の一時保存項目になる
+- Given Pi can render math through the image path
+- When render the theme and width comparison formula at 80 columns
+- And change the theme text color to RGB 10, 20, 30
+- And render the theme and width comparison formula at 80 columns
+- And restore the theme text color to RGB 212, 212, 212
+- And render the theme and width comparison formula at 40 columns
+- Then Each change to theme color or display width produces a separate cache entry
 
-## Scenario: 件数上限を超えた最も古い項目は再作成される
+## Scenario: The oldest entry is recreated after exceeding the entry limit
 
-- Given 件数上限が3件の画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 c を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 d を取得する
-- And 一時保存から画像 a を取得する
-- Then 件数上限を超えた最も古い項目は再作成される
+- Given an image cache has a 3-entry limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image c from the cache
+- And retrieve image b from the cache
+- And retrieve image d from the cache
+- And retrieve image a from the cache
+- Then The oldest entry is recreated after exceeding the entry limit
 
-## Scenario: 最近使った2件目の一時保存は再作成されない
+## Scenario: The recently used second cache entry is not recreated
 
-- Given 件数上限が3件の画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 c を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 d を取得する
-- And 一時保存から画像 a を取得する
-- Then 最近使った2件目の一時保存は再作成されない
+- Given an image cache has a 3-entry limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image c from the cache
+- And retrieve image b from the cache
+- And retrieve image d from the cache
+- And retrieve image a from the cache
+- Then The recently used second cache entry is not recreated
 
-## Scenario: 画像の一時保存は3件以内に収まる
+## Scenario: The image cache stays within 3 entries
 
-- Given 件数上限が3件の画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 c を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 d を取得する
-- And 一時保存から画像 a を取得する
-- Then 画像の一時保存は3件以内に収まる
+- Given an image cache has a 3-entry limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image c from the cache
+- And retrieve image b from the cache
+- And retrieve image d from the cache
+- And retrieve image a from the cache
+- Then The image cache stays within 3 entries
 
-## Scenario: バイト上限を超えた最も古い項目は再作成される
+## Scenario: The oldest entry is recreated after exceeding the byte limit
 
-- Given バイト上限が300バイトの画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 a を取得する
-- Then バイト上限を超えた最も古い項目は再作成される
+- Given an image cache has a 300-byte limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image a from the cache
+- Then The oldest entry is recreated after exceeding the byte limit
 
-## Scenario: バイト上限を超えた一時保存には最後の1件が残る
+## Scenario: Only the last entry remains after exceeding the cache byte limit
 
-- Given バイト上限が300バイトの画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 a を取得する
-- Then バイト上限を超えた一時保存には最後の1件が残る
+- Given an image cache has a 300-byte limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image a from the cache
+- Then Only the last entry remains after exceeding the cache byte limit
 
-## Scenario: 画像の一時保存は300バイト以内に収まる
+## Scenario: The image cache stays within 300 bytes
 
-- Given バイト上限が300バイトの画像一時保存がある
-- When 一時保存から画像 a を取得する
-- And 一時保存から画像 b を取得する
-- And 一時保存から画像 a を取得する
-- Then 画像の一時保存は300バイト以内に収まる
+- Given an image cache has a 300-byte limit
+- When retrieve image a from the cache
+- And retrieve image b from the cache
+- And retrieve image a from the cache
+- Then The image cache stays within 300 bytes
 
-## Scenario: 失敗結果を一時保存する
+## Scenario: Cache failure results
 
-- Given 画像結果を作る回数を数えられる一時保存がある
-- When 一時保存から同じ失敗項目を取得する
-- And 一時保存から同じ失敗項目を取得する
-- Then 同じ失敗項目の画像処理は一回だけになる
+- Given a cache can count image result creation calls
+- When retrieve the same failed entry from the cache
+- And retrieve the same failed entry from the cache
+- Then The same failed entry is processed as an image only once
 
-## Scenario: 未キャッシュ数式の計測は5件である
+## Scenario: There are 5 uncached formula measurements
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 初回準備用の数式を分離プロセスで描く
-- And 異なる未キャッシュ数式5件の変換時間を計測する
-- And 一時保存済みの最後の数式を10回計測する
-- Then 未キャッシュ数式の計測は5件である
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And render the initialization formula in an isolated process
+- And measure conversion times for 5 different uncached formulas
+- And measure the last cached formula 10 times
+- Then There are 5 uncached formula measurements
 
-## Scenario: 一時保存済み数式の計測は10件である
+## Scenario: There are 10 cached formula measurements
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 初回準備用の数式を分離プロセスで描く
-- And 異なる未キャッシュ数式5件の変換時間を計測する
-- And 一時保存済みの最後の数式を10回計測する
-- Then 一時保存済み数式の計測は10件である
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And render the initialization formula in an isolated process
+- And measure conversion times for 5 different uncached formulas
+- And measure the last cached formula 10 times
+- Then There are 10 cached formula measurements
 
-## Scenario: 一時保存済みの中央値比は有限である
+## Scenario: The cached median ratio is finite
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 初回準備用の数式を分離プロセスで描く
-- And 異なる未キャッシュ数式5件の変換時間を計測する
-- And 一時保存済みの最後の数式を10回計測する
-- Then 一時保存済みの中央値比は有限である
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And render the initialization formula in an isolated process
+- And measure conversion times for 5 different uncached formulas
+- And measure the last cached formula 10 times
+- Then The cached median ratio is finite
 
-## Scenario: 一時保存済みの中央値は未キャッシュ中央値の5パーセント未満である
+## Scenario: The cached median is less than 5 percent of the uncached median
 
-- Given 新しいNode.jsプロセスで拡張を読み込んで登録したPiがある
-- When 分離プロセスで画像経路のセッションを開始する
-- And 初回準備用の数式を分離プロセスで描く
-- And 異なる未キャッシュ数式5件の変換時間を計測する
-- And 一時保存済みの最後の数式を10回計測する
-- Then 一時保存済みの中央値は未キャッシュ中央値の5パーセント未満である
+- Given Pi has loaded and registered the extension in a fresh Node.js process
+- When start an image path session in an isolated process
+- And render the initialization formula in an isolated process
+- And measure conversion times for 5 different uncached formulas
+- And measure the last cached formula 10 times
+- Then The cached median is less than 5 percent of the uncached median

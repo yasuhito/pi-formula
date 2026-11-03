@@ -1,109 +1,109 @@
-# Feature: 検証用コーパスを準備し、独立したセッションで実表示を撮る
+# Feature: Prepare a verification corpus and capture the real display in an independent session
 
-実表示検証は、利用者の画面と作業を妨げない独立したセッションで行います。応答がコーパスと一致することを確認し、描き直し前後のキャプチャを目視確認用に残します。
+Real display verification runs in an independent session without disrupting the user's screen or work. It verifies that the response matches the corpus and keeps captures before and after redraw for visual inspection.
 
-検証用の再現コーパスと追加マクロを準備し、保存済みの表示数式を組版できることを確認します。追加マクロの定義が qni-cli と異なる場合や見つからない場合は、その理由を示します。
+Prepare reproduction corpora and extra macros for verification and confirm that saved display math can be typeset. Report why extra macro definitions differ from qni-cli or cannot be found.
 
-## Scenario: 目視確認用のキャプチャを取得する
+## Scenario: obtain captures for visual inspection
 
-- Given 実行可能な実表示検証の試験環境がある
-- When 実表示検証の interface を実行する
-- Then 目視確認用のキャプチャを返す
+- Given an executable real display verification test environment exists
+- When run the real display verification interface
+- Then Captures for visual inspection are returned
 
-## Scenario: 応答不一致をキャプチャ前に拒否する
+## Scenario: Reject response mismatches before capture
 
-- Given 実行可能な実表示検証の試験環境がある
-- And 応答がコーパスと異なる
-- When 実表示検証の interface を実行する
-- Then 応答確認 stage の失敗を返す
+- Given an executable real display verification test environment exists
+- And the response differs from the corpus
+- When run the real display verification interface
+- Then A response verification stage failure is returned
 
-## Scenario: 描き直し前後のキャプチャを残す
+## Scenario: Keep captures before and after redraw
 
-- Given 実行可能な実表示検証の試験環境がある
-- And 100 列へ描き直す
-- When 実表示検証の interface を実行する
-- Then 変更前後のキャプチャを返す
+- Given an executable real display verification test environment exists
+- And redraw at 100 columns
+- When run the real display verification interface
+- Then Captures before and after the change are returned
 
-## Scenario: Issue 21 の再現コーパスを使う
+## Scenario: Use the Issue 21 reproduction corpus
 
-- Given Issue 21 の再現コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- Then Issue 21 の最後の表示数式がコーパスに含まれる
+- Given an Issue 21 reproduction corpus exists
+- When Read saved reproduction corpora
+- Then The corpus contains the final display formula from Issue 21
 
-## Scenario: Issue26のコーパスに表示数式が3件ある
+## Scenario: The Issue 26 corpus contains 3 display formulas
 
-- Given Issue 26 の再現コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then Issue26のコーパスに表示数式が3件ある
+- Given an Issue 26 reproduction corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then The Issue 26 corpus contains 3 display formulas
 
-## Scenario: Issue26の追加マクロを含む表示数式は画像行を作れる
+## Scenario: Display math containing Issue 26 extra macros can produce image rows
 
-- Given Issue 26 の再現コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then Issue26の追加マクロを含む表示数式は画像行を作れる
+- Given an Issue 26 reproduction corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then Display math containing Issue 26 extra macros can produce image rows
 
-## Scenario: Issue 48 の Grover コーパスを組版する
+## Scenario: typeset the Issue 48 Grover corpus
 
-- Given Issue 48 の Grover コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then bra と braket を含む表示数式を組版できる
+- Given an Issue 48 Grover corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then Display math containing bra and braket can be typeset
 
-## Scenario: braket の直後の項を分ける
+## Scenario: Separate the term immediately after braket
 
-- Given braket の直後に ket が続く表示数式がある
-- When 検証用の追加マクロで表示数式を展開する
-- Then braket と直後の ket は別の項へ展開される
+- Given display math contains braket immediately followed by ket
+- When expand display math using verification extra macros
+- Then braket and the immediately following ket expand into separate terms
 
-## Scenario: bra の定義を保つ
+## Scenario: Preserve the bra definition
 
-- Given bra を使う表示数式がある
-- When 検証用の追加マクロで表示数式を展開する
-- Then bra は山括弧と縦線へ展開される
+- Given display math uses bra
+- When expand display math using verification extra macros
+- Then bra expands to an angle bracket and a vertical bar
 
-## Scenario: ket の定義を保つ
+## Scenario: Preserve the ket definition
 
-- Given ket を使う表示数式がある
-- When 検証用の追加マクロで表示数式を展開する
-- Then ket は縦線と山括弧へ展開される
+- Given display math uses ket
+- When expand display math using verification extra macros
+- Then ket expands to a vertical bar and an angle bracket
 
-## Scenario: Issue52のコーパスに表示数式が7件ある
+## Scenario: The Issue 52 corpus contains 7 display formulas
 
-- Given Issue 52 の幅掃引コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then Issue52のコーパスに表示数式が7件ある
+- Given an Issue 52 width-sweep corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then The Issue 52 corpus contains 7 display formulas
 
-## Scenario: 幅掃引コーパスには3項の表示数式が含まれる
+## Scenario: The width-sweep corpus contains display math with 3 terms
 
-- Given Issue 52 の幅掃引コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then 幅掃引コーパスには3項の表示数式が含まれる
+- Given an Issue 52 width-sweep corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then The width-sweep corpus contains display math with 3 terms
 
-## Scenario: 幅掃引コーパスには15項の表示数式が含まれる
+## Scenario: The width-sweep corpus contains display math with 15 terms
 
-- Given Issue 52 の幅掃引コーパスがある
-- When 保存済みの再現コーパスを読み取る
-- And コーパスの表示数式を組版して表示計画を作る
-- Then 幅掃引コーパスには15項の表示数式が含まれる
+- Given an Issue 52 width-sweep corpus exists
+- When Read saved reproduction corpora
+- And typeset corpus display math to create a display plan
+- Then The width-sweep corpus contains display math with 15 terms
 
-## Scenario: 検証ハーネスの追加マクロを qni-cli と揃える
+## Scenario: Align verification harness extra macros with qni-cli
 
-- Given 検証ハーネスと書式だけが異なる qni-cli の追加マクロ定義がある
-- When qni-cli の追加マクロ定義を読み取る
-- Then 検証ハーネスの追加マクロは qni-cli と一致する
+- Given qni-cli extra macro definitions differ only in formatting from the verification harness
+- When read the qni-cli extra macro definitions
+- Then The verification harness extra macros match qni-cli
 
-## Scenario: qni-cli の追加マクロ変更を検出する
+## Scenario: Detect changes to qni-cli extra macros
 
-- Given 検証ハーネスと値が異なる qni-cli の追加マクロ定義がある
-- When qni-cli の追加マクロ定義を読み取る
-- Then 検証ハーネスは qni-cli の定義差分を検出する
+- Given qni-cli extra macro definitions differ in value from the verification harness
+- When read the qni-cli extra macro definitions
+- Then The verification harness detects qni-cli definition differences
 
-## Scenario: qni-cli の追加マクロ定義が見つからない理由を示す
+## Scenario: Explain why qni-cli extra macro definitions cannot be found
 
-- Given 追加マクロ定義のない qni-cli ソースがある
-- When qni-cli の追加マクロ定義を読み取る
-- Then 読み取り失敗は対象ファイルを示す
+- Given qni-cli source has no extra macro definitions
+- When read the qni-cli extra macro definitions
+- Then Read failures identify the affected file

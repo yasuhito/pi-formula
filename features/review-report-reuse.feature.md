@@ -1,99 +1,99 @@
-# Feature: 現 HEAD の独立レビュー判定を再利用する
+# Feature: Reuse the independent review verdict for the current HEAD
 
-PR reviewer は、現 HEAD に対応する完了済みの独立レビュー判定を再利用できます。使えないレポートの理由を判別し、同じ HEAD の review worker を重ねて起動しないようにします。
+The PR reviewer can reuse a completed independent review verdict for the current HEAD. Identify why a report is unusable and avoid launching duplicate review workers for the same HEAD.
 
-## Scenario: 有効な独立レビューの解決は正常終了する
+## Scenario: Resolving a valid independent review succeeds
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 有効な独立レビューの解決は正常終了する
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then Resolving a valid independent review succeeds
 
-## Scenario: 有効な独立レビューのレポートは保持される
+## Scenario: The valid independent review report is retained
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 有効な独立レビューのレポートは保持される
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then The valid independent review report is retained
 
-## Scenario: 現HEADの有効なレポートは有効と判定される
+## Scenario: The valid report for the current HEAD is considered valid
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 現HEADの有効なレポートは有効と判定される
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then The valid report for the current HEAD is considered valid
 
-## Scenario: 有効な独立レビューではterminal作成を要求しない
+## Scenario: A valid independent review does not require terminal creation
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 有効な独立レビューではterminal作成を要求しない
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then A valid independent review does not require terminal creation
 
-## Scenario: 有効な独立レビューの次の段階は6.2である
+## Scenario: The next stage for a valid independent review is 6.2
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 有効な独立レビューの次の段階は6.2である
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then The next stage for a valid independent review is 6.2
 
-## Scenario Outline: 無効な独立レビューの解決は正常終了する
+## Scenario Outline: Resolving an invalid independent review succeeds
 
-- Given 現 HEAD のレポートが「<欠陥>」である
-- When レビュー判定フローを解決する
-- Then 無効な独立レビューの解決は正常終了する
+- Given the current HEAD report has defect "<defect>"
+- When resolve the review verdict flow
+- Then Resolving an invalid independent review succeeds
 
 ### Examples:
 
-  | 欠陥 |
+  | defect |
   | --- |
   | ファイルなし |
   | HEAD 不一致 |
   | VERDICT なし |
   | COMPLETE なし |
 
-## Scenario Outline: 無効な独立レビューのレポートは削除される
+## Scenario Outline: The invalid independent review report is deleted
 
-- Given 現 HEAD のレポートが「<欠陥>」である
-- When レビュー判定フローを解決する
-- Then 無効な独立レビューのレポートは削除される
+- Given the current HEAD report has defect "<defect>"
+- When resolve the review verdict flow
+- Then The invalid independent review report is deleted
 
 ### Examples:
 
-  | 欠陥 |
+  | defect |
   | --- |
   | ファイルなし |
   | HEAD 不一致 |
   | VERDICT なし |
   | COMPLETE なし |
 
-## Scenario Outline: 欠陥のあるレポートは無効と判定される
+## Scenario Outline: The defective report is considered invalid
 
-- Given 現 HEAD のレポートが「<欠陥>」である
-- When レビュー判定フローを解決する
-- Then 欠陥のあるレポートは無効と判定される
+- Given the current HEAD report has defect "<defect>"
+- When resolve the review verdict flow
+- Then The defective report is considered invalid
 
 ### Examples:
 
-  | 欠陥 |
+  | defect |
   | --- |
   | ファイルなし |
   | HEAD 不一致 |
   | VERDICT なし |
   | COMPLETE なし |
 
-## Scenario Outline: 無効な独立レビューではterminal作成を要求する
+## Scenario Outline: An invalid independent review requires terminal creation
 
-- Given 現 HEAD のレポートが「<欠陥>」である
-- When レビュー判定フローを解決する
-- Then 無効な独立レビューではterminal作成を要求する
+- Given the current HEAD report has defect "<defect>"
+- When resolve the review verdict flow
+- Then An invalid independent review requires terminal creation
 
 ### Examples:
 
-  | 欠陥 |
+  | defect |
   | --- |
   | ファイルなし |
   | HEAD 不一致 |
   | VERDICT なし |
   | COMPLETE なし |
 
-## Scenario: 再利用した PASS 判定も merge gate へ進める
+## Scenario: Allow reused PASS verdicts to proceed to the merge gate
 
-- Given 現 HEAD の有効な PASS レポートが残っている
-- When レビュー判定フローを解決する
-- Then 再利用した PASS 判定の行き先は 7.5 である
+- Given a valid PASS report for the current HEAD remains
+- When resolve the review verdict flow
+- Then The reused PASS verdict proceeds to 7.5

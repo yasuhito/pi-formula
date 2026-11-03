@@ -1,151 +1,151 @@
-# Feature: 公開 API で既成 PNG を端末へ描く
+# Feature: Render prebuilt PNGs to the terminal through the public API
 
-連携拡張は、Buffer またはファイルの既成 PNG を公開 API で端末へ描けます。画像転送と placeholder を対応させ、描画後に背景色や dim を残しません。
+Integration extensions can render prebuilt PNG Buffers or files to the terminal through the public API. Image transfers and placeholders correspond, and rendering leaves no background color or dim state behind.
 
-画像経路を使えない場合や、画像の形式・寸法・展開量が条件を満たさない場合は描画せず、拒否理由を返します。
+When the image path is unavailable or image format, dimensions, or decompressed size fail the requirements, return a rejection reason without rendering.
 
-## Scenario: 既成PNGの描画は成功する
+## Scenario: Rendering the prebuilt PNG succeeds
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの描画は成功する
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then Rendering the prebuilt PNG succeeds
 
-## Scenario: 既成PNGの描画成功時に拒否理由はない
+## Scenario: Successful prebuilt PNG rendering has no rejection reason
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの描画成功時に拒否理由はない
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then Successful prebuilt PNG rendering has no rejection reason
 
-## Scenario: 既成PNGの描画結果には画像転送が含まれる
+## Scenario: The prebuilt PNG render result contains an image transfer
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの描画結果には画像転送が含まれる
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG render result contains an image transfer
 
-## Scenario: 既成PNGの描画結果にはplaceholderが含まれる
+## Scenario: The prebuilt PNG render result contains placeholders
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの描画結果にはplaceholderが含まれる
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG render result contains placeholders
 
-## Scenario: 既成PNGの配置は8列以内に収まる
+## Scenario: The prebuilt PNG placement fits within 8 columns
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの配置は8列以内に収まる
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG placement fits within 8 columns
 
-## Scenario: 既成PNGの配置は1行以上を使う
+## Scenario: The prebuilt PNG placement uses at least one row
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの配置は1行以上を使う
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG placement uses at least one row
 
-## Scenario: 既成PNGの画像IDは危険域の3バイトを保持する
+## Scenario: The prebuilt PNG image ID preserves the 3 bytes in the unsafe range
 
-- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの画像IDは危険域の3バイトを保持する
+- Given a prebuilt PNG produces an image ID containing bytes in the unsafe range
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG image ID preserves the 3 bytes in the unsafe range
 
-## Scenario: placeholderの下線色はコロン形式で表現される
+## Scenario: Placeholder underline colors use colon syntax
 
-- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then placeholderの下線色はコロン形式で表現される
+- Given a prebuilt PNG produces an image ID containing bytes in the unsafe range
+- When render a prebuilt PNG Buffer through the public API
+- Then Placeholder underline colors use colon syntax
 
-## Scenario: placeholder出力後に背景色は残らない
+## Scenario: Background color does not remain after placeholder output
 
-- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
-- When Buffer の既成 PNG を公開 API で描く
-- And placeholder出力後のSGR状態を読み取る
-- Then placeholder出力後に背景色は残らない
+- Given a prebuilt PNG produces an image ID containing bytes in the unsafe range
+- When render a prebuilt PNG Buffer through the public API
+- And read the SGR state after placeholder output
+- Then Background color does not remain after placeholder output
 
-## Scenario: placeholder出力後にdimは残らない
+## Scenario: Dim does not remain after placeholder output
 
-- Given 危険域のバイトを含む画像 ID になる既成 PNG がある
-- When Buffer の既成 PNG を公開 API で描く
-- And placeholder出力後のSGR状態を読み取る
-- Then placeholder出力後にdimは残らない
+- Given a prebuilt PNG produces an image ID containing bytes in the unsafe range
+- When render a prebuilt PNG Buffer through the public API
+- And read the SGR state after placeholder output
+- Then Dim does not remain after placeholder output
 
-## Scenario: ファイルの既成PNGは描画される
+## Scenario: The prebuilt PNG file is rendered
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When ファイルの既成 PNG を公開 API で描く
-- Then ファイルの既成PNGは描画される
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG file through the public API
+- Then The prebuilt PNG file is rendered
 
-## Scenario: ファイルの既成PNGはPNG画像を転送する
+## Scenario: The prebuilt PNG file transfers a PNG image
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When ファイルの既成 PNG を公開 API で描く
-- Then ファイルの既成PNGはPNG画像を転送する
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG file through the public API
+- Then The prebuilt PNG file transfers a PNG image
 
-## Scenario: 画像を使えない端末では既成PNGを描画しない
+## Scenario: Do not render prebuilt PNGs in terminals without image support
 
-- Given テキスト経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 画像を使えない端末では既成PNGを描画しない
+- Given a test integration extension uses the text path
+- When render a prebuilt PNG Buffer through the public API
+- Then Do not render prebuilt PNGs in terminals without image support
 
-## Scenario: 既成PNGを描画しない理由は画像経路を使えないことである
+## Scenario: The prebuilt PNG is not rendered because the image path is unavailable
 
-- Given テキスト経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGを描画しない理由は画像経路を使えないことである
+- Given a test integration extension uses the text path
+- When render a prebuilt PNG Buffer through the public API
+- Then The prebuilt PNG is not rendered because the image path is unavailable
 
-## Scenario: テキスト経路での拒否では、拒否結果には描画状態と拒否理由だけがある
+## Scenario: A text path rejection contains only render status and rejection reason
 
-- Given テキスト経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 拒否結果には描画状態と拒否理由だけがある
+- Given a test integration extension uses the text path
+- When render a prebuilt PNG Buffer through the public API
+- Then The rejection result contains only render status and rejection reason
 
-## Scenario: 寸法の安全上限を超える PNG では、安全上限を超えた既成PNGは描画しない
+## Scenario: A PNG exceeding dimension safety limits is not rendered
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 安全上限を超える既成 PNG を公開 API で描く
-- Then 安全上限を超えた既成PNGは描画しない
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding safety limits through the public API
+- Then A prebuilt PNG exceeding safety limits is not rendered
 
-## Scenario: 寸法の安全上限を超える PNG では、既成PNGの拒否理由は安全上限である
+## Scenario: The rejection reason for a PNG exceeding dimension safety limits is the safety limit
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 安全上限を超える既成 PNG を公開 API で描く
-- Then 既成PNGの拒否理由は安全上限である
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding safety limits through the public API
+- Then The prebuilt PNG rejection reason is the safety limit
 
-## Scenario: 寸法の安全上限を超える PNG では、拒否結果には描画状態と拒否理由だけがある
+## Scenario: A PNG dimension safety limit rejection contains only render status and rejection reason
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 安全上限を超える既成 PNG を公開 API で描く
-- Then 拒否結果には描画状態と拒否理由だけがある
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding safety limits through the public API
+- Then The rejection result contains only render status and rejection reason
 
-## Scenario: 不正な既成PNGは描画しない
+## Scenario: An invalid prebuilt PNG is not rendered
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 途中で切れた既成 PNG を公開 API で描く
-- Then 不正な既成PNGは描画しない
+- Given a test integration extension uses the image path
+- When render a truncated prebuilt PNG through the public API
+- Then An invalid prebuilt PNG is not rendered
 
-## Scenario: 既成PNGの拒否理由はPNG形式の不正である
+## Scenario: The prebuilt PNG rejection reason is invalid PNG format
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 途中で切れた既成 PNG を公開 API で描く
-- Then 既成PNGの拒否理由はPNG形式の不正である
+- Given a test integration extension uses the image path
+- When render a truncated prebuilt PNG through the public API
+- Then The prebuilt PNG rejection reason is invalid PNG format
 
-## Scenario: 途中で切れた PNG の拒否では、拒否結果には描画状態と拒否理由だけがある
+## Scenario: A truncated PNG rejection contains only render status and rejection reason
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 途中で切れた既成 PNG を公開 API で描く
-- Then 拒否結果には描画状態と拒否理由だけがある
+- Given a test integration extension uses the image path
+- When render a truncated prebuilt PNG through the public API
+- Then The rejection result contains only render status and rejection reason
 
-## Scenario: 展開上限を超える PNG では、安全上限を超えた既成PNGは描画しない
+## Scenario: A PNG exceeding decompression limits is not rendered
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 展開上限を超える既成 PNG を公開 API で描く
-- Then 安全上限を超えた既成PNGは描画しない
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding decompression limits through the public API
+- Then A prebuilt PNG exceeding safety limits is not rendered
 
-## Scenario: 展開上限を超える PNG では、既成PNGの拒否理由は安全上限である
+## Scenario: The rejection reason for a PNG exceeding decompression limits is the safety limit
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 展開上限を超える既成 PNG を公開 API で描く
-- Then 既成PNGの拒否理由は安全上限である
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding decompression limits through the public API
+- Then The prebuilt PNG rejection reason is the safety limit
 
-## Scenario: 展開上限を超える PNG では、拒否結果には描画状態と拒否理由だけがある
+## Scenario: A PNG decompression limit rejection contains only render status and rejection reason
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 展開上限を超える既成 PNG を公開 API で描く
-- Then 拒否結果には描画状態と拒否理由だけがある
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG exceeding decompression limits through the public API
+- Then The rejection result contains only render status and rejection reason

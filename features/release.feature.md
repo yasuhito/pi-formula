@@ -1,155 +1,155 @@
-# Feature: 承認付きで pi-formula を公開する
+# Feature: Publish pi-formula with approval
 
-保守者は秘密情報を残さず、版と配布物を確認してから pi-formula を公開します。公開の各段階で承認と検査結果を確認し、失敗した手順は進めません。
+Maintainers publish pi-formula after checking the version and distribution files without leaving secrets behind. Each publishing stage checks approval and verification results and does not proceed after a failed step.
 
-公開物が承認済みの GitHub リリースに由来することを、リリースノートと provenance から確認できます。
+Release notes and provenance verify that the published artifact originates from an approved GitHub release.
 
-## Scenario: 版が異なるタグの公開準備は終了コード1を返す
+## Scenario: Release preparation for a mismatched version tag returns exit code 1
 
-- Given package.json と異なる版の公開タグがある
-- When 公開準備を実行する
-- Then 版が異なるタグの公開準備は終了コード1を返す
+- Given a release tag differs from the package.json version
+- When run release preparation
+- Then Release preparation for a mismatched version tag returns exit code 1
 
-## Scenario: 公開準備はpackageの版とタグの不一致を表示する
+## Scenario: Release preparation reports a package version and tag mismatch
 
-- Given package.json と異なる版の公開タグがある
-- When 公開準備を実行する
-- Then 公開準備はpackageの版とタグの不一致を表示する
+- Given a release tag differs from the package.json version
+- When run release preparation
+- Then Release preparation reports a package version and tag mismatch
 
-## Scenario: 版が異なるタグの公開準備では配布ファイルを作らない
+## Scenario: Release preparation for a mismatched version tag creates no distribution files
 
-- Given package.json と異なる版の公開タグがある
-- When 公開準備を実行する
-- Then 版が異なるタグの公開準備では配布ファイルを作らない
+- Given a release tag differs from the package.json version
+- When run release preparation
+- Then Release preparation for a mismatched version tag creates no distribution files
 
-## Scenario: 版が一致する公開準備は正常終了する
+## Scenario: Release preparation with matching versions succeeds
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then 版が一致する公開準備は正常終了する
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then Release preparation with matching versions succeeds
 
-## Scenario: 公開準備コマンドは全チェックを通してから配布物を作る
+## Scenario: The release preparation command passes all checks before creating distribution files
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then 公開準備コマンドは全チェックを通してから配布物を作る
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then The release preparation command passes all checks before creating distribution files
 
-## Scenario: 公開準備では同じ版のtarballとリリースノートが用意される
+## Scenario: Release preparation produces a tarball and release notes for the same version
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then 公開準備では同じ版のtarballとリリースノートが用意される
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then Release preparation produces a tarball and release notes for the same version
 
-## Scenario: 公開workflowは公開準備コマンドを使う
+## Scenario: The publish workflow uses the release preparation command
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then 公開workflowは公開準備コマンドを使う
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then The publish workflow uses the release preparation command
 
-## Scenario: 公開workflowは版のタグpushで起動する
+## Scenario: The publish workflow starts on version tag pushes
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then 公開workflowは版のタグpushで起動する
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The publish workflow starts on version tag pushes
 
-## Scenario: 公開workflowは承認用のnpm環境を使う
+## Scenario: The publish workflow uses the npm environment for approval
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then 公開workflowは承認用のnpm環境を使う
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The publish workflow uses the npm environment for approval
 
-## Scenario: npm環境で許可する操作はnpm publishと案内される
+## Scenario: The npm environment documents npm publish as the permitted operation
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then npm環境で許可する操作はnpm publishと案内される
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The npm environment documents npm publish as the permitted operation
 
-## Scenario: 公開workflowにはOIDCのtoken発行権限がある
+## Scenario: The publish workflow has permission to issue OIDC tokens
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then 公開workflowにはOIDCのtoken発行権限がある
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The publish workflow has permission to issue OIDC tokens
 
-## Scenario: npm公開では由来証明を付ける
+## Scenario: The npm publish includes provenance
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then npm公開では由来証明を付ける
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The npm publish includes provenance
 
-## Scenario: 公開workflowにはnpm tokenを設定しない
+## Scenario: The publish workflow does not configure an npm token
 
-- Given npm 公開用の GitHub Actions がある
-- When 公開ジョブの権限と環境を調べる
-- Then 公開workflowにはnpm tokenを設定しない
+- Given GitHub Actions for npm publishing exist
+- When inspect publish job permissions and environment
+- Then The publish workflow does not configure an npm token
 
-## Scenario: リリースノートは同じ版のCHANGELOGの本文と一致する
+## Scenario: The release notes match the CHANGELOG body for the same version
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then リリースノートは同じ版のCHANGELOGの本文と一致する
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then The release notes match the CHANGELOG body for the same version
 
-## Scenario: Releaseの題名にはpackageの版が含まれる
+## Scenario: The Release title contains the package version
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then Releaseの題名にはpackageの版が含まれる
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then The Release title contains the package version
 
-## Scenario: Releaseの本文には同じ版のリリースノートを使う
+## Scenario: The Release body uses release notes for the same version
 
-- Given package.json と同じ版の公開タグがある
-- When 公開準備を実行する
-- Then Releaseの本文には同じ版のリリースノートを使う
+- Given a release tag matches the package.json version
+- When run release preparation
+- Then The Release body uses release notes for the same version
 
-## Scenario: 似た版の CHANGELOG 見出しを現在の版として扱わない
+## Scenario: Do not treat a similar CHANGELOG version heading as the current version
 
-- Given CHANGELOG に現在の版から始まる別の版だけがある
-- When 現在の版の Release 本文を取り出す
-- Then 現在の版の Release 本文は見つからない
+- Given the CHANGELOG contains only another version starting with the current version
+- When extract the Release body for the current version
+- Then No Release body is found for the current version
 
-## Scenario: 複数行の CHANGELOG 箇条書きを保持する
+## Scenario: Preserve multiline CHANGELOG bullets
 
-- Given CHANGELOG に継続行を持つ箇条書きと次の箇条書きがある
-- When その版の Release 本文を取り出す
-- Then 継続行と次の箇条書きが同じ順で保持される
+- Given the CHANGELOG contains a bullet with continuation lines followed by another bullet
+- When extract the Release body for that version
+- Then Continuation lines and the following bullet retain their order
 
-## Scenario: 空の CHANGELOG 箇条書きを拒否する
+## Scenario: Reject empty CHANGELOG bullets
 
-- Given CHANGELOG の版に空の箇条書きしかない
-- When その版の Release 本文を取り出す
-- Then Release 本文は見つからない
+- Given a CHANGELOG version contains only empty bullets
+- When extract the Release body for that version
+- Then No Release body is found
 
-## Scenario: 公開後にnpmの版を確認する手順がある
+## Scenario: A procedure verifies the npm version after publishing
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 公開後にnpmの版を確認する手順がある
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then A procedure verifies the npm version after publishing
 
-## Scenario: 公開後に遠隔タグを確認する手順がある
+## Scenario: A procedure verifies the remote tag after publishing
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 公開後に遠隔タグを確認する手順がある
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then A procedure verifies the remote tag after publishing
 
-## Scenario: 公開後にGitHub Releaseを確認する手順がある
+## Scenario: A procedure verifies the GitHub Release after publishing
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 公開後にGitHub Releaseを確認する手順がある
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then A procedure verifies the GitHub Release after publishing
 
-## Scenario: 公開後に由来証明を確認する手順がある
+## Scenario: A procedure verifies provenance after publishing
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 公開後に由来証明を確認する手順がある
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then A procedure verifies provenance after publishing
 
-## Scenario: 外部条件が不足した公開は再試行しないと案内される
+## Scenario: Publishing with missing external prerequisites is documented as not retryable
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 外部条件が不足した公開は再試行しないと案内される
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then Publishing with missing external prerequisites is documented as not retryable
 
-## Scenario: 公開条件の不足を報告する手順がある
+## Scenario: A procedure reports missing publishing prerequisites
 
-- Given 継続公開の運用手順がある
-- When 公開後と公開失敗時の手順を調べる
-- Then 公開条件の不足を報告する手順がある
+- Given ongoing publishing procedures exist
+- When inspect post-publish and publish failure procedures
+- Then A procedure reports missing publishing prerequisites

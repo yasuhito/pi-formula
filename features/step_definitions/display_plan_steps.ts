@@ -48,7 +48,7 @@ function runPlanBoundary(
 }
 
 Given(
-  "組版できる式と組版できない式を含むコーパスがある",
+  "a corpus contains formulas that can and cannot be typeset",
   function (this: StepWorld) {
     createPlanCorpus(
       this,
@@ -58,15 +58,18 @@ Given(
   },
 );
 
-Given("組版できない表示数式だけのコーパスがある", function (this: StepWorld) {
-  createPlanCorpus(
-    this,
-    "all-typesetting-failures.md",
-    "$$\\undefinedcommandhere$$",
-  );
-});
+Given(
+  "a corpus contains only display math that cannot be typeset",
+  function (this: StepWorld) {
+    createPlanCorpus(
+      this,
+      "all-typesetting-failures.md",
+      "$$\\undefinedcommandhere$$",
+    );
+  },
+);
 
-Given("読み取れないコーパスのパスがある", function (this: StepWorld) {
+Given("an unreadable corpus path exists", function (this: StepWorld) {
   this.directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-cucumber-plan-"),
   );
@@ -74,14 +77,14 @@ Given("読み取れないコーパスのパスがある", function (this: StepWo
 });
 
 Given(
-  "100 列へのリフローで折り返しが増えるコーパスがある",
+  "a corpus wraps onto more lines when reflowed to 100 columns",
   function (this: StepWorld) {
     createPlanCorpus(this, "reflow.md", `${"あ".repeat(6_000)}\n\n$$x$$`);
   },
 );
 
 Given(
-  "100 列へのリフロー後だけ上限を超えるコーパスがある",
+  "a corpus exceeds the limit only after reflow to 100 columns",
   function (this: StepWorld) {
     createPlanCorpus(
       this,
@@ -92,7 +95,7 @@ Given(
 );
 
 Given(
-  "全角文字と空白を含む Markdown 表のコーパスがある",
+  "a corpus contains a Markdown table with full-width characters and spaces",
   function (this: StepWorld) {
     const rows = ["| A | B |", "|---|---|"];
     for (let row = 0; row < 30; row += 1) {
@@ -102,14 +105,17 @@ Given(
   },
 );
 
-Given("100 列では読めない縮尺になる表示数式がある", function (this: StepWorld) {
-  const latex = Array.from({ length: 30 }, (_, index) => `x_${index}`).join(
-    "+",
-  );
-  createPlanCorpus(this, "scaled.md", `$$${latex}$$`);
-});
+Given(
+  "display math becomes unreadably scaled at 100 columns",
+  function (this: StepWorld) {
+    const latex = Array.from({ length: 30 }, (_, index) => `x_${index}`).join(
+      "+",
+    );
+    createPlanCorpus(this, "scaled.md", `$$${latex}$$`);
+  },
+);
 
-Given("11 個の高い表示数式を含むコーパスがある", function (this: StepWorld) {
+Given("a corpus contains 11 tall display formulas", function (this: StepWorld) {
   const tallFormula = String.raw`$$\begin{matrix}x\\x\\x\\x\\x\\x\\x\\x\\x\\x\end{matrix}$$`;
   createPlanCorpus(
     this,
@@ -119,7 +125,7 @@ Given("11 個の高い表示数式を含むコーパスがある", function (thi
 });
 
 Given(
-  "文字数上限を超える表示数式を含む収容可能なコーパスがある",
+  "a corpus that fits contains display math exceeding the character limit",
   function (this: StepWorld) {
     const { corpus, expectedPlan } = longFormulaPlanFixture();
     this.expectedLongFormulaPlan = expectedPlan;
@@ -127,20 +133,26 @@ Given(
   },
 );
 
-When("実表示検証の表示計画境界を実行する", function (this: StepWorld) {
-  runPlanBoundary(this, "verify-display-plan.js");
-});
+When(
+  "run the real display verification display plan boundary",
+  function (this: StepWorld) {
+    runPlanBoundary(this, "verify-display-plan.js");
+  },
+);
 
-When("表示数式の画像行数を含む出力高を計画する", function (this: StepWorld) {
-  runPlanBoundary(this, "plan-display.js");
-});
+When(
+  "plan output height including display math image rows",
+  function (this: StepWorld) {
+    runPlanBoundary(this, "plan-display.js");
+  },
+);
 
-When("テキスト経路の表示計画境界を実行する", function (this: StepWorld) {
+When("run the text path display plan boundary", function (this: StepWorld) {
   runPlanBoundary(this, "verify-display-plan.js", "--path", "text");
 });
 
 When(
-  "100 列とテキスト経路の表示計画境界を実行する",
+  "run the display plan boundary at 100 columns through the text path",
   function (this: StepWorld) {
     runPlanBoundary(
       this,
@@ -153,68 +165,92 @@ When(
   },
 );
 
-When("100 列と画像経路の表示計画境界を実行する", function (this: StepWorld) {
-  runPlanBoundary(this, "verify-display-plan.js", "--reflow", "100");
-});
-
-Then("100列へのテキスト表示計画は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.planResult.status, 0);
-});
-
-Then("100列へのリフローを含む計画高は8856pxである", function (this: StepWorld) {
-  const plan = JSON.parse(this.planResult.stdout);
-  assert.deepEqual(plan.height, 8856);
-});
-
-Then("リフロー前の計画幅は1920pxである", function (this: StepWorld) {
-  const plan = JSON.parse(this.planResult.stdout);
-  assert.deepEqual(plan.initialWidth, 1920);
-});
-
-Then("100列へのリフロー後の計画幅は816pxである", function (this: StepWorld) {
-  const plan = JSON.parse(this.planResult.stdout);
-  assert.deepEqual(plan.reflowWidth, 816);
-});
-
-Then(
-  "リフロー後に収まらない表示計画は終了コード2を返す",
+When(
+  "run the display plan boundary at 100 columns through the image path",
   function (this: StepWorld) {
-    assert.deepEqual(this.planResult.status, 2);
+    runPlanBoundary(this, "verify-display-plan.js", "--reflow", "100");
   },
 );
 
-Then("高さ超過の診断にテキスト経路が示される", function (this: StepWorld) {
-  assert.deepEqual(/テキスト経路/u.test(this.planResult.stderr), true);
-});
-
-Then("高さ超過の診断に100列へのリフローが示される", function (this: StepWorld) {
-  assert.deepEqual(/100列へのリフロー後/u.test(this.planResult.stderr), true);
-});
-
-Then("高さ超過の診断に必要な高さ16056pxが示される", function (this: StepWorld) {
-  assert.deepEqual(/16056px/u.test(this.planResult.stderr), true);
-});
-
-Then("表示計画は Markdown 表の折り返しを含む", function (this: StepWorld) {
-  assert.equal(JSON.parse(this.planResult.stdout).height, 9000);
-});
-
 Then(
-  "読めない縮尺の数式を含む表示計画は正常終了する",
+  "The text display plan at 100 columns succeeds",
   function (this: StepWorld) {
     assert.deepEqual(this.planResult.status, 0);
   },
 );
 
 Then(
-  "読めない縮尺の数式が組版失敗1件として計画される",
+  "The planned height including reflow to 100 columns is 8856px",
+  function (this: StepWorld) {
+    const plan = JSON.parse(this.planResult.stdout);
+    assert.deepEqual(plan.height, 8856);
+  },
+);
+
+Then("The planned width before reflow is 1920px", function (this: StepWorld) {
+  const plan = JSON.parse(this.planResult.stdout);
+  assert.deepEqual(plan.initialWidth, 1920);
+});
+
+Then(
+  "The planned width after reflow to 100 columns is 816px",
+  function (this: StepWorld) {
+    const plan = JSON.parse(this.planResult.stdout);
+    assert.deepEqual(plan.reflowWidth, 816);
+  },
+);
+
+Then(
+  "A display plan that does not fit after reflow returns exit code 2",
+  function (this: StepWorld) {
+    assert.deepEqual(this.planResult.status, 2);
+  },
+);
+
+Then(
+  "Height overflow diagnostics show the text path",
+  function (this: StepWorld) {
+    assert.deepEqual(/テキスト経路/u.test(this.planResult.stderr), true);
+  },
+);
+
+Then(
+  "Height overflow diagnostics show reflow to 100 columns",
+  function (this: StepWorld) {
+    assert.deepEqual(/100列へのリフロー後/u.test(this.planResult.stderr), true);
+  },
+);
+
+Then(
+  "Height overflow diagnostics show the required height of 16056px",
+  function (this: StepWorld) {
+    assert.deepEqual(/16056px/u.test(this.planResult.stderr), true);
+  },
+);
+
+Then(
+  "The display plan includes Markdown table wrapping",
+  function (this: StepWorld) {
+    assert.equal(JSON.parse(this.planResult.stdout).height, 9000);
+  },
+);
+
+Then(
+  "The display plan containing unreadably scaled math succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.planResult.status, 0);
+  },
+);
+
+Then(
+  "Unreadably scaled math is planned as one typesetting failure",
   function (this: StepWorld) {
     assert.deepEqual(JSON.parse(this.planResult.stdout).failedFormulas, 1);
   },
 );
 
 Then(
-  "読めない縮尺の数式の組版失敗1件が診断に示される",
+  "Diagnostics show one typesetting failure for unreadably scaled math",
   function (this: StepWorld) {
     assert.deepEqual(
       /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
@@ -224,61 +260,79 @@ Then(
 );
 
 Then(
-  "画像転送行で高さを超えた表示計画は終了コード2を返す",
+  "A display plan exceeding the height limit due to image transfer rows returns exit code 2",
   function (this: StepWorld) {
     assert.deepEqual(this.planResult.status, 2);
   },
 );
 
-Then("転送行の高さ超過の診断に画像経路が示される", function (this: StepWorld) {
-  assert.deepEqual(/画像経路/u.test(this.planResult.stderr), true);
-});
+Then(
+  "Transfer row height overflow diagnostics show the image path",
+  function (this: StepWorld) {
+    assert.deepEqual(/画像経路/u.test(this.planResult.stderr), true);
+  },
+);
 
 Then(
-  "転送行の高さ超過の診断に16000px上限が示される",
+  "Transfer row height overflow diagnostics show the 16000px limit",
   function (this: StepWorld) {
     assert.deepEqual(/16000px/u.test(this.planResult.stderr), true);
   },
 );
 
-Then("テキスト経路の表示計画は正常終了する", function (this: StepWorld) {
+Then("The text path display plan succeeds", function (this: StepWorld) {
   assert.deepEqual(this.planResult.status, 0);
 });
 
-Then("テキスト経路の表示計画に画像行は含まれない", function (this: StepWorld) {
-  const plan = JSON.parse(this.planResult.stdout);
-  assert.deepEqual(plan.imageRows, 0);
-});
+Then(
+  "The text path display plan contains no image rows",
+  function (this: StepWorld) {
+    const plan = JSON.parse(this.planResult.stdout);
+    assert.deepEqual(plan.imageRows, 0);
+  },
+);
 
 Then(
-  "テキスト経路の表示計画に画像組版失敗は含まれない",
+  "The text path display plan contains no image typesetting failures",
   function (this: StepWorld) {
     const plan = JSON.parse(this.planResult.stdout);
     assert.deepEqual(plan.failedFormulas, 0);
   },
 );
 
-Then("組版失敗を含む検証用表示計画は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.planResult.status, 0);
-});
-
-Then("検証用表示計画は組版失敗を1件数える", function (this: StepWorld) {
-  assert.deepEqual(JSON.parse(this.planResult.stdout).failedFormulas, 1);
-});
-
-Then("検証用表示計画の診断に組版失敗1件が示される", function (this: StepWorld) {
-  assert.deepEqual(
-    /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
-    true,
-  );
-});
-
-Then("画像行のない検証用表示計画は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.planResult.status, 0);
-});
+Then(
+  "The verification display plan with typesetting failures succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.planResult.status, 0);
+  },
+);
 
 Then(
-  "全数式の組版失敗後もテキスト用の表示計画が返る",
+  "The verification display plan counts one typesetting failure",
+  function (this: StepWorld) {
+    assert.deepEqual(JSON.parse(this.planResult.stdout).failedFormulas, 1);
+  },
+);
+
+Then(
+  "Verification display plan diagnostics show one typesetting failure",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+      true,
+    );
+  },
+);
+
+Then(
+  "The verification display plan without image rows succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.planResult.status, 0);
+  },
+);
+
+Then(
+  "A text display plan is returned even after all formulas fail typesetting",
   function (this: StepWorld) {
     assert.deepEqual(JSON.parse(this.planResult.stdout), {
       height: 8000,
@@ -291,55 +345,67 @@ Then(
   },
 );
 
-Then("全数式の組版失敗後も失敗1件が診断に示される", function (this: StepWorld) {
-  assert.deepEqual(
-    /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
-    true,
-  );
-});
+Then(
+  "Diagnostics show one failure even after all formulas fail typesetting",
+  function (this: StepWorld) {
+    assert.deepEqual(
+      /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+      true,
+    );
+  },
+);
 
 Then(
-  "読めないコーパスの表示計画は終了コード2を返す",
+  "The unreadable corpus display plan returns exit code 2",
   function (this: StepWorld) {
     assert.deepEqual(this.planResult.status, 2);
   },
 );
 
 Then(
-  "表示計画の診断に読めないコーパスのファイル名が示される",
+  "Display plan diagnostics show the unreadable corpus filename",
   function (this: StepWorld) {
     assert.deepEqual(/missing\.md/u.test(this.planResult.stderr), true);
   },
 );
 
-Then("読取失敗の診断に高さ超過は示されない", function (this: StepWorld) {
-  assert.deepEqual(/16000px/u.test(this.planResult.stderr), false);
-});
-
-Then("組版失敗を含む出力高の計画は正常終了する", function (this: StepWorld) {
-  assert.deepEqual(this.planResult.status, 0);
-});
-
-Then("組版失敗と残りの画像行を含む表示計画が返る", function (this: StepWorld) {
-  assert.deepEqual(JSON.parse(this.planResult.stdout), {
-    height: 8000,
-    initialWidth: 1920,
-    reflowWidth: null,
-    imageRows: 1,
-    displayFormulas: 2,
-    failedFormulas: 1,
-  });
-});
+Then(
+  "Read failure diagnostics do not show a height overflow",
+  function (this: StepWorld) {
+    assert.deepEqual(/16000px/u.test(this.planResult.stderr), false);
+  },
+);
 
 Then(
-  "入力文字数上限による失敗を含む表示計画は正常終了する",
+  "Output height planning with typesetting failures succeeds",
   function (this: StepWorld) {
     assert.deepEqual(this.planResult.status, 0);
   },
 );
 
 Then(
-  "長い数式をテキストとして一度だけ数えた表示計画が返る",
+  "A display plan containing typesetting failures and remaining image rows is returned",
+  function (this: StepWorld) {
+    assert.deepEqual(JSON.parse(this.planResult.stdout), {
+      height: 8000,
+      initialWidth: 1920,
+      reflowWidth: null,
+      imageRows: 1,
+      displayFormulas: 2,
+      failedFormulas: 1,
+    });
+  },
+);
+
+Then(
+  "The display plan containing an input character limit failure succeeds",
+  function (this: StepWorld) {
+    assert.deepEqual(this.planResult.status, 0);
+  },
+);
+
+Then(
+  "A display plan counting long math as text exactly once is returned",
   function (this: StepWorld) {
     assert.deepEqual(
       JSON.parse(this.planResult.stdout),
@@ -349,7 +415,7 @@ Then(
 );
 
 Given(
-  "16000px を超える高い表示数式を含む短いコーパスがある",
+  "a short corpus contains display math taller than 16000px",
   function (this: StepWorld) {
     createPlanCorpus(
       this,
@@ -360,16 +426,22 @@ Given(
 );
 
 Then(
-  "高い表示数式の計画は描画前に終了コード2を返す",
+  "The tall display math plan returns exit code 2 before rendering",
   function (this: StepWorld) {
     assert.deepEqual(this.planResult.status, 2);
   },
 );
 
-Then("高い表示数式の診断に16000px上限が示される", function (this: StepWorld) {
-  assert.deepEqual(/16000px/u.test(this.planResult.stderr), true);
-});
+Then(
+  "Tall display math diagnostics show the 16000px limit",
+  function (this: StepWorld) {
+    assert.deepEqual(/16000px/u.test(this.planResult.stderr), true);
+  },
+);
 
-Then("高い表示数式の診断に読取失敗は示されない", function (this: StepWorld) {
-  assert.deepEqual(/missing\.md/u.test(this.planResult.stderr), false);
-});
+Then(
+  "Tall display math diagnostics do not show a read failure",
+  function (this: StepWorld) {
+    assert.deepEqual(/missing\.md/u.test(this.planResult.stderr), false);
+  },
+);

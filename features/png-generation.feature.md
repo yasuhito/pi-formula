@@ -1,238 +1,238 @@
-# Feature: 公開 API で表示数式の PNG を作る
+# Feature: Create display math PNGs through the public API
 
-連携拡張は公開 API を使い、利用者マクロと追加マクロを含む表示数式から PNG を作れます。テーマと字形の違いに応じた画像を、同期的に返します。
+Integration extensions can create PNGs from display math containing user and extra macros through the public API. Images reflecting theme and glyph differences are returned synchronously.
 
-PNG の返り値は画像データと寸法です。返された Buffer を変更しても、同じ数式から作る次の画像や Markdown の画像は破損しません。
+The PNG result contains image data and dimensions. Mutating the returned Buffer does not corrupt subsequent images of the same formula or Markdown images.
 
-不正な入力やテキスト経路では、例外を出さずに PNG を返しません。
+Invalid input and the text path return no PNG without throwing.
 
-## Scenario: XDG 設定と環境変数から利用者マクロを読む
+## Scenario: Read user macros from XDG settings and environment variables
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | configured | x | なし |
 
-- And 環境変数の利用者マクロは次のとおりである
+- And the environment variable user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | temporary | y | なし |
 
-- And 画像経路の公開APIを使っている
-- When 両方の利用者マクロを使う PNG を公開 API で作る
-- Then XDG 設定と環境変数の利用者マクロが一緒に使える
+- And the image path public API is in use
+- When create a PNG using both user macros through the public API
+- Then User macros from XDG settings and environment variables can be used together
 
-## Scenario: 環境変数の利用者マクロを優先する
+## Scenario: Prefer environment variable user macros
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | chosen | y | なし |
 
-- And 環境変数の利用者マクロは次のとおりである
+- And the environment variable user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | chosen | x | なし |
 
-- And 画像経路の公開APIを使っている
-- When 同名の利用者マクロを使う PNG を公開 API で作る
-- And 比較用の数式 "x" のPNGを公開APIで作る
-- Then 環境変数の利用者マクロで PNG が作られる
+- And the image path public API is in use
+- When create a PNG using the user macro of the same name through the public API
+- And create a PNG of the reference formula "x" through the public API
+- Then A PNG is created with the environment variable user macro
 
-## Scenario: 空文字列の利用者マクロを使う
+## Scenario: Use an empty-string user macro
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | empty |  | なし |
 
-- And 画像経路の公開APIを使っている
-- When 空文字列の利用者マクロを使う PNG を公開 API で作る
-- And 比較用の数式 "x" のPNGを公開APIで作る
-- Then 空文字列の利用者マクロが使える
+- And the image path public API is in use
+- When create a PNG using an empty-string user macro through the public API
+- And create a PNG of the reference formula "x" through the public API
+- Then An empty-string user macro can be used
 
-## Scenario: 空文字列の追加マクロを使う
+## Scenario: Use an empty-string extra macro
 
-- Given 空文字列の追加マクロがある
-- When 空文字列の追加マクロを使う PNG を公開 API で作る
-- And 比較用の数式 "x" のPNGを公開APIで作る
-- Then 空文字列の追加マクロが使える
+- Given an empty-string extra macro exists
+- When create a PNG using an empty-string extra macro through the public API
+- And create a PNG of the reference formula "x" through the public API
+- Then An empty-string extra macro can be used
 
-## Scenario: エスケープしたハッシュ記号を利用者マクロで使う
+## Scenario: Use an escaped hash sign in a user macro
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | hash | \\# | なし |
 
-- And 画像経路の公開APIを使っている
-- When その利用者マクロを使う PNG を公開 API で作る
-- Then ハッシュ記号の PNG が作られる
+- And the image path public API is in use
+- When create a PNG using that user macro through the public API
+- Then A PNG of the hash sign is created
 
-## Scenario: 正しい利用者マクロでPNGが作られる
+## Scenario: A valid user macro produces a PNG
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | usable | x | なし |
   | broken | #2 | 1 |
 
-- And 画像経路の公開APIを使っている
-- When 正しい利用者マクロからPNGを作る
-- And 壊れた利用者マクロからPNGを作る
-- Then 正しい利用者マクロでPNGが作られる
+- And the image path public API is in use
+- When create a PNG from a valid user macro
+- And create a PNG from an invalid user macro
+- Then A valid user macro produces a PNG
 
-## Scenario: 壊れた利用者マクロではPNGを返さない
+## Scenario: An invalid user macro returns no PNG
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | usable | x | なし |
   | broken | #2 | 1 |
 
-- And 画像経路の公開APIを使っている
-- When 正しい利用者マクロからPNGを作る
-- And 壊れた利用者マクロからPNGを作る
-- Then 壊れた利用者マクロではPNGを返さない
+- And the image path public API is in use
+- When create a PNG from a valid user macro
+- And create a PNG from an invalid user macro
+- Then An invalid user macro returns no PNG
 
-## Scenario: 壊れた環境変数の定義では XDG 定義を上書きしない
+## Scenario: Invalid environment variable definitions do not override XDG definitions
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | chosen | x | なし |
 
-- And 環境変数の利用者マクロは次のとおりである
+- And the environment variable user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | chosen | #2 | 1 |
 
-- And 画像経路の公開APIを使っている
-- When 同名の利用者マクロを使う PNG を公開 API で作る
-- And 比較用の数式 "x" のPNGを公開APIで作る
-- Then 正しい XDG 定義で PNG が作られる
+- And the image path public API is in use
+- When create a PNG using the user macro of the same name through the public API
+- And create a PNG of the reference formula "x" through the public API
+- Then A PNG is created with valid XDG definitions
 
-## Scenario: JSON 全体が壊れた設定元だけを無効にする
+## Scenario: Disable only the configuration source whose entire JSON is invalid
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | configured | x | なし |
 
-- And 環境変数のマクロ設定は壊れたJSONである
-- And 画像経路の公開APIを使っている
-- When XDG 設定の利用者マクロを使う PNG を公開 API で作る
-- Then 壊れた環境変数に関係なく XDG 設定の利用者マクロが使える
+- And the environment variable macro setting is invalid JSON
+- And the image path public API is in use
+- When create a PNG using the XDG user macro through the public API
+- Then XDG user macros remain available despite an invalid environment variable
 
-## Scenario: 追加マクロを利用者設定から保護する
+## Scenario: Protect extra macros from user settings
 
-- Given XDG設定の利用者マクロは次のとおりである
+- Given the XDG user macros are as follows
 
-  | 名前 | 置換 | 引数 |
+  | name | replacement | arity |
   | ---- | ---- | ---- |
   | trial | wrong | なし |
 
-- And 画像経路を使う試験用の連携拡張がある
-- When 連携拡張の追加マクロを使う PNG を公開 API で作る
-- And 比較用の数式のPNGを公開APIで作る
+- And a test integration extension uses the image path
+- When create a PNG using integration extension extra macros through the public API
+- And create a PNG of the reference formula through the public API
 
   ```text
   \left|x\right\rangle
   ```
-- Then 利用者設定では追加マクロを上書きできない
+- Then User settings cannot override extra macros
 
-## Scenario: Object prototype と同名の追加マクロを登録する
+## Scenario: register an extra macro named after an Object prototype member
 
-- Given Object prototype と同名の追加マクロがある
-- When その追加マクロを使う PNG を公開 API で作る
-- And 比較用の数式 "x" のPNGを公開APIで作る
-- Then Object prototype と同名の追加マクロが使える
+- Given an extra macro has the same name as an Object prototype member
+- When create a PNG using that extra macro through the public API
+- And create a PNG of the reference formula "x" through the public API
+- Then An extra macro named after an Object prototype member can be used
 
-## Scenario: 既存の公開 API と画像描画 API を公開する
+## Scenario: Expose the existing public API and image rendering API
 
-- Given pi-formula の CommonJS 公開 API がある
-- When 公開された名前を調べる
-- Then 既存の公開 API と画像経路向け API が公開される
+- Given the pi-formula CommonJS public API exists
+- When inspect the exported names
+- Then The existing public API and image path API are exported
 
-## Scenario Outline: 公開 API の不正な LaTeX 入力を安全に拒否する
+## Scenario Outline: Safely reject invalid LaTeX input to the public API
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 公開APIへ <入力> のLaTeX入力を渡す
-- Then 公開 API は例外を出さず画像を返さない
+- Given a test integration extension uses the image path
+- When pass <input> LaTeX input to the public API
+- Then The public API returns no image without throwing
 
 ### Examples:
 
-  | 入力 |
+  | input |
   | --- |
   | null |
   | object |
 
-## Scenario: 公開PNGの返り値には画像データと寸法だけが含まれる
+## Scenario: The public PNG result contains only image data and dimensions
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 連携拡張が公開 API で PNG を作る
-- Then 公開PNGの返り値には画像データと寸法だけが含まれる
+- Given a test integration extension uses the image path
+- When The integration extension creates a PNG through the public API
+- Then The public PNG result contains only image data and dimensions
 
-## Scenario: 公開PNGのデータはPNG形式である
+## Scenario: The public PNG data is in PNG format
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 連携拡張が公開 API で PNG を作る
-- Then 公開PNGのデータはPNG形式である
+- Given a test integration extension uses the image path
+- When The integration extension creates a PNG through the public API
+- Then The public PNG data is in PNG format
 
-## Scenario: 公開PNGの幅は正数である
+## Scenario: The public PNG width is positive
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 連携拡張が公開 API で PNG を作る
-- Then 公開PNGの幅は正数である
+- Given a test integration extension uses the image path
+- When The integration extension creates a PNG through the public API
+- Then The public PNG width is positive
 
-## Scenario: 公開PNGの高さは正数である
+## Scenario: The public PNG height is positive
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 連携拡張が公開 API で PNG を作る
-- Then 公開PNGの高さは正数である
+- Given a test integration extension uses the image path
+- When The integration extension creates a PNG through the public API
+- Then The public PNG height is positive
 
-## Scenario: 変更されたBufferから次の公開PNGへ破損が伝わらない
+## Scenario: A mutated Buffer does not corrupt the next public PNG
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 変更前の公開PNGを作る
-- And 返された公開PNGのBufferを書き換える
-- And 同じ数式の公開PNGをもう一度作る
-- And 同じ数式をMarkdownの表示数式として描く
-- Then 変更されたBufferから次の公開PNGへ破損が伝わらない
+- Given a test integration extension uses the image path
+- When create a public PNG before mutation
+- And mutate the returned public PNG Buffer
+- And create another public PNG of the same formula
+- And render the same formula as Markdown display math
+- Then A mutated Buffer does not corrupt the next public PNG
 
-## Scenario: 変更されたBufferからMarkdownの画像へ破損が伝わらない
+## Scenario: A mutated Buffer does not corrupt the Markdown image
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 変更前の公開PNGを作る
-- And 返された公開PNGのBufferを書き換える
-- And 同じ数式の公開PNGをもう一度作る
-- And 同じ数式をMarkdownの表示数式として描く
-- Then 変更されたBufferからMarkdownの画像へ破損が伝わらない
+- Given a test integration extension uses the image path
+- When create a public PNG before mutation
+- And mutate the returned public PNG Buffer
+- And create another public PNG of the same formula
+- And render the same formula as Markdown display math
+- Then A mutated Buffer does not corrupt the Markdown image
 
-## Scenario: テーマ変更後は現在の文字色で PNG を作る
+## Scenario: Create PNGs with the current text color after a theme change
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When テーマ変更前の公開PNGを作る
-- And テーマの文字色をRGBの1・2・3へ変える
-- And テーマ変更後の同じ数式の公開PNGを作る
-- Then 変更後の文字色で新しい PNG が作られる
+- Given a test integration extension uses the image path
+- When create a public PNG before the theme change
+- And change the theme text color to RGB 1, 2, 3
+- And create a public PNG of the same formula after the theme change
+- Then A new PNG is created with the changed text color
 
-## Scenario Outline: 動的字形を含む表示数式を画像にする
+## Scenario Outline: Convert display math containing dynamic glyphs to an image
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When "<latex>" を含む表示数式の PNG を公開 API で作る
-- Then 動的字形を含む表示数式の PNG が返る
+- Given a test integration extension uses the image path
+- When create a PNG of display math containing "<latex>" through the public API
+- Then A PNG of display math containing dynamic glyphs is returned
 
 ### Examples:
 
@@ -245,11 +245,11 @@ PNG の返り値は画像データと寸法です。返された Buffer を変�
   | `\\mathsf{T}`   |
   | `\\mathtt{x}`   |
 
-## Scenario Outline: 既存の字形を含む表示数式を引き続き画像にする
+## Scenario Outline: Continue converting display math containing existing glyphs to images
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When "<latex>" を含む表示数式の PNG を公開 API で作る
-- Then 既存の字形を含む表示数式の PNG が返る
+- Given a test integration extension uses the image path
+- When create a PNG of display math containing "<latex>" through the public API
+- Then A PNG of display math containing existing glyphs is returned
 
 ### Examples:
 
@@ -259,14 +259,14 @@ PNG の返り値は画像データと寸法です。返された Buffer を変�
   | `\\mathrm{d}x`       |
   | `a^2 + b^2 = c^2`    |
 
-## Scenario: 表示数式の PNG を同期的に作る
+## Scenario: Create display math PNGs synchronously
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 動的字形を含む表示数式の PNG を公開 API で作る
-- Then 公開 API は同期的に PNG を返す
+- Given a test integration extension uses the image path
+- When create a PNG of display math containing dynamic glyphs through the public API
+- Then The public API returns a PNG synchronously
 
-## Scenario: テキスト経路では PNG を返さない
+## Scenario: The text path returns no PNG
 
-- Given テキスト経路を使う試験用の連携拡張がある
-- When 連携拡張が公開 API で PNG を作る
-- Then 公開 API は画像を返さない
+- Given a test integration extension uses the text path
+- When The integration extension creates a PNG through the public API
+- Then The public API returns no image

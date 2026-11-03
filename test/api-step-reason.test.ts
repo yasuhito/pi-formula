@@ -7,10 +7,10 @@ import test, { type TestContext } from "node:test";
 
 const root = resolve(__dirname, "..");
 const feature = `# Feature: PNG result observation
-## Scenario: 既成PNGの描画成功時に拒否理由はない
-- Given 画像経路を使う試験用の連携拡張がある
-- When Buffer の既成 PNG を公開 API で描く
-- Then 既成PNGの描画成功時に拒否理由はない
+## Scenario: Successful prebuilt PNG rendering has no rejection reason
+- Given a test integration extension uses the image path
+- When render a prebuilt PNG Buffer through the public API
+- Then Successful prebuilt PNG rendering has no rejection reason
 `;
 const mutation = `
 const Module = require("node:module");

@@ -1,28 +1,28 @@
-# Feature: 端末に合わせて表示経路を選ぶ
+# Feature: Select the display path for the terminal
 
-Formula for Piは、端末が画像表示に対応しているかどうかと、ユーザーの設定に応じて、数式を画像またはテキストで表示します。通常は自動判定を使い、必要に応じて手動で切り替えられます。
+Formula for Pi displays math as images or text according to terminal image support and user settings. Automatic detection is used by default, with manual switching available when needed.
 
-Piの非対話モードでは、端末の画像表示機能を問い合わせず、応答待ちを避けます。
+Pi noninteractive mode avoids querying terminal image capabilities and waiting for a response.
 
-このFeatureでは、数式表示方法の自動選択と手動切替について、期待する振る舞いを定義します。公開 API から現在の経路も確認できます。
+This feature defines automatic selection and manual switching of math display paths. The current path can also be queried through the public API.
 
-## Scenario: 現在の画像経路を問い合わせる
+## Scenario: Query the current image path
 
-- Given 画像経路を使う試験用の連携拡張がある
-- When 現在の表示経路を公開 API で問い合わせる
-- Then 現在の表示経路は画像経路である
+- Given a test integration extension uses the image path
+- When query the current display path through the public API
+- Then The current display path is the image path
 
-## Scenario: 現在のテキスト経路を問い合わせる
+## Scenario: Query the current text path
 
-- Given テキスト経路を使う試験用の連携拡張がある
-- When 現在の表示経路を公開 API で問い合わせる
-- Then 現在の表示経路はテキスト経路である
+- Given a test integration extension uses the text path
+- When query the current display path through the public API
+- Then The current display path is the text path
 
-## Scenario Outline: 端末のPNG画像表示への対応に応じて経路を選ぶ
+## Scenario Outline: Select a path based on terminal PNG display support
 
-- Given 端末 `<terminal>` でPiを使っている
-- When セッションを開始する
-- Then `<path>`経路が選ばれる
+- Given Pi is running in the `<terminal>` terminal
+- When start a session
+- Then The `<path>` path is selected
 
 ### Examples:
 
@@ -32,92 +32,92 @@ Piの非対話モードでは、端末の画像表示機能を問い合わせず
   | Kitty | 画像 |
   | Alacritty | テキスト |
 
-## Scenario: tmux の中では画像に対応した端末でもテキスト経路を選ぶ
+## Scenario: Select the text path inside tmux even when the terminal supports images
 
-- Given 端末でPiを使っている
-- And 端末はPNG画像を表示できると返答する
-- And 端末の種類は "xterm-kitty"
-- And tmuxの中でPiを使っている
-- When セッションを開始する
-- Then テキスト経路が選ばれる
+- Given Pi is running in a terminal
+- And the terminal responds that it can display PNG images
+- And the terminal type is "xterm-kitty"
+- And Pi is running inside tmux
+- When start a session
+- Then The text path is selected
 
-## Scenario: screen の端末種別では画像に対応した端末でもテキスト経路を選ぶ
+## Scenario: Select the text path for a screen terminal type even when the terminal supports images
 
-- Given 端末でPiを使っている
-- And 端末はPNG画像を表示できると返答する
-- And 端末の種類は "screen-256color"
-- When セッションを開始する
-- Then テキスト経路が選ばれる
+- Given Pi is running in a terminal
+- And the terminal responds that it can display PNG images
+- And the terminal type is "screen-256color"
+- When start a session
+- Then The text path is selected
 
-## Scenario: PNG画像表示を拒否した端末ではテキスト経路を選ぶ
+## Scenario: Select the text path when the terminal rejects PNG display
 
-- Given 端末でPiを使っている
-- And 端末の種類は "xterm-kitty"
-- And 端末はPNG画像表示の問い合わせにエラーを返す
-- When セッションを開始する
-- Then テキスト経路が選ばれる
+- Given Pi is running in a terminal
+- And the terminal type is "xterm-kitty"
+- And the terminal returns an error to the PNG display query
+- When start a session
+- Then The text path is selected
 
-## Scenario: PNG画像表示へ応答しない端末ではテキスト経路を選ぶ
+## Scenario: Select the text path when the terminal does not respond to the PNG display query
 
-- Given 端末でPiを使っている
-- And 端末の種類は "xterm-kitty"
-- And 端末はPNG画像表示の問い合わせに応答しない
-- When セッションを開始する
-- Then テキスト経路が選ばれる
+- Given Pi is running in a terminal
+- And the terminal type is "xterm-kitty"
+- And the terminal does not respond to the PNG display query
+- When start a session
+- Then The text path is selected
 
-## Scenario: 非対話モードではテキスト経路を選ぶ
+## Scenario: Select the text path in noninteractive mode
 
-- Given Piを非対話モード（RPC）で使っている
-- And 端末の種類は "xterm-kitty"
-- When セッションを開始する
-- Then テキスト経路が選ばれる
+- Given Pi is running in noninteractive RPC mode
+- And the terminal type is "xterm-kitty"
+- When start a session
+- Then The text path is selected
 
-## Scenario: image 指定で画像経路へ切り替える
+## Scenario: Switch to the image path with image
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And formula imageを実行する
-- Then 画像経路が選ばれる
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And run formula image
+- Then The image path is selected
 
-## Scenario: text 指定で画像経路からテキスト経路へ切り替える
+## Scenario: Switch from the image path to the text path with text
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And formula imageを実行する
-- And formula textを実行する
-- Then テキスト経路が選ばれる
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And run formula image
+- And run formula text
+- Then The text path is selected
 
-## Scenario: auto 指定でテキスト経路から端末の自動判定へ戻す
+## Scenario: Switch from the text path back to automatic terminal detection with auto
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And formula imageを実行する
-- And formula textを実行する
-- And formula autoを実行する
-- Then 画像経路が選ばれる
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And run formula image
+- And run formula text
+- And run formula auto
+- Then The image path is selected
 
-## Scenario: セッションの auto 指定で全体既定を上書きする
+## Scenario: Override the global default with a session auto selection
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路はテキスト経路である
-- When セッションを開始する
-- And formula autoを実行する
-- Then 画像経路が選ばれる
+- Given Pi is running in a terminal that can display PNG images
+- And the global default display path is the text path
+- When start a session
+- And run formula auto
+- Then The image path is selected
 
-## Scenario: auto 指定ではセッション開始時のPNG画像表示確認を選択理由にする
+## Scenario: Auto uses the PNG display check at session start as the selection reason
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路はテキスト経路である
-- When セッションを開始する
-- And formula autoを実行する
-- Then 選択理由はPNG画像表示の問い合わせの成功になる
+- Given Pi is running in a terminal that can display PNG images
+- And the global default display path is the text path
+- When start a session
+- And run formula auto
+- Then The selection reason is a successful PNG display query
 
-## Scenario: 非対話モードでは端末へ問い合わせを出さない
+## Scenario: No terminal query is sent in noninteractive mode
 
-- Given Piを非対話モード（RPC）で使っている
-- And 端末はPNG画像を表示できると返答する
-- When セッションを開始する
-- Then 端末の画像表示機能を問い合わせない
+- Given Pi is running in noninteractive RPC mode
+- And the terminal responds that it can display PNG images
+- When start a session
+- Then The terminal image display capability is not queried

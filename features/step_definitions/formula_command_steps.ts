@@ -55,7 +55,7 @@ async function statusLines(pi: StepWorld["pi"], started: StepWorld["started"]) {
 }
 
 Given(
-  "端末 `{word}` でPiを使っている",
+  "Pi is running in the `{word}` terminal",
   function (this: StepWorld, terminal: string) {
     const terminals = new Map([
       ["Ghostty", { pngQuery: "OK", multiplexer: undefined }],
@@ -74,7 +74,7 @@ Given(
   },
 );
 
-When("セッションを開始する", async function (this: StepWorld) {
+When("start a session", async function (this: StepWorld) {
   this.started = await withEnvironment(
     {
       TERM_PROGRAM: this.terminal,
@@ -85,21 +85,24 @@ When("セッションを開始する", async function (this: StepWorld) {
   );
 });
 
-Then("`{word}`経路が選ばれる", async function (this: StepWorld, path: string) {
-  const paths = new Map([
-    ["画像", "image"],
-    ["テキスト", "text"],
-  ]);
-  if (!paths.has(path)) {
-    throw new Error(`Unknown path label: ${path}`);
-  }
-  assert.equal(
-    (await statusLines(this.pi, this.started)).find((line) =>
-      line.startsWith("path:"),
-    ),
-    `path: ${paths.get(path)}`,
-  );
-});
+Then(
+  "The `{word}` path is selected",
+  async function (this: StepWorld, path: string) {
+    const paths = new Map([
+      ["画像", "image"],
+      ["テキスト", "text"],
+    ]);
+    if (!paths.has(path)) {
+      throw new Error(`Unknown path label: ${path}`);
+    }
+    assert.equal(
+      (await statusLines(this.pi, this.started)).find((line) =>
+        line.startsWith("path:"),
+      ),
+      `path: ${paths.get(path)}`,
+    );
+  },
+);
 
 function preparePi(
   world: StepWorld,
@@ -110,83 +113,98 @@ function preparePi(
   world.startOptions = startOptions;
 }
 
-Given("端末でPiを使っている", function (this: StepWorld) {
+Given("Pi is running in a terminal", function (this: StepWorld) {
   preparePi(this);
 });
 
-Given("PNG画像を表示できる端末でPiを使っている", function (this: StepWorld) {
-  preparePi(this, { response: "OK" });
-});
+Given(
+  "Pi is running in a terminal that can display PNG images",
+  function (this: StepWorld) {
+    preparePi(this, { response: "OK" });
+  },
+);
 
-Given("Piを非対話モード（RPC）で使っている", function (this: StepWorld) {
+Given("Pi is running in noninteractive RPC mode", function (this: StepWorld) {
   preparePi(this, { mode: "rpc" });
 });
 
-Given("端末はPNG画像を表示できると返答する", function (this: StepWorld) {
-  this.startOptions.response = "OK";
-});
+Given(
+  "the terminal responds that it can display PNG images",
+  function (this: StepWorld) {
+    this.startOptions.response = "OK";
+  },
+);
 
 Given(
-  "端末はPNG画像表示の問い合わせにエラーを返す",
+  "the terminal returns an error to the PNG display query",
   function (this: StepWorld) {
     this.startOptions.response = "EINVAL";
   },
 );
 
-Given("端末はPNG画像表示の問い合わせに応答しない", function (this: StepWorld) {
-  delete this.startOptions.response;
-});
+Given(
+  "the terminal does not respond to the PNG display query",
+  function (this: StepWorld) {
+    delete this.startOptions.response;
+  },
+);
 
-Given("端末の種類は {string}", function (this: StepWorld, term: string) {
-  this.term = term;
-});
+Given(
+  "the terminal type is {string}",
+  function (this: StepWorld, term: string) {
+    this.term = term;
+  },
+);
 
-Given("tmuxの中でPiを使っている", function (this: StepWorld) {
+Given("Pi is running inside tmux", function (this: StepWorld) {
   this.tmux = "1";
 });
 
-Given("全体の既定の表示経路は設定されていない", function (this: StepWorld) {
-  if (existsSync(join(this.xdg, "pi-formula", "config.json"))) {
-    throw new Error("Expected an unset global path fixture");
-  }
-});
+Given(
+  "The global default display path is not configured",
+  function (this: StepWorld) {
+    if (existsSync(join(this.xdg, "pi-formula", "config.json"))) {
+      throw new Error("Expected an unset global path fixture");
+    }
+  },
+);
 
-Given("全体の設定ファイルは存在しない", function (this: StepWorld) {
+Given("the global settings file does not exist", function (this: StepWorld) {
   if (existsSync(join(this.xdg, "pi-formula", "config.json"))) {
     throw new Error("Expected no global config file");
   }
 });
 
-Given("全体の既定の表示経路はテキスト経路である", function (this: StepWorld) {
-  const directory = join(this.xdg, "pi-formula");
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(
-    join(directory, "config.json"),
-    JSON.stringify({ path: "text" }),
-  );
-});
+Given(
+  "the global default display path is the text path",
+  function (this: StepWorld) {
+    const directory = join(this.xdg, "pi-formula");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, "config.json"),
+      JSON.stringify({ path: "text" }),
+    );
+  },
+);
 
-Given("利用者マクロを1個設定している", () => {
+Given("one user macro is configured", () => {
   process.env.PI_FORMULA_MACROS = JSON.stringify({ secret: "x" });
 });
 
-Given("マクロの内容に秘密の文字列が含まれる", () => {
+Given("the macro contents include a secret string", () => {
   process.env.PI_FORMULA_MACROS = JSON.stringify({
     secret: "do-not-show-this",
   });
 });
 
-When(
-  "formula {word}を実行する",
-  async function (this: StepWorld, action: string) {
-    await this.pi.commands.get("formula").handler(action, this.started.ctx);
-    if (action === "status")
-      this.lines = this.started.widgets.get("pi-formula-status");
-  },
-);
+When("run formula {word}", async function (this: StepWorld, action: string) {
+  await this.pi.commands.get("formula").handler(action, this.started.ctx);
+  if (action === "status")
+    this.lines = this.started.widgets.get("pi-formula-status");
+});
 
 When(
-  "formula {word} --defaultを実行する",
+  "run formula {word} --default",
   async function (this: StepWorld, action: string) {
     await this.pi.commands
       .get("formula")
@@ -195,7 +213,7 @@ When(
 );
 
 When(
-  "数式 {string} を画像へ変換する",
+  "convert the formula {string} to an image",
   function (this: StepWorld, markdown: string) {
     this.rendered = this.pi.transformer()(markdown, {
       messageType: "assistant",
@@ -205,7 +223,7 @@ When(
   },
 );
 
-Then("画像経路が選ばれる", async function (this: StepWorld) {
+Then("The image path is selected", async function (this: StepWorld) {
   assert.equal(
     (await statusLines(this.pi, this.started)).find((line) =>
       line.startsWith("path:"),
@@ -214,7 +232,7 @@ Then("画像経路が選ばれる", async function (this: StepWorld) {
   );
 });
 
-Then("テキスト経路が選ばれる", async function (this: StepWorld) {
+Then("The text path is selected", async function (this: StepWorld) {
   assert.equal(
     (await statusLines(this.pi, this.started)).find((line) =>
       line.startsWith("path:"),
@@ -224,7 +242,7 @@ Then("テキスト経路が選ばれる", async function (this: StepWorld) {
 });
 
 Then(
-  "表示経路の指定が次の順に記録される",
+  "Display path selections are recorded in the following order",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     assert.deepEqual(
       this.pi.entries.map((entry) =>
@@ -240,7 +258,7 @@ Then(
 );
 
 Then(
-  "選択理由はPNG画像表示の問い合わせの成功になる",
+  "The selection reason is a successful PNG display query",
   async function (this: StepWorld) {
     assert.equal(
       (await statusLines(this.pi, this.started)).find((line) =>
@@ -251,12 +269,12 @@ Then(
   },
 );
 
-Then("全体の設定ファイルは作られない", function (this: StepWorld) {
+Then("No global settings file is created", function (this: StepWorld) {
   assert.equal(existsSync(join(this.xdg, "pi-formula", "config.json")), false);
 });
 
 Then(
-  "全体の既定の表示経路は画像経路として保存される",
+  "The global default display path is saved as the image path",
   function (this: StepWorld) {
     assert.equal(
       JSON.parse(
@@ -268,7 +286,7 @@ Then(
 );
 
 Then(
-  "表示経路だけを持つ全体の設定ファイルは削除される",
+  "The global settings file containing only the display path is deleted",
   function (this: StepWorld) {
     assert.equal(
       existsSync(join(this.xdg, "pi-formula", "config.json")),
@@ -277,16 +295,19 @@ Then(
   },
 );
 
-Then("画像の一時保存に1件以上が含まれる", async function (this: StepWorld) {
-  assert.match(
-    (await statusLines(this.pi, this.started)).find((line) =>
-      line.startsWith("cache:"),
-    ) ?? "",
-    /^cache: [1-9]\d* entries, [1-9]\d* bytes$/u,
-  );
-});
+Then(
+  "The image cache contains at least one entry",
+  async function (this: StepWorld) {
+    assert.match(
+      (await statusLines(this.pi, this.started)).find((line) =>
+        line.startsWith("cache:"),
+      ) ?? "",
+      /^cache: [1-9]\d* entries, [1-9]\d* bytes$/u,
+    );
+  },
+);
 
-Then("画像の一時保存が空になる", async function (this: StepWorld) {
+Then("The image cache becomes empty", async function (this: StepWorld) {
   assert.equal(
     (await statusLines(this.pi, this.started)).find((line) =>
       line.startsWith("cache:"),
@@ -296,7 +317,7 @@ Then("画像の一時保存が空になる", async function (this: StepWorld) {
 });
 
 Then(
-  "診断には次の項目だけがこの順に含まれる",
+  "Diagnostics contain only the following fields in this order",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const fieldNames = new Map([
       ["版", "pi-formula 0.1.2"],
@@ -321,24 +342,36 @@ Then(
   },
 );
 
-Then("診断情報はすべて印字可能なASCII文字である", function (this: StepWorld) {
-  assert.equal(
-    this.lines.every((line) => /^[\x20-\x7e]+$/u.test(line)),
-    true,
-  );
-});
+Then(
+  "Diagnostics contain only printable ASCII characters",
+  function (this: StepWorld) {
+    assert.equal(
+      this.lines.every((line) => /^[\x20-\x7e]+$/u.test(line)),
+      true,
+    );
+  },
+);
 
-Then("診断に表示される利用者マクロの数は1である", function (this: StepWorld) {
-  assert.equal(
-    this.lines.find((line) => line.startsWith("macros:")),
-    "macros: 1",
-  );
-});
+Then(
+  "The user macro count shown in diagnostics is 1",
+  function (this: StepWorld) {
+    assert.equal(
+      this.lines.find((line) => line.startsWith("macros:")),
+      "macros: 1",
+    );
+  },
+);
 
-Then("診断情報に秘密のマクロ内容は含まれない", function (this: StepWorld) {
-  assert.equal(this.lines.join("\n").includes("do-not-show-this"), false);
-});
+Then(
+  "Diagnostics do not contain secret macro contents",
+  function (this: StepWorld) {
+    assert.equal(this.lines.join("\n").includes("do-not-show-this"), false);
+  },
+);
 
-Then("端末の画像表示機能を問い合わせない", function (this: StepWorld) {
-  assert.equal(this.started.terminalWrites, 0);
-});
+Then(
+  "The terminal image display capability is not queried",
+  function (this: StepWorld) {
+    assert.equal(this.started.terminalWrites, 0);
+  },
+);

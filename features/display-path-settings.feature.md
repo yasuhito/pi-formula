@@ -1,48 +1,48 @@
-# Feature: 表示経路の指定を保存する
+# Feature: Save display path selections
 
-表示経路を手動で指定すると、その指定を現在のセッションに記録します。
+Manual display path selections are recorded in the current session.
 
-必要に応じて、既定の設定を保存できます。`--default` を付けた指定だけを全体の設定ファイルへ保存し、`/formula auto --default` で表示経路だけを持つ設定ファイルを削除します。
+Default settings can be saved when needed. Only selections with `--default` are saved to the global settings file, and `/formula auto --default` removes a settings file containing only the display path.
 
-## Scenario: 手動指定を現在のセッションへ順に記録する
+## Scenario: Record manual selections in the current session in order
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の既定の表示経路は設定されていない
-- When セッションを開始する
-- And formula imageを実行する
-- And formula textを実行する
-- And formula autoを実行する
-- Then 表示経路の指定が次の順に記録される
+- Given Pi is running in a terminal that can display PNG images
+- And The global default display path is not configured
+- When start a session
+- And run formula image
+- And run formula text
+- And run formula auto
+- Then Display path selections are recorded in the following order
 
-  | 指定 |
+  | selection |
   | ---- |
   | image |
   | text |
   | auto |
 
-## Scenario: default のない指定は全体設定を作らない
+## Scenario: A selection without default does not create global settings
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の設定ファイルは存在しない
-- When セッションを開始する
-- And formula textを実行する
-- Then 全体の設定ファイルは作られない
+- Given Pi is running in a terminal that can display PNG images
+- And the global settings file does not exist
+- When start a session
+- And run formula text
+- Then No global settings file is created
 
-## Scenario: default 指定で全体の既定を保存する
+## Scenario: Save the global default with the default option
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の設定ファイルは存在しない
-- When セッションを開始する
-- And formula textを実行する
-- And formula image --defaultを実行する
-- Then 全体の既定の表示経路は画像経路として保存される
+- Given Pi is running in a terminal that can display PNG images
+- And the global settings file does not exist
+- When start a session
+- And run formula text
+- And run formula image --default
+- Then The global default display path is saved as the image path
 
-## Scenario: auto default 指定で表示経路だけの全体設定を削除する
+## Scenario: Remove global settings containing only the display path with auto default
 
-- Given PNG画像を表示できる端末でPiを使っている
-- And 全体の設定ファイルは存在しない
-- When セッションを開始する
-- And formula textを実行する
-- And formula image --defaultを実行する
-- And formula auto --defaultを実行する
-- Then 表示経路だけを持つ全体の設定ファイルは削除される
+- Given Pi is running in a terminal that can display PNG images
+- And the global settings file does not exist
+- When start a session
+- And run formula text
+- And run formula image --default
+- And run formula auto --default
+- Then The global settings file containing only the display path is deleted
