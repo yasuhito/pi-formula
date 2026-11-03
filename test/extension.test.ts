@@ -78,7 +78,7 @@ test("inline formulas stay in Pi Markdown without image transfer", async () => {
   assert.equal(rendered, markdown);
 });
 
-test("登録済みの追加マクロを両方のインライン数式区切りで展開する", async () => {
+test("registered additional macros expand with both inline math delimiters", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -102,7 +102,7 @@ test("登録済みの追加マクロを両方のインライン数式区切り�
   );
 });
 
-test("追加マクロの引数と制御綴の境界を TeX と同じく保つ", async () => {
+test("additional macros preserve TeX argument and control sequence boundaries", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -141,7 +141,7 @@ test("追加マクロの引数と制御綴の境界を TeX と同じく保つ", 
   );
 });
 
-test("同じ追加マクロを引数内でも展開する", async () => {
+test("the same additional macro also expands inside arguments", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -161,7 +161,7 @@ test("同じ追加マクロを引数内でも展開する", async () => {
   );
 });
 
-test("空文字列へ展開する利用者マクロは原文を残す", async () => {
+test("user macros expanding to an empty string preserve the original text", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, { empty: "" });
@@ -177,7 +177,7 @@ test("空文字列へ展開する利用者マクロは原文を残す", async ()
   assert.equal(rendered, markdown);
 });
 
-test("Markdown 表内でも追加マクロを一つの列で描く", async () => {
+test("additional macros render in a single column within Markdown tables", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -201,7 +201,7 @@ test("Markdown 表内でも追加マクロを一つの列で描く", async () =>
   assert.equal((row?.match(/│/gu) ?? []).length, 2);
 });
 
-test("Markdown URL の構造内では追加マクロを展開しない", async () => {
+test("additional macros do not expand within Markdown URL structures", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -223,7 +223,7 @@ test("Markdown URL の構造内では追加マクロを展開しない", async (
   assert.equal(rendered, markdown);
 });
 
-test("テキスト経路でも登録済みの追加マクロを展開する", async () => {
+test("registered additional macros also expand on the text path", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -240,7 +240,7 @@ test("テキスト経路でも登録済みの追加マクロを展開する", as
   assert.equal(rendered, String.raw`$\left\vert{}s\right\rangle$`);
 });
 
-test("展開後に Pi が描けないインライン数式は原文を残す", async () => {
+test("inline formulas Pi cannot render after expansion preserve the original text", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -258,7 +258,7 @@ test("展開後に Pi が描けないインライン数式は原文を残す", a
   assert.equal(rendered, markdown);
 });
 
-test("ストリーミング中に追加マクロを含む閉じた表示数式を描く", async () => {
+test("complete display formulas containing additional macros render during streaming", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -278,7 +278,7 @@ test("ストリーミング中に追加マクロを含む閉じた表示数式�
   assert.equal((rendered.match(/\x1b_Ga=T,f=100/gu) ?? []).length, 2);
 });
 
-test("ストリーミング中もコード内の追加マクロを変更しない", async () => {
+test("streaming leaves additional macros in code unchanged", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {
@@ -296,7 +296,7 @@ test("ストリーミング中もコード内の追加マクロを変更しな�
   assert.equal(rendered, markdown);
 });
 
-test("ストリーミング中も URL 内の追加マクロを変更しない", async () => {
+test("streaming leaves additional macros in URLs unchanged", async () => {
   const pi = fakePi();
   registerFormula(pi.api);
   registerApiFormula(pi.api, {

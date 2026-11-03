@@ -50,87 +50,99 @@ function formulasPiKeptAsText(markdown: string) {
 }
 
 const PLAIN_FOR_PI = [
-  ["単独の金額", "$5 and $10"],
+  ["standalone monetary amounts", "$5 and $10"],
   [
-    "文中の金額と URL とエスケープ",
+    "monetary amounts, URLs, and escapes in prose",
     "It costs $5 or $10. https://example.com/$5 uses $HOME and \\$5.",
   ],
-  ["シェル変数と裸のドル記号", "$HOME and $"],
-  ["ドル記号で始まる語", "The values are $first and $second, not a formula."],
-  ["ドル二つで始まる金額", "価格は $$100 です。"],
-  ["金額とインライン記法の混在", "価格は $5、状態は |s⟩。\n$HOME の後は |t⟩。"],
-  ["前置きのドル二つと金額", "前置き $$ は数式ではありません。\n$$100 です。"],
-  ["URL 内のシェル変数", "https://example.com/$HOME の後は |s⟩"],
-  ["URL 内のドル二つ", "https://example.com/a$$b$$c"],
-  ["コード内の表示数式風", "`$$inline$$`"],
-  ["コード内のインライン数式風", "inline: `$\\ket{s}$`"],
-  ["行頭のドル二つを含む本文", "$$通常本文\n"],
-  ["ドル記号の直後が空白", "$ x $"],
+  ["shell variables and a bare dollar sign", "$HOME and $"],
+  [
+    "words starting with dollar signs",
+    "The values are $first and $second, not a formula.",
+  ],
+  ["a monetary amount starting with two dollar signs", "価格は $$100 です。"],
+  [
+    "mixed monetary amounts and inline notation",
+    "価格は $5、状態は |s⟩。\n$HOME の後は |t⟩。",
+  ],
+  [
+    "introductory dollar signs and a monetary amount",
+    "前置き $$ は数式ではありません。\n$$100 です。",
+  ],
+  ["a shell variable in a URL", "https://example.com/$HOME の後は |s⟩"],
+  ["two dollar signs in a URL", "https://example.com/a$$b$$c"],
+  ["display-math-like notation in code", "`$$inline$$`"],
+  ["inline-math-like notation in code", "inline: `$\\ket{s}$`"],
+  ["prose starting with two dollar signs", "$$通常本文\n"],
+  ["whitespace immediately after a dollar sign", "$ x $"],
 ];
 
 const PI_FORMULA_ONLY = [
-  ["箇条書きの中", "- 外側\n  - 式: $$\n    x^2\n    $$", "\nx^2\n"],
-  ["引用の中", "> 式: \\[\n> x^2\n> \\]", "\nx^2\n"],
+  ["a nested list", "- 外側\n  - 式: $$\n    x^2\n    $$", "\nx^2\n"],
+  ["a blockquote", "> 式: \\[\n> x^2\n> \\]", "\nx^2\n"],
 ];
 
 const AGREES_WITH_PI = [
-  ["単独の表示数式", "$$x = 1$$"],
-  ["数値だけの表示数式", "$$100$$"],
-  ["数値の表示数式と後続の表示数式", "$$42$$ と $$x = 1$$"],
-  ["ラベル直後の表示数式", "Result:$$x = 1$$"],
-  ["コロン直後の表示数式", "考える: $$x$$"],
+  ["a standalone display formula", "$$x = 1$$"],
+  ["a numeric-only display formula", "$$100$$"],
   [
-    "数式でないドル二つの後の表示数式",
+    "a numeric display formula followed by another display formula",
+    "$$42$$ と $$x = 1$$",
+  ],
+  ["a display formula immediately after a label", "Result:$$x = 1$$"],
+  ["a display formula immediately after a colon", "考える: $$x$$"],
+  [
+    "a display formula after non-math double dollar signs",
     "run echo $$; kill $$ after 2 seconds.\n\n$$x = 1$$",
   ],
   [
-    "改行を挟むドル二つの後の表示数式",
+    "a display formula after double dollar signs spanning a newline",
     "run echo $$;\nkill $$ after 2 seconds.\n\n$$x = 1$$",
   ],
   [
-    "前置きのドル二つと金額の後の表示数式",
+    "a display formula after introductory dollar signs and a monetary amount",
     "前置き $$ は数式ではありません。\n$$100 です。\n\n$$x = 1$$",
   ],
   [
-    "金額の後の表示数式",
+    "a display formula after a monetary amount",
     "前置き $$ は数式ではありません。\n価格は $$100\n\n$$x = 1$$",
   ],
 ];
 
-test("oracle が表示数式を数式として読む", () => {
+test("the oracle recognizes display formulas as math", () => {
   assert.equal(piSeesMath("$$x^2$$"), true);
 });
 
-test("oracle が金額を数式として読まない", () => {
+test("the oracle does not recognize monetary amounts as math", () => {
   assert.equal(piSeesMath("$$100"), false);
 });
 
-test("oracle は描画できない表示数式を判定不能として返す", () => {
+test("the oracle returns unknown for unrenderable display formulas", () => {
   assert.equal(piSeesMath(String.raw`$$\notacommand{x}$$`), undefined);
 });
 
 for (const [name, markdown] of PLAIN_FOR_PI) {
-  test(`Pi は${name}を数式と見なさないと判定できる`, () => {
+  test(`Pi is known not to recognize math in ${name}`, () => {
     assert.equal(piSeesMath(markdown), false);
   });
 
-  test(`Pi が数式と見なさない${name}を表示数式にしない`, () => {
+  test(`${name} is not converted to display math when Pi sees no math`, () => {
     assert.deepEqual(displayFormulasIn(markdown), []);
   });
 }
 
 for (const [name, markdown] of AGREES_WITH_PI) {
-  test(`${name}で Pi が本文として残した式を画像にしない`, () => {
+  test(`formulas Pi keeps as prose are not rendered as images in ${name}`, () => {
     assert.deepEqual(formulasPiKeptAsText(markdown), []);
   });
 }
 
 for (const [name, markdown, expected] of PI_FORMULA_ONLY) {
-  test(`Pi は${name}の表示数式を数式と見なさない`, () => {
+  test(`Pi does not recognize display formulas in ${name} as math`, () => {
     assert.equal(piSeesMath(markdown), false);
   });
 
-  test(`Pi が数式と見なさない${name}の表示数式を意図して画像にする`, () => {
+  test(`display formulas in ${name} are intentionally rendered as images despite Pi seeing no math`, () => {
     assert.deepEqual(displayFormulasIn(markdown), [expected]);
   });
 }

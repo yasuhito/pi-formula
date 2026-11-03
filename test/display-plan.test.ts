@@ -16,16 +16,16 @@ const issue26Corpus = path.resolve(
   "../docs/agents/verify-corpus/issue-26.md",
 );
 
-test("Issue 21 の表示数式を画像行数として数える", () => {
+test("Issue 21 display formulas count toward image rows", () => {
   assert.ok(planDisplay(issueCorpus).imageRows > 0);
 });
 
-test("Issue 21 のコーパスを対応する出力高へ収める", () => {
+test("the Issue 21 corpus fits within the supported output height", () => {
   const { height } = planDisplay(issueCorpus);
   assert.ok(height >= 8000 && height <= 16000);
 });
 
-test("Issue 26 の追加マクロを含む3式を画像行数として数える", () => {
+test("the three Issue 26 formulas with additional macros count toward image rows", () => {
   const plan = planDisplay(issue26Corpus);
 
   assert.deepEqual(
@@ -34,7 +34,7 @@ test("Issue 26 の追加マクロを含む3式を画像行数として数える"
   );
 });
 
-test("組版できない表示数式だけをテキスト経路へ戻して計画を続ける", () => {
+test("planning continues with only untypesettable display formulas falling back to the text path", () => {
   const corpus = ["$$x$$", "$$\\undefinedcommandhere$$"].join("\n\n");
 
   assert.deepEqual(planDisplay(corpus, { source: true }), {
@@ -47,19 +47,19 @@ test("組版できない表示数式だけをテキスト経路へ戻して計�
   });
 });
 
-test("組版できない表示数式のテキスト行を出力高へ一度だけ加える", () => {
+test("text rows for untypesettable display formulas are added to output height only once", () => {
   const corpus = `${"本文\n".repeat(100)}$$\n\\undefinedcommandhere\n$$\n\n$$x$$`;
 
   assert.equal(planDisplay(corpus, { source: true }).height, 8224);
 });
 
-test("文字数上限を超える表示数式の出力高が収まれば計画を続ける", () => {
+test("planning continues when display formulas exceeding the character limit fit the output height", () => {
   const { corpus, expectedPlan } = longFormulaPlanFixture();
 
   assert.deepEqual(planDisplay(corpus, { source: true }), expectedPlan);
 });
 
-test("Issue 48 コーパスの全角文字幅を出力高へ含める", () => {
+test("the Issue 48 corpus includes full-width character widths in output height", () => {
   const issue48Corpus = path.resolve(
     __dirname,
     "../docs/agents/verify-corpus/issue-48.md",
@@ -75,7 +75,7 @@ test("Issue 48 コーパスの全角文字幅を出力高へ含める", () => {
   });
 });
 
-test("短いが高い表示数式を複数含むコーパスを事前に拒否する", () => {
+test("a corpus with multiple short but tall display formulas is rejected in advance", () => {
   const corpus = ["$$\\rule{1em}{300ex}$$", "$$\\rule{1em}{300ex}$$"].join(
     "\n\n",
   );

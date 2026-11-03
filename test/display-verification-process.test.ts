@@ -11,7 +11,7 @@ const {
 
 const adapter = new NodeDisplayProcessAdapter();
 
-test("production process adapterは標準出力を返す", async () => {
+test("the production process adapter returns standard output", async () => {
   const outcome = await adapter.run({
     label: "output",
     command: process.execPath,
@@ -21,7 +21,7 @@ test("production process adapterは標準出力を返す", async () => {
   assert.equal(outcome.stdout, "ready");
 });
 
-test("production process adapterは期限を超えたprocessを停止する", async () => {
+test("the production process adapter stops processes exceeding the deadline", async () => {
   const outcome = await adapter.run({
     label: "timeout",
     command: process.execPath,
@@ -31,7 +31,7 @@ test("production process adapterは期限を超えたprocessを停止する", as
   assert.equal(outcome.timedOut, true);
 });
 
-test("timeout後にprocessが終了コード0を返しても失敗にする", async () => {
+test("a process returning exit code 0 after a timeout still fails", async () => {
   const outcome = await adapter.run({
     label: "handled-timeout",
     command: process.execPath,
@@ -44,7 +44,7 @@ test("timeout後にprocessが終了コード0を返しても失敗にする", as
   assert.equal(outcome.status, 2);
 });
 
-test("開始前に中断済みならprocessを直ちに停止する", async () => {
+test("a process is stopped immediately if already aborted before starting", async () => {
   const controller = new AbortController();
   controller.abort();
   const outcome = await adapter.run(
@@ -59,7 +59,7 @@ test("開始前に中断済みならprocessを直ちに停止する", async () =
   assert.notEqual(outcome.status, 0);
 });
 
-test("AbortSignalはprocessを停止する", async () => {
+test("an AbortSignal stops the process", async () => {
   const controller = new AbortController();
   const pending = adapter.run(
     {
@@ -74,7 +74,7 @@ test("AbortSignalはprocessを停止する", async () => {
   assert.notEqual((await pending).status, 0);
 });
 
-test("managed processは明示的に停止できる", async () => {
+test("a managed process can be stopped explicitly", async () => {
   const managed = adapter.spawn({
     label: "managed",
     command: process.execPath,
@@ -85,7 +85,7 @@ test("managed processは明示的に停止できる", async () => {
   assert.deepEqual(diagnostics, []);
 });
 
-test("run commandの異常終了時も子孫processを停止する", async () => {
+test("descendant processes are stopped when the run command exits abnormally", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "display-process-"));
   const pidFile = path.join(directory, "child.pid");
   const source = `
@@ -113,7 +113,7 @@ test("run commandの異常終了時も子孫processを停止する", async () =>
   }
 });
 
-test("direct childの終了後も同じprocess groupの子孫を停止する", async () => {
+test("descendants in the same process group are stopped after the direct child exits", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "display-process-"));
   const pidFile = path.join(directory, "ready.pid");
   const stateOf = (pid: number) => {
@@ -167,7 +167,7 @@ test("direct childの終了後も同じprocess groupの子孫を停止する", a
   }
 });
 
-test("停止後にprocess groupへの探査がEPERMを返してもabortは完了する", async () => {
+test("aborting completes even if probing the stopped process group returns EPERM", async () => {
   const originalKill = process.kill;
   const terminated = new Set();
   process.kill = (pid, signal) => {

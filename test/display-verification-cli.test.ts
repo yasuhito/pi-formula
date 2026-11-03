@@ -24,11 +24,11 @@ function runBuiltScriptDirectly(...args: string[]) {
   );
 }
 
-test("CLIは入力拒否を終了コード1で返す", () => {
+test("the CLI returns exit code 1 for input rejection", () => {
   assert.equal(runBuiltScriptDirectly().status, 1);
 });
 
-test("CLIはmachine-readableな入力拒否を一件返す", () => {
+test("the CLI returns one machine-readable input rejection", () => {
   assert.equal(JSON.parse(runBuiltScriptDirectly().stdout).kind, "rejected");
 });
 
@@ -64,7 +64,7 @@ async function runSignal(signalName: NodeJS.Signals) {
 }
 
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-  test(`${signal}は実表示検証を中断して終了コード2を返す`, async () => {
+  test(`${signal} aborts real-display verification with exit code 2`, async () => {
     assert.equal(await runSignal(signal), 2);
   });
 }

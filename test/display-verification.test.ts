@@ -29,14 +29,14 @@ async function withFixture<T>(
   }
 }
 
-test("実表示検証は目視確認用の初期キャプチャを返す", async () => {
+test("real-display verification returns an initial capture for visual inspection", async () => {
   const exists = await withFixture({}, {}, (result) =>
     result.kind === "captured" ? fs.existsSync(result.captures[0]) : false,
   );
   assert.equal(exists, true);
 });
 
-test("描き直しでは変更前後のキャプチャを残す", async () => {
+test("reflow preserves captures before and after the change", async () => {
   const count = await withFixture(
     { reflow: 100 },
     {
@@ -54,21 +54,21 @@ test("描き直しでは変更前後のキャプチャを残す", async () => {
   assert.equal(count, 2);
 });
 
-test("コーパスと異なる応答はverify-responseで失敗する", async () => {
+test("a response differing from the corpus fails at verify-response", async () => {
   const stage = await withFixture({}, { response: "$$y$$\n" }, (result) =>
     result.kind === "failed" ? result.stage : undefined,
   );
   assert.equal(stage, "verify-response");
 });
 
-test("計画と異なる寸法のキャプチャはcaptureで失敗する", async () => {
+test("capture dimensions differing from the plan fail at capture", async () => {
   const stage = await withFixture({}, { wrongDimensions: true }, (result) =>
     result.kind === "failed" ? result.stage : undefined,
   );
   assert.equal(stage, "capture");
 });
 
-test("安定しないキャプチャはcapturedにならない", async () => {
+test("an unstable capture does not produce a captured result", async () => {
   const subject = fixture({}, { unstable: true });
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 10);
@@ -95,21 +95,21 @@ test("安定しないキャプチャはcapturedにならない", async () => {
   }
 });
 
-test("PNGでないキャプチャはcaptureで失敗する", async () => {
+test("a non-PNG capture fails at capture", async () => {
   const stage = await withFixture({}, { invalidPng: true }, (result) =>
     result.kind === "failed" ? result.stage : undefined,
   );
   assert.equal(stage, "capture");
 });
 
-test("途中で切れたPNGキャプチャはcaptureで失敗する", async () => {
+test("a truncated PNG capture fails at capture", async () => {
   const stage = await withFixture({}, { truncatedPng: true }, (result) =>
     result.kind === "failed" ? result.stage : undefined,
   );
   assert.equal(stage, "capture");
 });
 
-test("テキスト経路を選んでキャプチャできる", async () => {
+test("the text path can be selected for capture", async () => {
   const kind = await withFixture(
     { path: "text" },
     { selectedPath: "text" },
@@ -118,7 +118,7 @@ test("テキスト経路を選んでキャプチャできる", async () => {
   assert.equal(kind, "captured");
 });
 
-test("protocol検査を三つとも実行する", async () => {
+test("all three protocol checks run", async () => {
   const count = await withFixture(
     {},
     {},
@@ -130,7 +130,7 @@ test("protocol検査を三つとも実行する", async () => {
   assert.equal(count, 3);
 });
 
-test("CLI optionsを実表示検証の実行条件へ渡す", async () => {
+test("CLI options are passed to real-display verification conditions", async () => {
   const subject = fixture({}, { selectedPath: "text" });
   try {
     const result = await verifyDisplayArguments(
@@ -168,7 +168,7 @@ test("CLI optionsを実表示検証の実行条件へ渡す", async () => {
   }
 });
 
-test("検証セッションを起動できない場合はlaunchで失敗する", async () => {
+test("failure to start the verification session fails at launch", async () => {
   const stage = await withFixture(
     {},
     { spawnError: "cannot spawn" },
@@ -177,7 +177,7 @@ test("検証セッションを起動できない場合はlaunchで失敗する",
   assert.equal(stage, "launch");
 });
 
-test("capture timeoutでも検証セッションを停止する", async () => {
+test("a capture timeout still stops the verification session", async () => {
   const stopped = await withFixture(
     {},
     { captureTimeout: true },
@@ -186,7 +186,7 @@ test("capture timeoutでも検証セッションを停止する", async () => {
   assert.equal(stopped, true);
 });
 
-test("中断時も検証セッションを停止する", async () => {
+test("aborting still stops the verification session", async () => {
   const subject = fixture({}, { unstable: true });
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 10);
@@ -213,7 +213,7 @@ test("中断時も検証セッションを停止する", async () => {
   }
 });
 
-test("失敗時も検証セッションを停止する", async () => {
+test("failure still stops the verification session", async () => {
   const terminated = await withFixture(
     {},
     { response: "different" },
@@ -222,7 +222,7 @@ test("失敗時も検証セッションを停止する", async () => {
   assert.equal(terminated, true);
 });
 
-test("cleanupだけが失敗した場合はcleanup failureを返す", async () => {
+test("a cleanup-only failure returns a cleanup failure", async () => {
   const stage = await withFixture(
     {},
     { cleanupDiagnostics: ["still running"] },
@@ -231,7 +231,7 @@ test("cleanupだけが失敗した場合はcleanup failureを返す", async () =
   assert.equal(stage, "cleanup");
 });
 
-test("cleanupが例外を返しても完了待ちせず実表示検証は完了する", async () => {
+test("real-display verification finishes without waiting for completion when cleanup throws", async () => {
   const subject = fixture({}, { terminationError: "cannot stop" });
   try {
     const result = await subject.run();
@@ -247,21 +247,21 @@ test("cleanupが例外を返しても完了待ちせず実表示検証は完了�
   }
 });
 
-test("診断artifactを書けなくてもcleanup failureを返す", async () => {
+test("failure to write diagnostic artifacts still returns a cleanup failure", async () => {
   const kind = await withFixture({}, { blockCageLog: true }, (result) =>
     result.kind === "failed" ? result.stage : result.kind,
   );
   assert.equal(kind, "cleanup");
 });
 
-test("結果artifactを書けなくてもcleanup failureを返す", async () => {
+test("failure to write result artifacts still returns a cleanup failure", async () => {
   const kind = await withFixture({}, { blockResult: true }, (result) =>
     result.kind === "failed" ? result.stage : result.kind,
   );
   assert.equal(kind, "cleanup");
 });
 
-test("先行する失敗はcleanup診断で置き換えない", async () => {
+test("cleanup diagnostics do not replace an earlier failure", async () => {
   const stage = await withFixture(
     {},
     { response: "different", cleanupDiagnostics: ["still running"] },
@@ -270,7 +270,7 @@ test("先行する失敗はcleanup診断で置き換えない", async () => {
   assert.equal(stage, "verify-response");
 });
 
-test("表示計画による拒否はartifact directoryを返す", async () => {
+test("display plan rejection returns an artifact directory", async () => {
   const directory = await withFixture(
     {},
     {
@@ -287,7 +287,7 @@ test("表示計画による拒否はartifact directoryを返す", async () => {
   assert.equal(typeof directory, "string");
 });
 
-test("directoryをコーパスとして指定すると入力拒否になる", async () => {
+test("specifying a directory as the corpus rejects the input", async () => {
   const subject = fixture({ corpus: undefined });
   subject.options.corpus = subject.directory;
   subject.processAdapter.options.corpus = subject.directory;
@@ -298,7 +298,7 @@ test("directoryをコーパスとして指定すると入力拒否になる", as
   }
 });
 
-test("読めないコーパスは入力拒否として返す", async () => {
+test("an unreadable corpus returns an input rejection", async () => {
   const subject = fixture();
   try {
     fs.rmSync(path.join(subject.directory, "corpus.md"));
@@ -308,7 +308,7 @@ test("読めないコーパスは入力拒否として返す", async () => {
   }
 });
 
-test("platform failureもartifact directoryを返す", async () => {
+test("a platform failure also returns an artifact directory", async () => {
   const subject = fixture();
   try {
     const result = await subject.run({ platform: "darwin" });
@@ -318,7 +318,7 @@ test("platform failureもartifact directoryを返す", async () => {
   }
 });
 
-test("安全な整数でないreflowを入力拒否する", async () => {
+test("a reflow value that is not a safe integer is rejected", async () => {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-display-reflow-"),
   );
@@ -333,7 +333,7 @@ test("安全な整数でないreflowを入力拒否する", async () => {
   }
 });
 
-test("引数拒否もartifact directoryを返す", async () => {
+test("argument rejection also returns an artifact directory", async () => {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), "pi-formula-display-arguments-"),
   );
@@ -347,7 +347,7 @@ test("引数拒否もartifact directoryを返す", async () => {
   }
 });
 
-test("capturedは終了コード0になる", () => {
+test("a captured result maps to exit code 0", () => {
   assert.equal(
     displayVerificationExitCode({
       kind: "captured",
