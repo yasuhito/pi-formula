@@ -576,7 +576,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
-      "SKIP: libghostty-vt のプロトコル検査（vt-pty がありません）\n",
+      "SKIP: libghostty-vt protocol check (vt-pty not found)\n",
     );
   },
 );
@@ -593,7 +593,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
-      "SKIP: Pi を通したプロトコル検査（vt-pty がありません）\n",
+      "SKIP: protocol check through Pi (vt-pty not found)\n",
     );
   },
 );
@@ -607,7 +607,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
-      "SKIP: ストリーミング中のプロトコル検査（vt-pty がありません）\n",
+      "SKIP: streaming protocol check (vt-pty not found)\n",
     );
   },
 );
@@ -698,7 +698,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stdout,
-      "SKIP: エンコーダ層のプロトコル検査（vt-pty がありません）\n",
+      "SKIP: encoder protocol check (vt-pty not found)\n",
     );
   },
 );
@@ -792,7 +792,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.nativeResult.stderr.trim(),
-      "placeholder が指す id に仮想配置がない",
+      "No virtual placement for the ID referenced by a placeholder",
     );
   },
 );
@@ -949,7 +949,7 @@ Then(
   "The check fails on APC fragments in body cells",
   function (this: StepWorld) {
     assert.equal(
-      /Pi を通した本文セルに APC の断片/u.test(this.nativeResult.stderr),
+      /APC fragments in body cells through Pi/u.test(this.nativeResult.stderr),
       true,
       this.nativeResult.stderr || this.nativeResult.stdout,
     );
@@ -960,9 +960,7 @@ Then(
   "The check fails on missing placeholders for virtual placements",
   function (this: StepWorld) {
     assert.equal(
-      this.nativeResult.stderr.includes(
-        "仮想配置に対応する placeholder がありません",
-      ),
+      this.nativeResult.stderr.includes("No placeholder for virtual placement"),
       true,
       this.nativeResult.stderr || this.nativeResult.stdout,
     );
@@ -1020,7 +1018,7 @@ Then(
 
 Then("The check fails on dirty placeholder cells", function (this: StepWorld) {
   assert.equal(
-    /Pi を通した placeholder セルに汚れ/u.test(this.nativeResult.stderr),
+    /Dirty placeholder cells through Pi/u.test(this.nativeResult.stderr),
     true,
     this.nativeResult.stderr || this.nativeResult.stdout,
   );

@@ -70,23 +70,23 @@ function inspect(output: string, raw: string, displayFormulas: number) {
   const virtualImages = virtualImageCount(final);
   const streamingUpdates = Math.max(0, completeFrames.length - 2);
 
-  if (frames.length < 2) return "読み取りごとのフレームが記録されませんでした";
+  if (frames.length < 2) return "No per-read frames were recorded";
   if (streamingUpdates !== expectedStreamingUpdates)
-    return `ストリーミング更新は ${expectedStreamingUpdates} 回に対して ${streamingUpdates} 回です`;
+    return `Expected ${expectedStreamingUpdates} streaming updates, got ${streamingUpdates}`;
   if (completeFrames.some((frame) => !frame.includes("qni tool result")))
-    return "差分描画で先行する tool 出力が失われました";
+    return "Incremental rendering lost preceding tool output";
   if (raw.includes("\x1b[2J"))
-    return "差分描画の途中で画面全体が消去されました";
+    return "Incremental rendering cleared the entire screen";
   if (fragmentedTransfers.length === 0)
-    return "読み取り境界をまたぐ Kitty APC を確認できませんでした";
+    return "No Kitty APC spanning read boundaries was observed";
   if (leaks.some((value) => value !== 0))
-    return `本文セルに APC の断片があるフレームがあります: ${leaks.join(",")}`;
+    return `Frames contain APC fragments in body cells: ${leaks.join(",")}`;
   if (unmatchedFrames.length > 0)
-    return `${unmatchedFrames.length} 件の完了フレームで仮想配置と placeholder が対応しません`;
+    return `Virtual placements and placeholders do not match in ${unmatchedFrames.length} completed frames`;
   if (virtualImages !== displayFormulas)
     return (
-      `最終フレームの表示数式 ${displayFormulas} 件に対して ` +
-      `仮想配置 ${virtualImages} 件です`
+      `Final frame has ${displayFormulas} display formulas but ` +
+      `${virtualImages} virtual placements`
     );
   return {
     completeFrames: completeFrames.length,
@@ -133,7 +133,7 @@ function run(tool: string, displayFormulas: number, configHome: string) {
   );
   if (result.error) {
     console.error(
-      `ストリーミング中のプロトコル検査を実行できませんでした: ${result.error.message}`,
+      `Could not run streaming protocol check: ${result.error.message}`,
     );
     return 2;
   }
@@ -170,9 +170,7 @@ function run(tool: string, displayFormulas: number, configHome: string) {
 function main() {
   const tool = resolveVtTool();
   if (!tool) {
-    console.log(
-      "SKIP: ストリーミング中のプロトコル検査（vt-pty がありません）",
-    );
+    console.log("SKIP: streaming protocol check (vt-pty not found)");
     return 0;
   }
   const displayFormulas = displayFormulaCount(

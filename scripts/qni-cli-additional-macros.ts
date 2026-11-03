@@ -87,7 +87,7 @@ function literalValue(
   if (node?.type === "Literal") return node.value;
   if (node?.type === "TemplateLiteral" && node.expressions.length === 0)
     return node.quasis[0].value.cooked;
-  throw new Error(`qni-cli の追加マクロ値を解析できません: ${sourcePath}`);
+  throw new Error(`Cannot parse qni-cli additional macro value: ${sourcePath}`);
 }
 
 function extractQniCliAdditionalMacros(
@@ -96,19 +96,19 @@ function extractQniCliAdditionalMacros(
 ) {
   const parsed = parseSync(sourcePath, source, { sourceType: "module" });
   if (parsed.errors.length > 0)
-    throw new Error(`qni-cli の TypeScript を解析できません: ${sourcePath}`);
+    throw new Error(`Cannot parse qni-cli TypeScript: ${sourcePath}`);
   const macrosObject =
     findMacrosObject(parsed.program) ??
     topLevelNamedObject(parsed.program, "quantumMacros");
   if (!macrosObject)
-    throw new Error(`qni-cli の macros 定義が見つかりません: ${sourcePath}`);
+    throw new Error(`qni-cli macros definition not found: ${sourcePath}`);
 
   const macros: Record<string, MacroDefinition> = {};
   for (const property of macroProperties(parsed.program, macrosObject)) {
     const name = propertyName(property);
     if (!name || property.value.type !== "ArrayExpression")
       throw new Error(
-        `qni-cli の追加マクロ定義を解析できません: ${sourcePath}`,
+        `Cannot parse qni-cli additional macro definition: ${sourcePath}`,
       );
     const [replacementNode, parameterCountNode, ...extra] =
       property.value.elements;
@@ -121,7 +121,7 @@ function extractQniCliAdditionalMacros(
       !Number.isInteger(parameterCount)
     )
       throw new Error(
-        `qni-cli の追加マクロ定義を解析できません: ${sourcePath}`,
+        `Cannot parse qni-cli additional macro definition: ${sourcePath}`,
       );
     macros[name] = [replacement, parameterCount];
   }

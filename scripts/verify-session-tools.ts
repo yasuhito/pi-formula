@@ -73,17 +73,17 @@ function decodeRecord(value: unknown): { message?: Message } {
 
 const TOOL_PATTERNS = [
   {
-    kind: "非 0 終了",
+    kind: "nonzero-exit",
     pattern:
       /(?:exited with status|exited with code|Command exited with code)\s+(-?\d+)/iu,
     accepts: (match: RegExpMatchArray) => Number(match[1]) !== 0,
   },
   {
-    kind: "機能不足",
+    kind: "unsupported",
     pattern: /未対応|対応していない|unsupported|not supported/iu,
   },
   {
-    kind: "途中停止",
+    kind: "stopped",
     pattern: /Stopped at command\s+(\d+)\s+of\s+(\d+)/iu,
   },
 ];
@@ -96,13 +96,12 @@ function parseArguments(argv: readonly string[]) {
   let sessionFilename: string | undefined;
   for (const argument of argv) {
     if (argument.startsWith("--ignore=")) {
-      if (ignoreFilename)
-        throw new Error("--ignore は一度だけ指定してください");
+      if (ignoreFilename) throw new Error("Specify --ignore only once");
       ignoreFilename = argument.slice("--ignore=".length);
     } else if (!sessionFilename) {
       sessionFilename = argument;
     } else {
-      throw new Error(`不明な引数です: ${argument}`);
+      throw new Error(`Unknown argument: ${argument}`);
     }
   }
   if (!sessionFilename)
@@ -132,23 +131,21 @@ function readIgnoreList(filename: string | undefined): IgnoreEntry[] {
   if (!filename) return [];
   const source = readJson(filename);
   if (!isRecord(source) || !Array.isArray(source.ignore))
-    throw new Error(
-      "無視リストは ignore 配列を持つ JSON object にしてください",
-    );
+    throw new Error("Ignore list must be a JSON object with an ignore array");
   return source.ignore.map((entry: unknown, index: number) => {
     if (!isRecord(entry))
-      throw new Error(`ignore[${index}] は JSON object にしてください`);
+      throw new Error(`ignore[${index}] must be a JSON object`);
     const allowed = new Set(["kind", "tool", "command", "pattern"]);
     for (const [key, value] of Object.entries(entry)) {
       if (!allowed.has(key))
-        throw new Error(`ignore[${index}] に不明な項目があります: ${key}`);
+        throw new Error(`ignore[${index}] has an unknown field: ${key}`);
       if (typeof value !== "string")
-        throw new Error(`ignore[${index}].${key} は文字列にしてください`);
+        throw new Error(`ignore[${index}].${key} must be a string`);
       if (value.trim() === "")
-        throw new Error(`ignore[${index}].${key} は空文字にできません`);
+        throw new Error(`ignore[${index}].${key} must not be empty`);
     }
     if (Object.keys(entry).length === 0)
-      throw new Error(`ignore[${index}] は条件を一つ以上持たせてください`);
+      throw new Error(`ignore[${index}] must have at least one condition`);
     return {
       kind: optionalString(entry.kind),
       tool: optionalString(entry.tool),
@@ -177,15 +174,15 @@ function shellArgument(value: unknown) {
 }
 
 function toolCommand(tool: string | undefined, arguments_: unknown[]) {
-  return `${tool ?? "不明"} ${arguments_.map(shellArgument).join(" ")}`.trimEnd();
+  return `${tool ?? "unknown"} ${arguments_.map(shellArgument).join(" ")}`.trimEnd();
 }
 
 function commandFromCall(call: Content | undefined) {
   const arguments_ = call?.arguments;
-  if (!arguments_ || typeof arguments_ !== "object") return "不明";
+  if (!arguments_ || typeof arguments_ !== "object") return "unknown";
   if (typeof arguments_.command === "string") return arguments_.command;
   if (Array.isArray(arguments_.args))
-    return [call?.name ?? "不明", ...arguments_.args]
+    return [call?.name ?? "unknown", ...arguments_.args]
       .map(shellArgument)
       .join(" ");
   if (Array.isArray(arguments_.commands) && arguments_.commands.length === 1) {
@@ -193,7 +190,7 @@ function commandFromCall(call: Content | undefined) {
       throw new TypeError("Invalid command arguments");
     return toolCommand(call?.name, arguments_.commands[0]);
   }
-  return `${call?.name ?? "不明"} ${JSON.stringify(arguments_)}`;
+  return `${call?.name ?? "unknown"} ${JSON.stringify(arguments_)}`;
 }
 
 function commandAt(call: Content | undefined, position: number) {
@@ -229,14 +226,14 @@ function toolHits(
   message: Message,
   call: Content | undefined,
 ) {
-  const tool = message.toolName ?? call?.name ?? "不明";
+  const tool = message.toolName ?? call?.name ?? "unknown";
   const lines = textContent(message).split("\n");
   const hits: Hit[] = [];
   for (const [lineIndex, line] of lines.entries()) {
     for (const candidate of TOOL_PATTERNS) {
       const match = line.match(candidate.pattern);
       if (!match || (candidate.accepts && !candidate.accepts(match))) continue;
-      const stoppedAt = candidate.kind === "途中停止" ? Number(match[1]) : null;
+      const stoppedAt = candidate.kind === "stopped" ? Number(match[1]) : null;
       hits.push({
         kind: candidate.kind,
         tool,
@@ -272,7 +269,7 @@ function fallbackHits(
     FALLBACK_PATTERN.test(line)
       ? [
           {
-            kind: "代替手段",
+            kind: "fallback suggested",
             tool: fallbackCandidate.tool,
             command: fallbackCandidate.command,
             recordIndex,
@@ -319,16 +316,16 @@ function inspectSession(records: RecordEntry[], ignoreList: IgnoreEntry[]) {
 
 function report(hits: Hit[]) {
   if (hits.length === 0) {
-    console.log("セッション記録にツール失敗はありません");
+    console.log("No tool failures in session record");
     return;
   }
-  console.log(`セッション記録のツール失敗を ${hits.length} 件検出しました`);
+  console.log(`Detected ${hits.length} tool failures in session record`);
   for (const hit of hits) {
-    console.log(`- 種類: ${hit.kind}`);
-    console.log(`  ツール: ${hit.tool}`);
-    console.log(`  コマンド: ${hit.command}`);
-    console.log(`  記録行: ${hit.recordIndex}`);
-    console.log("  文脈:");
+    console.log(`- Kind: ${hit.kind}`);
+    console.log(`  Tool: ${hit.tool}`);
+    console.log(`  Command: ${hit.command}`);
+    console.log(`  Record line: ${hit.recordIndex}`);
+    console.log("  Context:");
     for (const line of hit.context) console.log(`    ${line}`);
   }
 }
@@ -348,7 +345,7 @@ if (require.main === module) {
     main(process.argv.slice(2));
   } catch (error) {
     console.error(
-      `セッション記録検査失敗: ${error instanceof Error ? error.message : String(error)}`,
+      `Session record check failed: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exitCode = 2;
   }

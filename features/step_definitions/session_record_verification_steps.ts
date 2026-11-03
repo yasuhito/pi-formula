@@ -163,7 +163,7 @@ Given(
         {
           ignore: [
             {
-              kind: "機能不足",
+              kind: "unsupported",
               tool: "qni",
               command: "qni run --symbolic",
               pattern: "unsupported symbolic gate column",
@@ -218,7 +218,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 機能不足[\s\S]*ツール: qni[\s\S]*コマンド: qni run --symbolic[\s\S]*文脈:[\s\S]*unsupported symbolic gate column/u,
+      /Kind: unsupported[\s\S]*Tool: qni[\s\S]*Command: qni run --symbolic[\s\S]*Context:[\s\S]*unsupported symbolic gate column/u,
     );
   },
 );
@@ -228,7 +228,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 非 0 終了[\s\S]*ツール: qni[\s\S]*コマンド: qni run --symbolic/u,
+      /Kind: nonzero-exit[\s\S]*Tool: qni[\s\S]*Command: qni run --symbolic/u,
     );
   },
 );
@@ -238,7 +238,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 途中停止[\s\S]*ツール: qni[\s\S]*コマンド: qni run --symbolic/u,
+      /Kind: stopped[\s\S]*Tool: qni[\s\S]*Command: qni run --symbolic/u,
     );
   },
 );
@@ -248,7 +248,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 機能不足[\s\S]*ツール: runner[\s\S]*コマンド: runner check/u,
+      /Kind: unsupported[\s\S]*Tool: runner[\s\S]*Command: runner check/u,
     );
   },
 );
@@ -258,7 +258,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 途中停止[\s\S]*ツール: runner[\s\S]*コマンド: runner deploy/u,
+      /Kind: stopped[\s\S]*Tool: runner[\s\S]*Command: runner deploy/u,
     );
   },
 );
@@ -268,7 +268,7 @@ Then(
   function (this: StepWorld) {
     assert.match(
       this.result.stdout,
-      /種類: 代替手段[\s\S]*ツール: bash[\s\S]*コマンド: qni run --symbolic/u,
+      /Kind: fallback suggested[\s\S]*Tool: bash[\s\S]*Command: qni run --symbolic/u,
     );
   },
 );
@@ -276,14 +276,14 @@ Then(
 Then(
   "Alternative wording after a successful result is not reported",
   function (this: StepWorld) {
-    assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+    assert.doesNotMatch(this.result.stdout, /Kind: fallback suggested/u);
   },
 );
 
 Then(
   "Fallback wording later than the immediate failure response is not reported",
   function (this: StepWorld) {
-    assert.doesNotMatch(this.result.stdout, /種類: 代替手段/u);
+    assert.doesNotMatch(this.result.stdout, /Kind: fallback suggested/u);
   },
 );
 
@@ -306,7 +306,7 @@ Then(
   function (this: StepWorld) {
     assert.deepEqual(
       this.result.stdout,
-      "セッション記録にツール失敗はありません\n",
+      "No tool failures in session record\n",
     );
   },
 );
@@ -314,14 +314,14 @@ Then(
 Then(
   "Only allowed capability limitations are excluded from the report",
   function (this: StepWorld) {
-    assert.doesNotMatch(this.result.stdout, /種類: 機能不足/u);
+    assert.doesNotMatch(this.result.stdout, /Kind: unsupported/u);
   },
 );
 
 Then(
   "Nonzero exits outside the ignore list remain in the report",
   function (this: StepWorld) {
-    assert.match(this.result.stdout, /種類: 非 0 終了/u);
+    assert.match(this.result.stdout, /Kind: nonzero-exit/u);
   },
 );
 

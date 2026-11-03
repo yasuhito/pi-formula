@@ -28,7 +28,7 @@ function controlValue(control: string, name: string) {
 }
 
 function kittyCommandPattern() {
-  // biome-ignore lint/complexity/useRegexLiterals: 制御文字を含む正規表現リテラルは lint が拒否する。
+  // biome-ignore lint/complexity/useRegexLiterals: The linter rejects regular expression literals containing control characters.
   return new RegExp("\\x1b_G([^;]*);([A-Za-z0-9+/=]*)\\x1b\\\\", "gu");
 }
 
@@ -37,7 +37,7 @@ function transferPlan(encoded: string) {
   const firstIndex = commands.findIndex(
     (command) => controlValue(command[1], "a") === "T",
   );
-  if (firstIndex < 0) throw new Error("画像転送の計画がありません");
+  if (firstIndex < 0) throw new Error("No image transfer plan");
   const first = commands[firstIndex];
   let payload = "";
   for (let index = firstIndex; index < commands.length; index += 1) {
@@ -49,7 +49,7 @@ function transferPlan(encoded: string) {
     png.length < 24 ||
     !png.subarray(0, 4).equals(Buffer.from([137, 80, 78, 71]))
   ) {
-    throw new Error("画像転送の payload が PNG ではありません");
+    throw new Error("Image transfer payload is not PNG");
   }
   return {
     id: Number(controlValue(first[1], "i")),
@@ -131,8 +131,7 @@ function runVt(tool: string, encoded: string, waitForPlacement = true) {
   if (result.error) throw result.error;
   if (result.signal || result.status !== 0) {
     throw new Error(
-      result.stderr.trim() ||
-        `vt-pty が終了コード ${result.status} で失敗しました`,
+      result.stderr.trim() || `vt-pty failed with exit code ${result.status}`,
     );
   }
   return result.stdout;
@@ -185,7 +184,7 @@ function problemFor(
         .map((item) => item.imageId),
     );
     return state.placeholders.some((cell) => !ids.has(cell.foregroundId))
-      ? "placeholder が指す id に仮想配置がない"
+      ? "No virtual placement for the ID referenced by a placeholder"
       : undefined;
   }
   if (check === "storage" || check === "cached") {
@@ -196,7 +195,7 @@ function problemFor(
       actual[0].width === plan.width &&
       actual[0].height === plan.height
       ? undefined
-      : `storage の画像が計画と一致しない: ${JSON.stringify({ plan, actual })}`;
+      : `Stored image does not match the plan: ${JSON.stringify({ plan, actual })}`;
   }
   if (check === "placement") {
     return placement?.imageId === plan.id &&
@@ -204,13 +203,13 @@ function problemFor(
       placement.columns === plan.columns &&
       placement.rows === plan.rows
       ? undefined
-      : "仮想配置が計画と一致しない";
+      : "Virtual placement does not match the plan";
   }
   if (check === "image-id") {
     return state.placeholders.length > 0 &&
       state.placeholders.every((cell) => cell.foregroundId === plan.id)
       ? undefined
-      : "foreground RGB の画像 id が計画と一致しない";
+      : "Foreground RGB image ID does not match the plan";
   }
   if (check === "coordinates") {
     const expected = Array.from({ length: plan.rows }, (_, row) =>
@@ -225,15 +224,15 @@ function problemFor(
     }));
     return sameValues(actual, expected)
       ? undefined
-      : "placeholder の座標が計画と一致しない";
+      : "Placeholder coordinates do not match the plan";
   }
   if (check === "underline") {
     return state.placeholders.length > 0 &&
       state.placeholders.every((cell) => cell.underline === "rgb")
       ? undefined
-      : "placeholder の underline_color タグが RGB ではない";
+      : "Placeholder underline_color tag is not RGB";
   }
-  return `未知の検査です: ${check}`;
+  return `Unknown check: ${check}`;
 }
 
 function executeCheck(tool: string, check: string, outputs: string[]) {
@@ -257,7 +256,7 @@ async function main() {
   }
   const tool = resolveVtTool();
   if (!tool) {
-    console.log("SKIP: エンコーダ層のプロトコル検査（vt-pty がありません）");
+    console.log("SKIP: encoder protocol check (vt-pty not found)");
     return 0;
   }
   const outputs = await encoderOutputs();

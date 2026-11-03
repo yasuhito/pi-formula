@@ -87,8 +87,8 @@ args=(--name pi-formula-verify --session "$PI_FORMULA_VERIFY_SESSION" --no-exten
   --extension "$PI_FORMULA_VERIFY_PATH_EXTENSION"
   --no-themes --theme "$PI_FORMULA_VERIFY_THEME" --use-theme pi-formula-verify
   --no-skills --no-prompt-templates --no-context-files --no-tools --approve
-  --thinking off --system-prompt '添付された Markdown だけを、一字一句そのまま出力してください。')
-exec pi "${SHELL_DOLLAR}{args[@]}" "@$PI_FORMULA_VERIFY_CORPUS" '次の Markdown を一字一句そのまま出力してください。'
+  --thinking off --system-prompt 'Output only the attached Markdown, verbatim.')
+exec pi "${SHELL_DOLLAR}{args[@]}" "@$PI_FORMULA_VERIFY_CORPUS" 'Output the following Markdown verbatim.'
 `;
 }
 

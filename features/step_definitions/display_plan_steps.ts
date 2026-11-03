@@ -210,14 +210,17 @@ Then(
 Then(
   "Height overflow diagnostics show the text path",
   function (this: StepWorld) {
-    assert.deepEqual(/テキスト経路/u.test(this.planResult.stderr), true);
+    assert.deepEqual(/text path/u.test(this.planResult.stderr), true);
   },
 );
 
 Then(
   "Height overflow diagnostics show reflow to 100 columns",
   function (this: StepWorld) {
-    assert.deepEqual(/100列へのリフロー後/u.test(this.planResult.stderr), true);
+    assert.deepEqual(
+      /after reflow to 100 columns/u.test(this.planResult.stderr),
+      true,
+    );
   },
 );
 
@@ -253,7 +256,7 @@ Then(
   "Diagnostics show one typesetting failure for unreadably scaled math",
   function (this: StepWorld) {
     assert.deepEqual(
-      /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+      /Display math typesetting failures: 1/u.test(this.planResult.stderr),
       true,
     );
   },
@@ -269,7 +272,7 @@ Then(
 Then(
   "Transfer row height overflow diagnostics show the image path",
   function (this: StepWorld) {
-    assert.deepEqual(/画像経路/u.test(this.planResult.stderr), true);
+    assert.deepEqual(/image path/u.test(this.planResult.stderr), true);
   },
 );
 
@@ -318,7 +321,7 @@ Then(
   "Verification display plan diagnostics show one typesetting failure",
   function (this: StepWorld) {
     assert.deepEqual(
-      /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+      /Display math typesetting failures: 1/u.test(this.planResult.stderr),
       true,
     );
   },
@@ -349,7 +352,7 @@ Then(
   "Diagnostics show one failure even after all formulas fail typesetting",
   function (this: StepWorld) {
     assert.deepEqual(
-      /組版に失敗した表示数式: 1/u.test(this.planResult.stderr),
+      /Display math typesetting failures: 1/u.test(this.planResult.stderr),
       true,
     );
   },

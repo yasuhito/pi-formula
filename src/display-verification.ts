@@ -83,9 +83,9 @@ const READY_TIMEOUT_MS = 30_000;
 const WINDOW_TIMEOUT_MS = 270_000;
 
 function displayPathLabel(path: string): string {
-  if (path === "image") return "画像経路";
-  if (path === "text") return "テキスト経路";
-  return `${path}経路`;
+  if (path === "image") return "image path";
+  if (path === "text") return "text path";
+  return `${path} path`;
 }
 
 function defaultArtifactsRoot(env: NodeJS.ProcessEnv): string {
@@ -109,12 +109,12 @@ function parseDisplayVerificationOptions(
   while (remaining.length > 0) {
     const argument = remaining.shift() as string;
     if (!argument.startsWith("--")) {
-      if (corpus) throw new Error("コーパスは一つだけ指定できます");
+      if (corpus) throw new Error("Only one corpus may be specified");
       corpus = argument;
       continue;
     }
     const value = remaining.shift();
-    if (value === undefined) throw new Error(`${argument} に値がありません`);
+    if (value === undefined) throw new Error(`Missing value for ${argument}`);
     if (argument === "--theme" && (value === "light" || value === "dark"))
       theme = value;
     else if (
@@ -129,11 +129,11 @@ function parseDisplayVerificationOptions(
     else if (argument === "--reflow" && /^[1-9][0-9]*$/u.test(value)) {
       const columns = Number(value);
       if (!Number.isSafeInteger(columns))
-        throw new Error(`未対応の設定です: ${argument} ${value}`);
+        throw new Error(`Unsupported setting: ${argument} ${value}`);
       reflow = columns;
-    } else throw new Error(`未対応の設定です: ${argument} ${value}`);
+    } else throw new Error(`Unsupported setting: ${argument} ${value}`);
   }
-  if (!corpus) throw new Error("コーパスを指定してください");
+  if (!corpus) throw new Error("Specify a corpus");
   return {
     corpus: resolve(corpus),
     theme,
@@ -179,7 +179,7 @@ async function ensureReadable(filename: string, label: string): Promise<void> {
   } catch {
     throw new VerificationFailure(
       "prepare",
-      `${label}が読めません: ${filename}`,
+      `Cannot read ${label}: ${filename}`,
       true,
     );
   }
@@ -233,8 +233,8 @@ async function preparePlan(
     signal,
   );
   if (outcome.status !== 0) {
-    const detail = outcome.stderr.trim() || "表示計画を作れませんでした";
-    const rejected = /収まりません|表示数式がありません/u.test(detail);
+    const detail = outcome.stderr.trim() || "Could not create display plan";
+    const rejected = /does not fit|Corpus has no display math/u.test(detail);
     throw new VerificationFailure(
       "prepare",
       processFailure("display-plan", outcome, detail),
@@ -245,10 +245,10 @@ async function preparePlan(
   try {
     parsed = JSON.parse(outcome.stdout);
   } catch {
-    throw new VerificationFailure("prepare", "表示計画がJSONではありません");
+    throw new VerificationFailure("prepare", "Display plan is not JSON");
   }
   if (!validPlan(parsed))
-    throw new VerificationFailure("prepare", "表示計画の内容が不正です");
+    throw new VerificationFailure("prepare", "Invalid display plan contents");
   await writeFile(files.plan, `${JSON.stringify(parsed, null, 2)}\n`);
   return parsed;
 }
@@ -281,7 +281,7 @@ async function verifyProtocols(
     if (outcome.status !== 0 || outcome.timedOut) {
       throw new VerificationFailure(
         "prepare",
-        processFailure(check, outcome, "検査が失敗しました"),
+        processFailure(check, outcome, "Check failed"),
       );
     }
     results.push(check);
@@ -300,14 +300,15 @@ async function readWhenReady(
   while (Date.now() < deadline) {
     const stoppedReason = stopped?.();
     if (stoppedReason) throw new Error(stoppedReason);
-    if (signal?.aborted) throw new Error("実表示検証が中断されました");
+    if (signal?.aborted)
+      throw new Error("Display verification was interrupted");
     try {
       const value = (await readFile(filename, "utf8")).trim();
       if (value) return value;
     } catch {}
     await sleep(interval, undefined, { signal });
   }
-  throw new Error(`${basename(filename)} の準備がtimeoutしました`);
+  throw new Error(`Timed out waiting for ${basename(filename)}`);
 }
 
 interface SessionRecord {
@@ -350,7 +351,7 @@ async function waitForSession(
     }
     await sleep(dependencies.pollIntervalMs, undefined, { signal });
   }
-  throw new Error("Piの応答がtimeoutしました");
+  throw new Error("Timed out waiting for Pi response");
 }
 
 function withoutTrailingNewlines(text: string): string {
@@ -365,10 +366,10 @@ function assistantText(source: string): string {
     )
     .at(-1);
   if (assistant?.message?.stopReason !== "stop")
-    throw new Error("最後のassistant messageが完了していません");
+    throw new Error("Last assistant message is incomplete");
   const content = assistant.message.content;
   if (!Array.isArray(content))
-    throw new Error("assistant contentが配列ではありません");
+    throw new Error("Assistant content is not an array");
   return content
     .filter(
       (part: unknown) =>
@@ -385,7 +386,7 @@ async function verifyResponse(corpus: string, session: string): Promise<void> {
     assistantText(await readFile(session, "utf8")),
   );
   if (expected !== actual)
-    throw new Error("assistantの応答がコーパスと一字一句一致しません");
+    throw new Error("Assistant response does not match the corpus verbatim");
 }
 
 async function stableCapture(
@@ -414,14 +415,14 @@ async function stableCapture(
     );
     if (outcome.status !== 0)
       throw new Error(
-        processFailure(`capture-${label}`, outcome, "grimが失敗しました"),
+        processFailure(`capture-${label}`, outcome, "grim failed"),
       );
     const current = await readFile(attempt);
     const loaded = loadPng(current, CAPTURE_PNG_LIMITS);
-    if (!loaded.loaded) throw new Error("キャプチャをPNGとして読めません");
+    if (!loaded.loaded) throw new Error("Cannot read capture as PNG");
     if (loaded.width !== width || loaded.height !== height)
       throw new Error(
-        `キャプチャが${width}x${height}ではありません: ${loaded.width}x${loaded.height}`,
+        `Capture is not ${width}x${height}: ${loaded.width}x${loaded.height}`,
       );
     if (previous?.equals(current)) {
       await rename(attempt, destination);
@@ -430,7 +431,7 @@ async function stableCapture(
     previous = current;
     await sleep(dependencies.pollIntervalMs, undefined, { signal });
   }
-  throw new Error("キャプチャが安定する前にtimeoutしました");
+  throw new Error("Timed out before capture stabilized");
 }
 
 function withCleanupDiagnostics(
@@ -450,7 +451,7 @@ function withCleanupDiagnostics(
   return {
     kind: "failed",
     stage: "cleanup",
-    message: "検証セッションを停止または記録できませんでした",
+    message: "Could not stop or record verification session",
     artifactDirectory: directory,
     cleanupDiagnostics: diagnostics,
   };
@@ -499,10 +500,10 @@ export async function verifyDisplay(
     if (dependencies.platform !== "linux")
       throw new VerificationFailure(
         "prepare",
-        "実表示検証はLinux headless Waylandだけに対応します",
+        "Display verification supports only headless Wayland on Linux",
       );
-    await ensureReadable(options.corpus, "コーパス");
-    await ensureReadable(options.extension, "拡張");
+    await ensureReadable(options.corpus, "corpus");
+    await ensureReadable(options.extension, "extension");
     const plan = await preparePlan(options, files, dependencies, signal);
     const protocolChecks = await verifyProtocols(files, dependencies, signal);
     await writeDisplayRuntime(options, files, plan, dependencies.rootDirectory);
@@ -535,7 +536,7 @@ export async function verifyDisplay(
       stoppedReason = processFailure(
         "headless-session",
         outcome,
-        `検証セッションが終了コード${outcome.status}で停止しました`,
+        `Verification session stopped with exit code ${outcome.status}`,
       );
     });
 
@@ -566,7 +567,7 @@ export async function verifyDisplay(
       );
       if (selectedPath !== options.path)
         throw new Error(
-          `要求した${displayPathLabel(options.path)}ではなく${displayPathLabel(selectedPath)}が選ばれました`,
+          `Selected ${displayPathLabel(selectedPath)} instead of the requested ${displayPathLabel(options.path)}`,
         );
     } catch (error) {
       throw new VerificationFailure("launch", (error as Error).message);
@@ -614,7 +615,11 @@ export async function verifyDisplay(
         );
         if (resized.status !== 0)
           throw new Error(
-            processFailure("reflow", resized, "描き直し幅へ変更できません"),
+            processFailure(
+              "reflow",
+              resized,
+              "Could not resize to reflow width",
+            ),
           );
         const reflowCapture = join(files.directory, "reflow.png");
         await stableCapture(

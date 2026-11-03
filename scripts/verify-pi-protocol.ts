@@ -100,21 +100,21 @@ function protocolState(output: string) {
 
 function inspect(state: ReturnType<typeof protocolState>, expected: number) {
   if (!Number.isFinite(state.dirty) || state.dirty !== 0) {
-    return `Pi を通した placeholder セルに汚れがあります: ${state.dirty}`;
+    return `Dirty placeholder cells through Pi: ${state.dirty}`;
   }
   if (!Number.isFinite(state.apcLeak) || state.apcLeak !== 0) {
-    return `Pi を通した本文セルに APC の断片があります: ${state.apcLeak}`;
+    return `APC fragments in body cells through Pi: ${state.apcLeak}`;
   }
   if (state.missingPlaceholderImages.length > 0) {
     return (
-      "仮想配置に対応する placeholder がありません: " +
+      "No placeholder for virtual placement: " +
       state.missingPlaceholderImages.join(", ")
     );
   }
   if (state.placements !== expected || state.virtualImages !== expected) {
     return (
-      `表示数式 ${expected} 件に対して storage 付き仮想配置が ` +
-      `${state.virtualImages} 件（全配置 ${state.placements} 件）です`
+      `Expected ${expected} display formulas, got ` +
+      `${state.virtualImages} virtual placements with storage (${state.placements} total placements)`
     );
   }
   return undefined;
@@ -180,7 +180,7 @@ function run(
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.error) {
     console.error(
-      `Pi を通したプロトコル検査を実行できませんでした: ${result.error.message}`,
+      `Could not run protocol check through Pi: ${result.error.message}`,
     );
     return 2;
   }
@@ -200,7 +200,7 @@ function run(
 function main() {
   const tool = resolveVtTool();
   if (!tool) {
-    console.log("SKIP: Pi を通したプロトコル検査（vt-pty がありません）");
+    console.log("SKIP: protocol check through Pi (vt-pty not found)");
     return 0;
   }
   const markdown = fs.readFileSync(corpusPath, "utf8");

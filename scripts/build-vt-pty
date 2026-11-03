@@ -5,7 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PIN_FILE="$ROOT/native/libghostty-vt.commit"
 PIN=$(tr -d '\r\n' <"$PIN_FILE")
 [[ "$PIN" =~ ^[0-9a-f]{40}$ ]] || {
-  printf '%s には完全な commit hash を一行で指定してください\n' "$PIN_FILE" >&2
+  printf '%s must contain a full commit hash on a single line\n' "$PIN_FILE" >&2
   exit 2
 }
 
@@ -15,7 +15,7 @@ PRINT_PLAN=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --prefix)
-      [[ $# -ge 2 ]] || { printf 'build-vt-pty: --prefix の値がありません\n' >&2; exit 2; }
+      [[ $# -ge 2 ]] || { printf 'build-vt-pty: Missing value for --prefix\n' >&2; exit 2; }
       PREFIX=$2
       shift 2
       ;;
@@ -43,14 +43,14 @@ if [[ "$PRINT_PLAN" == true ]]; then
   exit 0
 fi
 
-command -v "${CC:-cc}" >/dev/null || { printf 'build-vt-pty: C compiler が必要です\n' >&2; exit 2; }
+command -v "${CC:-cc}" >/dev/null || { printf 'build-vt-pty: C compiler is required\n' >&2; exit 2; }
 if [[ ! -f "$PREFIX/include/ghostty/vt.h" ]] || ! compgen -G "$PREFIX/lib/libghostty-vt.*" >/dev/null; then
-  command -v zig >/dev/null || { printf 'build-vt-pty: zig 0.16.0 が必要です\n' >&2; exit 2; }
+  command -v zig >/dev/null || { printf 'build-vt-pty: zig 0.16.0 is required\n' >&2; exit 2; }
   [[ "$(zig version)" == 0.16.0 ]] || {
-    printf 'build-vt-pty: zig 0.16.0 が必要です（現在: %s）\n' "$(zig version)" >&2
+    printf 'build-vt-pty: zig 0.16.0 is required (current: %s)\n' "$(zig version)" >&2
     exit 2
   }
-  command -v git >/dev/null || { printf 'build-vt-pty: git が必要です\n' >&2; exit 2; }
+  command -v git >/dev/null || { printf 'build-vt-pty: git is required\n' >&2; exit 2; }
 
   if [[ ! -d "$SOURCE/.git" ]]; then
     mkdir -p "$(dirname "$SOURCE")"
@@ -65,7 +65,7 @@ if [[ ! -f "$PREFIX/include/ghostty/vt.h" ]] || ! compgen -G "$PREFIX/lib/libgho
     )
   fi
   [[ "$(git -C "$SOURCE" rev-parse HEAD)" == "$PIN" ]] || {
-    printf 'build-vt-pty: Ghostty source が pin と一致しません\n' >&2
+    printf 'build-vt-pty: Ghostty source does not match the pin\n' >&2
     exit 2
   }
 

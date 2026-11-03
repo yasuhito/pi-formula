@@ -106,12 +106,12 @@ export function planDisplay(input: string, options: DisplayPlanOptions = {}) {
   const tallestPlan =
     reflowPlan !== null &&
     reflowPlan.requiredHeight >= initialPlan.requiredHeight
-      ? { ...reflowPlan, label: `${reflow}列へのリフロー後` }
-      : { ...initialPlan, label: `通常幅${INITIAL_WIDTH}px` };
+      ? { ...reflowPlan, label: `after reflow to ${reflow} columns` }
+      : { ...initialPlan, label: `initial width ${INITIAL_WIDTH}px` };
   if (tallestPlan.requiredHeight > MAX_HEIGHT) {
-    const pathLabel = displayPath === "image" ? "画像経路" : "テキスト経路";
+    const pathLabel = displayPath === "image" ? "image path" : "text path";
     throw new Error(
-      `${tallestPlan.label}（${pathLabel}）には ${tallestPlan.requiredHeight}px 必要なため ${MAX_HEIGHT}px に収まりません`,
+      `${tallestPlan.label} (${pathLabel}) requires ${tallestPlan.requiredHeight}px and does not fit within ${MAX_HEIGHT}px`,
     );
   }
   return {
@@ -138,7 +138,7 @@ function main() {
     process.stdout.write(`${JSON.stringify(planDisplay(corpus))}\n`);
   } catch (error) {
     console.error(
-      `表示計画失敗: ${error instanceof Error ? error.message : String(error)}`,
+      `Display planning failed: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exitCode = 2;
   }

@@ -277,7 +277,7 @@ test("display plan rejection returns an artifact directory", async () => {
       planFailure: {
         status: 2,
         stdout: "",
-        stderr: "16000px に収まりません",
+        stderr: "does not fit within 16000px",
         timedOut: false,
       },
     },

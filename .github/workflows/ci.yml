@@ -100,7 +100,7 @@ jobs:
         run: |
           tool=$(node -p 'require("./scripts/vt-tool").resolveVtTool() || ""')
           if [ -z "$tool" ]; then
-            echo "vt-pty を解決できませんでした。ビルドが成功しているか確認してください。" >&2
+            echo "Could not resolve vt-pty. Check that the build succeeded." >&2
             exit 1
           fi
           echo "PI_FORMULA_VT_TOOL=$tool" >> "$GITHUB_ENV"

@@ -283,7 +283,7 @@ When("read the qni-cli extra macro definitions", function (this: StepWorld) {
 Then("Read failures identify the affected file", function (this: StepWorld) {
   assert.match(
     this.qniCliMacroError instanceof Error ? this.qniCliMacroError.message : "",
-    /macros 定義が見つかりません: missing-qni-cli-typesetter\.ts/u,
+    /macros definition not found: missing-qni-cli-typesetter\.ts/u,
   );
 });
 

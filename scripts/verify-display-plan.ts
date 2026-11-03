@@ -8,29 +8,29 @@ function validatePlan(plan: ReturnType<typeof planDisplay>) {
     plan.height < 1 ||
     plan.height > 16000
   ) {
-    throw new Error("表示計画の出力高が不正です");
+    throw new Error("Invalid display plan output height");
   }
   if (!Number.isSafeInteger(plan.displayFormulas) || plan.displayFormulas < 1) {
-    throw new Error("コーパスに表示数式がありません");
+    throw new Error("Corpus has no display math");
   }
   if (!Number.isSafeInteger(plan.initialWidth) || plan.initialWidth < 1) {
-    throw new Error("表示計画の初期幅が不正です");
+    throw new Error("Invalid display plan initial width");
   }
   if (
     plan.reflowWidth !== null &&
     (!Number.isSafeInteger(plan.reflowWidth) || plan.reflowWidth < 1)
   ) {
-    throw new Error("表示計画のリフロー幅が不正です");
+    throw new Error("Invalid display plan reflow width");
   }
   if (!Number.isSafeInteger(plan.imageRows) || plan.imageRows < 0) {
-    throw new Error("表示計画の画像行数が不正です");
+    throw new Error("Invalid display plan image row count");
   }
   if (
     !Number.isSafeInteger(plan.failedFormulas) ||
     plan.failedFormulas < 0 ||
     plan.failedFormulas > plan.displayFormulas
   ) {
-    throw new Error("表示計画の組版失敗数が不正です");
+    throw new Error("Invalid display plan typesetting failure count");
   }
   return plan;
 }
@@ -71,12 +71,12 @@ function main() {
   try {
     const plan = verifyDisplayPlan(corpus, { path: displayPath, reflow });
     console.error(
-      `verify-display: 組版に失敗した表示数式: ${plan.failedFormulas}`,
+      `verify-display: Display math typesetting failures: ${plan.failedFormulas}`,
     );
     process.stdout.write(`${JSON.stringify(plan)}\n`);
   } catch (error) {
     console.error(
-      `表示計画失敗: ${error instanceof Error ? error.message : String(error)}`,
+      `Display planning failed: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exitCode = 2;
   }
