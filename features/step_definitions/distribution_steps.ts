@@ -143,7 +143,7 @@ When("inspect the tarball file list", function (this: StepWorld) {
 });
 
 Then(
-  "Only src, dist, the English README, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed",
+  "Only src, dist, the English and Japanese READMEs, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed",
   function (this: StepWorld) {
     const topLevel = [
       ...new Set(this.packedFiles.map((path) => path.split("/")[0])),
@@ -151,6 +151,7 @@ Then(
     assert.deepEqual(topLevel, [
       "CHANGELOG.md",
       "LICENSE",
+      "README.ja.md",
       "README.md",
       "THIRD_PARTY_NOTICES.md",
       "assets",
@@ -165,8 +166,8 @@ Then("The English README is distributed", function (this: StepWorld) {
   assert.equal(this.packedFiles.includes("README.md"), true);
 });
 
-Then("The Japanese README is not distributed", function (this: StepWorld) {
-  assert.equal(this.packedFiles.includes("README.ja.md"), false);
+Then("The Japanese README is distributed", function (this: StepWorld) {
+  assert.equal(this.packedFiles.includes("README.ja.md"), true);
 });
 
 Then("The Ghostty display sample is distributed", function (this: StepWorld) {

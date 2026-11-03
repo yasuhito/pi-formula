@@ -18,7 +18,7 @@ The distribution includes necessary user-facing files and can be used as a publi
 
 - When create the pi-formula npm tarball
 - And inspect the tarball file list
-- Then Only src, dist, the English README, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed
+- Then Only src, dist, the English and Japanese READMEs, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed
 
 ## Scenario: Include the English README in the npm tarball
 
@@ -26,11 +26,11 @@ The distribution includes necessary user-facing files and can be used as a publi
 - And inspect the tarball file list
 - Then The English README is distributed
 
-## Scenario: Exclude the Japanese README from the npm tarball
+## Scenario: Include the Japanese README in the npm tarball
 
 - When create the pi-formula npm tarball
 - And inspect the tarball file list
-- Then The Japanese README is not distributed
+- Then The Japanese README is distributed
 
 ## Scenario: Include the Ghostty display sample in the npm tarball
 
