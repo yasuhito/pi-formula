@@ -4,6 +4,12 @@
 
 Readable LaTeX in Pi: selectable Unicode inline formulas and MathJax display-formula images.
 
+## Preview
+
+The light and dark Ghostty captures below show a complete Pi session, including the prompt and footer, with Unicode inline formulas in the prose and MathJax images for display formulas.
+
+![Light and dark Ghostty sessions showing Unicode inline formulas and MathJax display-formula images](assets/ghostty-formulas.png)
+
 ## Install
 
 Requires Pi 0.84 or later and Node.js 22.19 or later.
@@ -13,12 +19,6 @@ pi install npm:pi-formula
 ```
 
 Pi loads the extension automatically. Ask the model to use `$...$` or `\(...\)` for inline formulas and `$$...$$` or `\[...\]` for display formulas.
-
-## Preview
-
-The light and dark Ghostty captures below show a complete Pi session, including the prompt and footer, with Unicode inline formulas in the prose and MathJax images for display formulas.
-
-![Light and dark Ghostty sessions showing Unicode inline formulas and MathJax display-formula images](assets/ghostty-formulas.png)
 
 ## What it does
 
