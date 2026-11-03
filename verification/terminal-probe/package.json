@@ -1,0 +1,11 @@
+{
+  "name": "pi-formula-terminal-probe-verification",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "dependencies": {
+    "tla-ts": "0.0.6"
+  }
+}
