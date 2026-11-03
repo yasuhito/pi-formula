@@ -12,13 +12,13 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | configured | x | なし |
+  | configured | x | none |
 
 - And the environment variable user macros are as follows
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | temporary | y | なし |
+  | temporary | y | none |
 
 - And the image path public API is in use
 - When create a PNG using both user macros through the public API
@@ -30,13 +30,13 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | chosen | y | なし |
+  | chosen | y | none |
 
 - And the environment variable user macros are as follows
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | chosen | x | なし |
+  | chosen | x | none |
 
 - And the image path public API is in use
 - When create a PNG using the user macro of the same name through the public API
@@ -49,7 +49,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | empty |  | なし |
+  | empty |  | none |
 
 - And the image path public API is in use
 - When create a PNG using an empty-string user macro through the public API
@@ -69,7 +69,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | hash | \\# | なし |
+  | hash | \\# | none |
 
 - And the image path public API is in use
 - When create a PNG using that user macro through the public API
@@ -81,7 +81,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | usable | x | なし |
+  | usable | x | none |
   | broken | #2 | 1 |
 
 - And the image path public API is in use
@@ -95,7 +95,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | usable | x | なし |
+  | usable | x | none |
   | broken | #2 | 1 |
 
 - And the image path public API is in use
@@ -109,7 +109,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | chosen | x | なし |
+  | chosen | x | none |
 
 - And the environment variable user macros are as follows
 
@@ -128,7 +128,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | configured | x | なし |
+  | configured | x | none |
 
 - And the environment variable macro setting is invalid JSON
 - And the image path public API is in use
@@ -141,7 +141,7 @@ Invalid input and the text path return no PNG without throwing.
 
   | name | replacement | arity |
   | ---- | ---- | ---- |
-  | trial | wrong | なし |
+  | trial | wrong | none |
 
 - And a test integration extension uses the image path
 - When create a PNG using integration extension extra macros through the public API

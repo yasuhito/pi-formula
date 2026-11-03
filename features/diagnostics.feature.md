@@ -17,15 +17,15 @@ Only the user macro count is shown, without secret contents.
 
   | field |
   | ---- |
-  | 版 |
-  | 経路 |
-  | 理由 |
-  | 端末 |
-  | セリフ体 |
-  | マクロ数 |
-  | 数式色 |
-  | 一時保存 |
-  | 直近の失敗 |
+  | version |
+  | path |
+  | reason |
+  | terminal |
+  | serif |
+  | macros |
+  | color |
+  | cache |
+  | last failure |
 
 ## Scenario: Display diagnostics in printable English characters
 

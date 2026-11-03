@@ -809,11 +809,11 @@ Given(
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const macros = Object.fromEntries(
       table.rows().map(([name, replacement, arity]) => {
-        if (arity !== "なし" && !/^\d+$/u.test(arity))
+        if (arity !== "none" && !/^\d+$/u.test(arity))
           throw new Error(`Unknown macro arity: ${arity}`);
         return [
           name,
-          arity === "なし"
+          arity === "none"
             ? replacement
             : ([replacement, Number(arity)] as const),
         ];
@@ -828,11 +828,11 @@ Given(
   (table: import("@cucumber/cucumber").DataTable) => {
     const macros = Object.fromEntries(
       table.rows().map(([name, replacement, arity]) => {
-        if (arity !== "なし" && !/^\d+$/u.test(arity))
+        if (arity !== "none" && !/^\d+$/u.test(arity))
           throw new Error(`Unknown macro arity: ${arity}`);
         return [
           name,
-          arity === "なし"
+          arity === "none"
             ? replacement
             : ([replacement, Number(arity)] as const),
         ];

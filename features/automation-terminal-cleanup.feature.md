@@ -12,12 +12,12 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |
 
 ## Scenario Outline: The precheck returns exit code 0
 
@@ -29,12 +29,12 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |
 
 ## Scenario Outline: The precheck does not exit due to a signal
 
@@ -46,12 +46,12 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |
 
 ## Scenario Outline: The precheck writes nothing to stdout
 
@@ -63,12 +63,12 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |
 
 ## Scenario Outline: The precheck writes nothing to stderr
 
@@ -80,12 +80,12 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |
 
 ## Scenario Outline: terminal close is called only with the specified value
 
@@ -97,9 +97,9 @@ The Orca automation precheck does not close a terminal while its agent is still 
 
   | state | precheck | call |
   | --- | --- | --- |
-  | 直近 | PR reviewer | なし |
-  | 2分より前 | PR reviewer | worker-terminal |
-  | 記録なし | PR reviewer | worker-terminal |
-  | 直近 | issue coordinator | なし |
-  | 2分より前 | issue coordinator | worker-terminal |
-  | 記録なし | issue coordinator | worker-terminal |
+  | recent | PR reviewer | none |
+  | quiet | PR reviewer | worker-terminal |
+  | missing | PR reviewer | worker-terminal |
+  | recent | issue coordinator | none |
+  | quiet | issue coordinator | worker-terminal |
+  | missing | issue coordinator | worker-terminal |

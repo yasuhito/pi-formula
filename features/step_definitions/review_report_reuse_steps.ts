@@ -63,10 +63,13 @@ Given(
   /^the current HEAD report has defect "(.+)"$/,
   function (this: StepWorld, defect: string) {
     const reports: Record<string, string | undefined> = {
-      ファイルなし: undefined,
-      "HEAD 不一致": validReport.replace(head, "different-head"),
-      "VERDICT なし": validReport.replace("VERDICT: PASS\n", ""),
-      "COMPLETE なし": validReport.replace("<promise>COMPLETE</promise>\n", ""),
+      "missing file": undefined,
+      "HEAD mismatch": validReport.replace(head, "different-head"),
+      "missing VERDICT": validReport.replace("VERDICT: PASS\n", ""),
+      "missing COMPLETE": validReport.replace(
+        "<promise>COMPLETE</promise>\n",
+        "",
+      ),
     };
     prepareReport(this, reports[defect]);
   },

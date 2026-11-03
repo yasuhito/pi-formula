@@ -42,10 +42,10 @@ The PR reviewer can reuse a completed independent review verdict for the current
 
   | defect |
   | --- |
-  | ファイルなし |
-  | HEAD 不一致 |
-  | VERDICT なし |
-  | COMPLETE なし |
+  | missing file |
+  | HEAD mismatch |
+  | missing VERDICT |
+  | missing COMPLETE |
 
 ## Scenario Outline: The invalid independent review report is deleted
 
@@ -57,10 +57,10 @@ The PR reviewer can reuse a completed independent review verdict for the current
 
   | defect |
   | --- |
-  | ファイルなし |
-  | HEAD 不一致 |
-  | VERDICT なし |
-  | COMPLETE なし |
+  | missing file |
+  | HEAD mismatch |
+  | missing VERDICT |
+  | missing COMPLETE |
 
 ## Scenario Outline: The defective report is considered invalid
 
@@ -72,10 +72,10 @@ The PR reviewer can reuse a completed independent review verdict for the current
 
   | defect |
   | --- |
-  | ファイルなし |
-  | HEAD 不一致 |
-  | VERDICT なし |
-  | COMPLETE なし |
+  | missing file |
+  | HEAD mismatch |
+  | missing VERDICT |
+  | missing COMPLETE |
 
 ## Scenario Outline: An invalid independent review requires terminal creation
 
@@ -87,10 +87,10 @@ The PR reviewer can reuse a completed independent review verdict for the current
 
   | defect |
   | --- |
-  | ファイルなし |
-  | HEAD 不一致 |
-  | VERDICT なし |
-  | COMPLETE なし |
+  | missing file |
+  | HEAD mismatch |
+  | missing VERDICT |
+  | missing COMPLETE |
 
 ## Scenario: Allow reused PASS verdicts to proceed to the merge gate
 

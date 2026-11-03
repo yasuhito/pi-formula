@@ -38,9 +38,9 @@ const prechecks: Record<string, string> = {
   "issue coordinator": "docs/agents/automations/issue-coordinator.precheck.sh",
 };
 const terminalStates: Record<string, string> = {
-  直近: "recent",
-  "2分より前": "quiet",
-  記録なし: "missing",
+  recent: "recent",
+  quiet: "quiet",
+  missing: "missing",
 };
 
 function writeExecutable(path: string, source: string) {
@@ -160,7 +160,7 @@ Then(
   function (this: StepWorld, expected: string) {
     assert.deepEqual(
       this.precheckObservation.closedTerminals,
-      expected === "なし" ? [] : [expected],
+      expected === "none" ? [] : [expected],
     );
   },
 );

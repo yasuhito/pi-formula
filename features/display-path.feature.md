@@ -28,9 +28,9 @@ This feature defines automatic selection and manual switching of math display pa
 
   | terminal | path |
   | -------- | ---- |
-  | Ghostty | 画像 |
-  | Kitty | 画像 |
-  | Alacritty | テキスト |
+  | Ghostty | image |
+  | Kitty | image |
+  | Alacritty | text |
 
 ## Scenario: Select the text path inside tmux even when the terminal supports images
 

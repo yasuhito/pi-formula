@@ -89,8 +89,8 @@ Then(
   "The `{word}` path is selected",
   async function (this: StepWorld, path: string) {
     const paths = new Map([
-      ["画像", "image"],
-      ["テキスト", "text"],
+      ["image", "image"],
+      ["text", "text"],
     ]);
     if (!paths.has(path)) {
       throw new Error(`Unknown path label: ${path}`);
@@ -320,15 +320,15 @@ Then(
   "Diagnostics contain only the following fields in this order",
   function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
     const fieldNames = new Map([
-      ["版", "pi-formula 0.1.2"],
-      ["経路", "path"],
-      ["理由", "reason"],
-      ["端末", "terminal"],
-      ["セリフ体", "serif"],
-      ["マクロ数", "macros"],
-      ["数式色", "color"],
-      ["一時保存", "cache"],
-      ["直近の失敗", "last failure"],
+      ["version", "pi-formula 0.1.2"],
+      ["path", "path"],
+      ["reason", "reason"],
+      ["terminal", "terminal"],
+      ["serif", "serif"],
+      ["macros", "macros"],
+      ["color", "color"],
+      ["cache", "cache"],
+      ["last failure", "last failure"],
     ]);
     const expected = table.rows().map(([label]) => {
       if (!fieldNames.has(label))
