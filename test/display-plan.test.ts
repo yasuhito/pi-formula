@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
+import { longFormulaPlanFixture } from "../features/support/long-formula-plan.js";
 
 const {
   planDisplay,
@@ -53,17 +54,9 @@ test("組版できない表示数式のテキスト行を出力高へ一度だ�
 });
 
 test("文字数上限を超える表示数式の出力高が収まれば計画を続ける", () => {
-  const tooLong = `x=${"x".repeat(16_383)}`;
-  const corpus = ["$$x$$", `$$${tooLong}$$`].join("\n\n");
+  const { corpus, expectedPlan } = longFormulaPlanFixture();
 
-  assert.deepEqual(planDisplay(corpus, { source: true }), {
-    height: 9856,
-    initialWidth: 1920,
-    reflowWidth: null,
-    imageRows: 1,
-    displayFormulas: 2,
-    failedFormulas: 1,
-  });
+  assert.deepEqual(planDisplay(corpus, { source: true }), expectedPlan);
 });
 
 test("Issue 48 コーパスの全角文字幅を出力高へ含める", () => {

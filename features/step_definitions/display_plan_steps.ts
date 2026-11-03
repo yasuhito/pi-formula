@@ -1,6 +1,9 @@
 interface StepWorld {
   directory: string;
   planCorpus: string;
+  expectedLongFormulaPlan: ReturnType<
+    typeof longFormulaPlanFixture
+  >["expectedPlan"];
   planResult: import("node:child_process").SpawnSyncReturns<string>;
 }
 
@@ -16,6 +19,10 @@ const {
   Then,
   When,
 }: typeof import("@cucumber/cucumber") = require("@cucumber/cucumber");
+
+const {
+  longFormulaPlanFixture,
+}: typeof import("../support/long-formula-plan.js") = require("../support/long-formula-plan.js");
 
 const root = path.resolve(__dirname, "../..");
 
@@ -114,12 +121,9 @@ Given("11 個の高い表示数式を含むコーパスがある", function (thi
 Given(
   "文字数上限を超える表示数式を含む収容可能なコーパスがある",
   function (this: StepWorld) {
-    const tooLong = `x=${"x".repeat(16_383)}`;
-    createPlanCorpus(
-      this,
-      "long-typesetting-failure.md",
-      ["$$x$$", `$$${tooLong}$$`].join("\n\n"),
-    );
+    const { corpus, expectedPlan } = longFormulaPlanFixture();
+    this.expectedLongFormulaPlan = expectedPlan;
+    createPlanCorpus(this, "long-typesetting-failure.md", corpus);
   },
 );
 
@@ -337,14 +341,10 @@ Then(
 Then(
   "長い数式をテキストとして一度だけ数えた表示計画が返る",
   function (this: StepWorld) {
-    assert.deepEqual(JSON.parse(this.planResult.stdout), {
-      height: 9856,
-      initialWidth: 1920,
-      reflowWidth: null,
-      imageRows: 1,
-      displayFormulas: 2,
-      failedFormulas: 1,
-    });
+    assert.deepEqual(
+      JSON.parse(this.planResult.stdout),
+      this.expectedLongFormulaPlan,
+    );
   },
 );
 
