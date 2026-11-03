@@ -72,7 +72,6 @@ const topLevel = [
 const expectedTopLevel = [
   "CHANGELOG.md",
   "LICENSE",
-  "README.ja.md",
   "README.md",
   "THIRD_PARTY_NOTICES.md",
   "assets",

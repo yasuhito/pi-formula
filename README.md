@@ -1,7 +1,5 @@
 # Formula for Pi
 
-[日本語](README.ja.md)
-
 Readable LaTeX in Pi: selectable Unicode inline formulas and MathJax display-formula images.
 
 ## Install

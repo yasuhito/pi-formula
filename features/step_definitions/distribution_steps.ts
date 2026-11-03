@@ -20,16 +20,10 @@ interface PackageTrial {
 }
 
 interface StepWorld {
-  auditRows: Map<string | undefined, string[]>;
   build: ProcessResult;
-  directDependencies: Record<string, string>;
-  englishReadme: string;
   galleryImage: string | undefined;
   installedRequire: NodeJS.Require;
-  japaneseReadme: string;
-  license: string;
   manifest: typeof import("../../package.json");
-  notices: string;
   packResult: PackageMetadata;
   packageEnvironment: NodeJS.ProcessEnv & { PI_CODING_AGENT_DIR: string };
   packageRelease: string;
@@ -39,7 +33,6 @@ interface StepWorld {
   packedFiles: string[];
   preview: Buffer;
   publicOperations: { registerFormula: string; createFormulaPng: string };
-  readmes: { english: string; japanese: string };
   subpathErrorCode: unknown;
   tarball: string;
 }
@@ -110,66 +103,6 @@ After(function (this: StepWorld) {
   rmSync(join(root, "dist/macro-settings.d.ts"), { force: true });
 });
 
-Given(
-  "pi-formula English and Japanese READMEs exist",
-  function (this: StepWorld) {
-    this.englishReadme = readProjectFile("README.md");
-    this.japaneseReadme = readProjectFile("README.ja.md");
-  },
-);
-
-When(
-  "inspect user-facing installation, configuration, and supported scope",
-  function (this: StepWorld) {
-    this.readmes = {
-      english: this.englishReadme,
-      japanese: this.japaneseReadme,
-    };
-  },
-);
-
-Then(
-  "the {word} README provides {word} guidance",
-  function (
-    this: StepWorld,
-    language: keyof StepWorld["readmes"],
-    topic: string,
-  ) {
-    const common = {
-      primaryInstall: /pi install npm:pi-formula(?!@)/u,
-      preview: /assets\/ghostty-formulas\.png/u,
-      command: /\/formula/u,
-      environmentConfig: /PI_FORMULA_MACROS/u,
-      configFile: /config\.json/u,
-      ghostty: /Ghostty/u,
-      kitty: /Kitty/u,
-      linux: /Linux/u,
-      macOS: /macOS/u,
-    };
-    const localized = {
-      english: {
-        unsupported: /not supported/iu,
-        coexistence: /other math (?:rendering )?extensions/iu,
-        languageLink: /README\.ja\.md/u,
-      },
-      japanese: {
-        unsupported: /未対応/u,
-        coexistence: /他の数式拡張/u,
-        languageLink: /README\.md/u,
-      },
-    };
-    if (!Object.hasOwn(localized, language))
-      throw new Error(`unknown README language: ${language}`);
-    const patterns: Record<string, RegExp> = {
-      ...common,
-      ...localized[language],
-    };
-    const pattern = patterns[topic];
-    if (!pattern) throw new Error(`unknown README topic: ${topic}`);
-    assert.equal(pattern.test(this.readmes[language]), true);
-  },
-);
-
 Given("pi-formula Pi package metadata exists", function (this: StepWorld) {
   this.manifest = JSON.parse(readProjectFile("package.json"));
 });
@@ -210,7 +143,7 @@ When("inspect the tarball file list", function (this: StepWorld) {
 });
 
 Then(
-  "Only src, dist, both READMEs, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed",
+  "Only src, dist, the English README, LICENSE, CHANGELOG, third-party notices, and the display sample are distributed",
   function (this: StepWorld) {
     const topLevel = [
       ...new Set(this.packedFiles.map((path) => path.split("/")[0])),
@@ -218,7 +151,6 @@ Then(
     assert.deepEqual(topLevel, [
       "CHANGELOG.md",
       "LICENSE",
-      "README.ja.md",
       "README.md",
       "THIRD_PARTY_NOTICES.md",
       "assets",
@@ -228,6 +160,14 @@ Then(
     ]);
   },
 );
+
+Then("The English README is distributed", function (this: StepWorld) {
+  assert.equal(this.packedFiles.includes("README.md"), true);
+});
+
+Then("The Japanese README is not distributed", function (this: StepWorld) {
+  assert.equal(this.packedFiles.includes("README.ja.md"), false);
+});
 
 Then("The Ghostty display sample is distributed", function (this: StepWorld) {
   assert.equal(this.packedFiles.includes("assets/ghostty-formulas.png"), true);
@@ -470,109 +410,6 @@ Then(
         ),
       true,
     );
-  },
-);
-
-Given(
-  "pi-formula license and third-party notices exist",
-  function (this: StepWorld) {
-    this.license = readProjectFile("LICENSE");
-    this.notices = readProjectFile("THIRD_PARTY_NOTICES.md");
-    this.manifest = JSON.parse(readProjectFile("package.json"));
-  },
-);
-
-When(
-  "inspect origins, versions, update status, licenses, and known vulnerabilities",
-  function (this: StepWorld) {
-    this.directDependencies = {
-      ...this.manifest.dependencies,
-      ...this.manifest.peerDependencies,
-    };
-    this.auditRows = new Map(
-      this.notices
-        .split("\n")
-        .filter((line) => line.startsWith("| [`@"))
-        .map((line) => {
-          const cells = line
-            .split("|")
-            .slice(1, -1)
-            .map((cell) => cell.trim());
-          const name = /`([^`]+)`/u.exec(cells[0])?.[1];
-          return [name, cells];
-        }),
-    );
-  },
-);
-
-Then("The package license is MIT", function (this: StepWorld) {
-  assert.deepEqual(this.license.startsWith("MIT License"), true);
-});
-
-Then(
-  "Third-party notices identify the imported qni-cli commit",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      this.notices.includes("yasuhito/qni-cli") &&
-        this.notices.includes("2f12594e80b9e7baff0c85ecfecb4dd34d06f737"),
-      true,
-    );
-  },
-);
-
-Then(
-  "The dependency audit date is August 31, 2026",
-  function (this: StepWorld) {
-    assert.deepEqual(/2026-08-31/u.test(this.notices), true);
-  },
-);
-
-Then(
-  "The audited direct dependencies match the package metadata",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      Object.keys(this.directDependencies).sort(),
-      [
-        "@mathjax/src",
-        "@resvg/resvg-js",
-        "@earendil-works/pi-coding-agent",
-        "@earendil-works/pi-tui",
-      ].sort(),
-    );
-  },
-);
-
-Then(
-  "All direct dependencies are included in the audit table",
-  function (this: StepWorld) {
-    assert.deepEqual(
-      [...this.auditRows.keys()].sort(),
-      [
-        "@mathjax/src",
-        "@resvg/resvg-js",
-        "@earendil-works/pi-coding-agent",
-        "@earendil-works/pi-tui",
-      ].sort(),
-    );
-  },
-);
-
-Then(
-  "The direct dependency audit records are as follows",
-  function (this: StepWorld, table: import("@cucumber/cucumber").DataTable) {
-    const expectedRows = Object.fromEntries(
-      table
-        .raw()
-        .slice(1)
-        .map(([name, ...values]) => [name, values]),
-    );
-    const auditedRows = Object.fromEntries(
-      Object.keys(expectedRows).map((name) => [
-        name,
-        this.auditRows.get(name)?.slice(1),
-      ]),
-    );
-    assert.deepEqual(auditedRows, expectedRows);
   },
 );
 
