@@ -29,6 +29,14 @@ Resolve these paths relative to this skill directory. Do not duplicate their imp
 - The standard corpus capture asks a model to reproduce Markdown and can incur model charges. Explain that before running it unless the user has already authorized that cost. Prefer existing offline fixtures or saved-session replay when they exercise the requested behavior without model calls; report that method and its limitations.
 - Do not install or upgrade the user's global Pi or alter shared terminal settings merely to test another version. Prefer an isolated installation and dedicated headless terminal environment.
 
+## When terminal probe behavior changes
+
+For changes to `src/terminal-probe.ts` that affect response parsing, chunk boundaries, timeout, or settlement, also read `../../../verification/terminal-probe/README.md` and run its isolated manual model checks and current-source replay. Follow that document for the supported Node version, dependency installation, commands, bounds, and artifacts; do not add these checks to normal CI.
+
+Confirm the current model succeeds, both intentional mutants produce the expected invariant violations, and replay against the actual current implementation succeeds. Tool errors and missing inputs are failures, not counterexamples or skips. If using historical reproduction, distinguish its expected failure from current-source success and regenerate the current report afterward.
+
+Report model bounds and implementation correspondence explicitly. These checks do not prove arbitrary input preservation or replace real-terminal and protocol verification. Do not run them for unrelated visual or documentation changes.
+
 ## Capture and inspect
 
 Follow the capture document's commands and isolation rules. Store temporary corpora, logs, screenshots, and recordings outside the repository. Do not commit one-off artifacts unless explicitly requested.
