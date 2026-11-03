@@ -49,8 +49,8 @@
   "scripts": {
     "build": "node scripts/clean-dist.js && tsc",
     "prepack": "npm run build",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
+    "lint": "biome check . && node scripts/check-comments.ts",
+    "lint:fix": "biome check --write . && node scripts/check-comments.ts",
     "format": "biome format --write .",
     "knip": "node scripts/clean-tools.ts --analyze-sources && knip && node scripts/clean-dist.ts --tools",
     "complexity": "npm run build:tools --silent && node scripts/check-complexity.js",
