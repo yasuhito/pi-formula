@@ -82,8 +82,8 @@
     "@resvg/resvg-js": "^2.6.2"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": ">=0.99.0",
+    "@earendil-works/pi-tui": ">=0.99.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
